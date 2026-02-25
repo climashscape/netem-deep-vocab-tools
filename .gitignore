@@ -1,0 +1,11 @@
+*.docx
+.vscode/
+.idea/
+*.pdf
+__pycache__/
+.history
+.env
+config.json
+*.db
+*.bak
+node_modules/

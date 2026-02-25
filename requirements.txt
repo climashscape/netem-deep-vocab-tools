@@ -1,0 +1,17 @@
+# Core dependencies
+openai
+python-dotenv
+pydantic
+requests
+httpx
+
+# UI and Web Framework
+gradio
+fastapi
+uvicorn
+jinja2
+
+# Data Processing and NLP
+nltk
+pymysql
+python-docx

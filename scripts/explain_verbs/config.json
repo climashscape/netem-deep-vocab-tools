@@ -1,0 +1,8 @@
+{
+  "openai_api_key": "",
+  "openai_base_url": "",
+  "openai_model": "",
+  "image_provider": "dicebear",
+  "pollinations_api_key": "",
+  "pollinations_model": "flux"
+}
