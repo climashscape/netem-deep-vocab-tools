@@ -2,21 +2,38 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#e0e5ec">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>NETEM Deep Vocab Tools</title>
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/static/manifest.json">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Marked for Markdown rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="manifest" href="static/manifest.json">
+    <!-- Tailwind CSS (Local) -->
+    <script src="static/lib/tailwind.min.js"></script>
+    <!-- Marked for Markdown rendering (Local) -->
+    <script src="static/lib/marked.min.js"></script>
+    <!-- Font Awesome (Local) -->
+    <link rel="stylesheet" href="static/lib/font-awesome/css/all.min.css">
+    
+    <!-- Dexie.js for IndexedDB (Local) -->
+    <script src="static/lib/dexie.min.js"></script>
+    
+    <!-- Local API Logic -->
+    <script src="static/js/db.js"></script>
+    <script src="static/js/ebbinghaus.js"></script>
+    <script src="static/js/llm.js"></script>
+    <script src="static/js/local_api.js"></script>
     
     <style>
+        /* Safe Area Support */
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+
         /* Exam-style Serif Font globally */
         html, body, button, input, select, textarea {
             font-family: 'Times New Roman', Times, 'Georgia', serif;
@@ -34,21 +51,26 @@
         body {
             background-color: #e0e5ec;
             color: #4a5568;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
         }
 
         /* App Layout Containers */
         .app-shell {
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            width: 100vw;
+            height: 100%; /* Changed from 100vh to 100% to respect body padding */
+            width: 100%;
             position: relative;
+            box-sizing: border-box;
         }
 
         .app-content {
             flex: 1;
             overflow-y: auto;
-            padding-bottom: 80px; /* Space for bottom nav */
+            padding-bottom: 80px; /* Space for bottom nav only, safe area handled by body */
             -webkit-overflow-scrolling: touch;
         }
         .app-content.no-scroll {
@@ -59,9 +81,9 @@
         /* Bottom Navigation */
         .bottom-nav {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: var(--safe-bottom);
+            left: var(--safe-left);
+            right: var(--safe-right);
             height: 70px;
             background: #e0e5ec;
             box-shadow: 0 -10px 20px rgba(163,177,198,0.3);
@@ -70,6 +92,7 @@
             align-items: center;
             z-index: 40;
             border-top: 1px solid rgba(255,255,255,0.5);
+            box-sizing: border-box;
         }
 
         .nav-item {
@@ -341,6 +364,25 @@
             transition: all 0.4s ease-in;
         }
 
+        /* Frosted Glass Placeholder */
+        .frosted-placeholder {
+            background: rgba(224, 229, 236, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            border-bottom: 1px solid rgba(163,177,198,0.2);
+        }
+
+        .frosted-placeholder i {
+            font-size: 24px;
+            color: rgba(163, 177, 198, 0.6);
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
         /* Exclude Confirmation Overlay */
         .exclude-overlay {
             position: absolute;
@@ -504,12 +546,13 @@
         .modal-content {
             width: 98%;
             max-width: 950px;
-            height: 95vh;
+            height: calc(100vh - var(--safe-top) - var(--safe-bottom) - 20px);
             display: flex;
             flex-direction: column;
             position: relative;
             box-sizing: border-box; /* Ensure padding doesn't push width out */
-            padding-bottom: 20px; /* Reduced space */
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
         }
 
         /* Hide scrollbar utility */
@@ -969,8 +1012,9 @@
     </style>
 </head>
 <body class="min-h-screen overflow-hidden">
-    <!-- Main Content Area -->
-    <div class="app-content hide-scrollbar h-full w-full max-w-4xl mx-auto overflow-x-hidden">
+    <div class="app-shell">
+        <!-- Main Content Area -->
+        <div class="app-content hide-scrollbar w-full max-w-4xl mx-auto overflow-x-hidden">
             <!-- English Thinking Page -->
             <section id="page-philosophy" class="page-section hidden">
                 <div class="px-5 pt-10 pb-24 space-y-8 max-w-2xl mx-auto">
@@ -1038,7 +1082,7 @@
             </section>
 
             <!-- Global Header (Logo, Search & Stats) -->
-        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm">
+        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm transition-all">
             <!-- Integrated Row: Logo, Search & Stats -->
             <div class="flex items-center gap-4 mb-3 min-h-[40px]">
                 <!-- Logo & Title -->
@@ -1420,8 +1464,9 @@
                 </div>
             </section>
         </div>
+    </div>
 
-        <!-- Bottom Nav -->
+    <!-- Bottom Nav -->
         <nav class="bottom-nav">
             <div class="nav-item" onclick="switchPage('philosophy')">
                 <i class="fas fa-lightbulb"></i>
@@ -1450,8 +1495,8 @@
     <div id="learningModal" class="modal-overlay">
         <div class="modal-content relative flex flex-col bg-[#e0e5ec] rounded-[20px] shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
             <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pt-3 pb-1 opacity-40 md:hidden" onclick="closeModal()">
-                <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
+            <div class="w-full flex justify-center pt-2 pb-1 opacity-40 md:hidden" onclick="closeModal()">
+                <div class="w-12 h-1.5 bg-gray-400/40 rounded-full"></div>
             </div>
             <!-- Close Button (Absolute for better layout) -->
             <button onclick="closeModal()" class="absolute top-4 right-4 neumorphic-btn w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-500 z-[100] shadow-md md:flex hidden">
@@ -1467,7 +1512,7 @@
             </div>
 
             <!-- Modal Header -->
-            <div class="px-5 pt-5 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
+            <div class="px-5 pt-2 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
                 <div class="flex items-center pr-12 min-w-0 w-full gap-3">
                     <h2 id="modalTitle" class="text-2xl font-bold text-gray-700 capitalize whitespace-nowrap overflow-hidden min-w-0 flex-shrink drop-shadow-sm"></h2>
                     <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold border border-blue-200">Stage 0</div>
@@ -1586,7 +1631,7 @@
 
     <!-- Excluded Verbs Modal -->
     <div id="excludedModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center hidden" onclick="closeExcludedModal(event)">
-        <div class="bg-[#e0e5ec] w-[90%] max-w-md rounded-3xl p-6 neumorphic animate-fade-in" onclick="event.stopPropagation()">
+        <div class="bg-[#e0e5ec] w-[90%] max-w-md rounded-3xl p-6 neumorphic animate-fade-in flex flex-col max-h-[90vh]" style="padding-top: calc(1.5rem + var(--safe-top)); padding-bottom: calc(1.5rem + var(--safe-bottom));" onclick="event.stopPropagation()">
             <!-- Close Indicator (Mobile Friendly) -->
             <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeExcludedModal()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
@@ -1657,7 +1702,7 @@
 
     <!-- Search Input Modal -->
     <div id="searchModal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-start justify-center pt-20 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeSearchModal()">
-        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 transform -translate-y-4 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 transform -translate-y-4 transition-transform duration-300 border border-white/50" style="margin-top: var(--safe-top);" onclick="event.stopPropagation()">
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500">
                     <i class="fas fa-search"></i>
@@ -3925,7 +3970,7 @@
             renderGrid(true);
         }
 
-        function renderGrid(reset = false) {
+        async function renderGrid(reset = false) {
             const grid = document.getElementById('verbsGrid');
             
             if (reset) {
@@ -3946,6 +3991,27 @@
                  return;
             }
 
+            // Optimization: Pre-check cache for the current batch
+            try {
+                const verbsToCheck = slice.filter(v => !v.has_cache).map(v => v['单词']);
+                if (verbsToCheck.length > 0) {
+                    const res = await fetch('/api/check_cache', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ verbs: verbsToCheck })
+                    });
+                    if (res.ok) {
+                        const cachedVerbs = await res.json();
+                        cachedVerbs.forEach(verb => {
+                            const item = slice.find(v => v['单词'].toLowerCase() === verb.toLowerCase());
+                            if (item) item.has_cache = true;
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Cache pre-check failed:", e);
+            }
+
             slice.forEach(item => {
                 const card = createVerbCard(item);
                 grid.appendChild(card);
@@ -3959,8 +4025,8 @@
             card.id = 'verb-card-' + item['单词'];
             card.className = 'verb-card group relative flex flex-col items-stretch'; 
             
-            // Auto-generate image if missing
-            if (!item.image_url) {
+            // Auto-generate image/explanation if missing
+            if (!item.image_url && !item.has_cache) {
                 addToQueue(item['单词']);
             }
             
@@ -4040,10 +4106,23 @@
             let imageHtml = '';
             let contentClasses = 'verb-content flex-1 flex flex-col items-center p-4 min-h-[100px]';
             
-            if (item.image_url) {
+            // Check image provider setting
+            const appSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+            const imageProvider = appSettings.image_provider || 'dicebear';
+            
+            if (imageProvider === 'none') {
                 imageHtml = `
                 <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0">
-                    <img src="/api/image/${encodeURIComponent(item['单词'])}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${item['单词']}" loading="lazy" onerror="this.parentElement.style.display='none'">
+                    <div class="frosted-placeholder">
+                        <i class="fas fa-image"></i>
+                    </div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                </div>`;
+                contentClasses += ' justify-start pt-2';
+            } else if (item.image_url) {
+                imageHtml = `
+                <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0">
+                    <img src="/api/image/${encodeURIComponent(item['单词'])}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${item['单词']}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
                 contentClasses += ' justify-start pt-2';
@@ -4143,6 +4222,14 @@
                 ${refreshBtn}
             `;
             return card;
+        }
+
+        // Helper for image placeholders
+        function showFrostedPlaceholder(imgElement) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'frosted-placeholder';
+            placeholder.innerHTML = '<i class="fas fa-image"></i>';
+            imgElement.replaceWith(placeholder);
         }
 
         function showExcludeOverlay(card, word) {
@@ -4908,10 +4995,24 @@
                                 if (card) {
                                     // 1. Update image
                                     let imgContainer = card.querySelector('.verb-image-container');
+                                    const appSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                                    const imageProvider = appSettings.image_provider || 'dicebear';
+                                    const isNoneProvider = imageProvider === 'none';
+
                                     if (!imgContainer) {
+                                        let innerHtml = '';
+                                        if (isNoneProvider) {
+                                            innerHtml = `
+                                            <div class="frosted-placeholder">
+                                                <i class="fas fa-image"></i>
+                                            </div>`;
+                                        } else {
+                                            innerHtml = `<img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">`;
+                                        }
+
                                         const newImgHtml = `
                                     <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0">
-                                        <img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="this.parentElement.style.display='none'">
+                                        ${innerHtml}
                                         <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                                     </div>`;
                                         card.insertAdjacentHTML('afterbegin', newImgHtml);
@@ -4922,10 +5023,24 @@
                                             contentWrapper.classList.add('justify-start', 'pt-2');
                                         }
                                     } else {
-                                        const img = imgContainer.querySelector('img');
-                                        if (img) {
-                                            img.src = proxyUrl;
-                                            imgContainer.style.display = '';
+                                        if (isNoneProvider) {
+                                            imgContainer.innerHTML = `
+                                            <div class="frosted-placeholder">
+                                                <i class="fas fa-image"></i>
+                                            </div>
+                                            <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>`;
+                                        } else {
+                                            const img = imgContainer.querySelector('img');
+                                            if (img) {
+                                                img.src = proxyUrl;
+                                                imgContainer.style.display = '';
+                                                img.onerror = () => showFrostedPlaceholder(img);
+                                            } else {
+                                                // Replace placeholder with img if provider changed from none
+                                                imgContainer.innerHTML = `
+                                                <img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
+                                                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>`;
+                                            }
                                         }
                                     }
 
@@ -5472,28 +5587,29 @@
                     body: JSON.stringify({
                         verbs: verbsStr,
                         mode: 'single',
-                        refresh: false
+                        refresh: false,
+                        only_images: true
                     })
                 });
                 
                 if (res.ok) {
                     const data = await res.json();
+                    const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    const isNoneProvider = settings.image_provider === 'none';
                     
                     // Process results for each verb in batch
                     batch.forEach(verb => {
-                        if (data.images && data.images[verb]) {
-                            const imgUrl = data.images[verb];
-                            
-                            // Update local model
-                            const vIndex = allVerbs.findIndex(v => v['单词'] === verb);
-                            if (vIndex !== -1) {
-                                allVerbs[vIndex].image_url = imgUrl;
-                                allVerbs[vIndex].has_cache = true; // Mark as cached
+                        // Update local model - always mark as cached if API call succeeded
+                        const vIndex = allVerbs.findIndex(v => v['单词'] === verb);
+                        if (vIndex !== -1) {
+                            allVerbs[vIndex].has_cache = true; 
+                            if (data.images && data.images[verb]) {
+                                allVerbs[vIndex].image_url = data.images[verb];
                             }
-                            
-                            // Update UI
-                            updateCardWithImage(verb);
                         }
+                        
+                        // Update UI
+                        updateCardWithImage(verb);
                     });
                 }
             } catch (e) {
@@ -5509,30 +5625,38 @@
             const card = document.getElementById('verb-card-' + verb);
             if (!card) return;
             
-            // Check if image container already exists
-            if (card.querySelector('.verb-image-container')) return;
-            
-            const proxyUrl = `/api/image/${encodeURIComponent(verb)}?t=${Date.now()}`;
-            
-            const newImgHtml = `
-            <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0 opacity-0 transition-opacity duration-500">
-                <img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${verb}" onload="this.parentElement.classList.remove('opacity-0')" onerror="this.parentElement.style.display='none'">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-            </div>`;
-            
-            // Insert AFTER rank badge (which is absolute)
-            // If rank badge is first child, and we use afterbegin, image becomes first child.
-            // Rank badge becomes second.
-            // This is fine.
-            card.insertAdjacentHTML('afterbegin', newImgHtml);
-            
-            const contentWrapper = card.querySelector('.verb-content');
-            if (contentWrapper) {
-                contentWrapper.classList.remove('justify-center');
-                contentWrapper.classList.add('justify-start', 'pt-2');
-            }
+            const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+            const isNoneProvider = settings.image_provider === 'none';
 
-            // Ensure Refresh button is present
+            // 1. Handle Image Insertion
+            if (!card.querySelector('.verb-image-container')) {
+                let innerHtml = '';
+                if (isNoneProvider) {
+                    innerHtml = `
+                    <div class="frosted-placeholder">
+                        <i class="fas fa-image"></i>
+                    </div>`;
+                } else {
+                    const proxyUrl = `/api/image/${encodeURIComponent(verb)}?t=${Date.now()}`;
+                    innerHtml = `<img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${verb}" onload="this.parentElement.classList.remove('opacity-0')" onerror="showFrostedPlaceholder(this)">`;
+                }
+
+                const newImgHtml = `
+                <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0 ${isNoneProvider ? '' : 'opacity-0'} transition-opacity duration-500">
+                    ${innerHtml}
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                </div>`;
+                
+                card.insertAdjacentHTML('afterbegin', newImgHtml);
+                
+                const contentWrapper = card.querySelector('.verb-content');
+                if (contentWrapper) {
+                    contentWrapper.classList.remove('justify-center');
+                    contentWrapper.classList.add('justify-start', 'pt-2');
+                }
+            }
+            
+            // 2. Ensure Refresh button is present
             if (!card.querySelector('button[onclick*="refreshFromCard"]')) {
                 const refreshBtnHtml = `
                     <button 
@@ -5729,15 +5853,17 @@
                         
                         <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40">
                             <div class="flex flex-col gap-1.5">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                    <i class="fas fa-project-diagram scale-75"></i> Provider Source
+                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5"><i class="fas fa-project-diagram scale-75"></i> Provider Source</span>
+                                    <span class="text-[8px] opacity-50 font-bold normal-case tracking-normal">Choose how images are generated</span>
                                 </label>
-                                <div class="relative">
-                                    <select name="image_provider" onchange="const pc = document.getElementById('pollinationsConfig'); if(this.value === 'pollinations') { pc.classList.remove('hidden'); pc.classList.add('animate-fade-in'); } else { pc.classList.add('hidden'); }" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-400/20 transition-all">
-                                        <option value="dicebear">DiceBear Icons (Free, Reliable)</option>
-                                        <option value="pollinations">Pollinations.ai (High Quality AI)</option>
+                                <div class="relative group">
+                                    <select name="image_provider" onchange="const pc = document.getElementById('pollinationsConfig'); if(this.value === 'pollinations') { pc.classList.remove('hidden'); pc.classList.add('animate-fade-in'); } else { pc.classList.add('hidden'); }" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-400/20 transition-all group-hover:bg-white/10">
+                                        <option value="none">None (Hide Word Images)</option>
+                                        <option value="dicebear">DiceBear Icons (Simple & Fast)</option>
+                                        <option value="pollinations">Pollinations.ai (AI Generated Art)</option>
                                     </select>
-                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
+                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[10px] group-hover:text-blue-400 transition-colors"></i>
                                 </div>
                             </div>
 
@@ -6225,11 +6351,100 @@
             }
         };
 
+        // Proxy fetch to LocalAPI
+        const originalFetch = window.fetch;
+        window.fetch = async function(url, options) {
+            let route = typeof url === 'string' ? url : url.url;
+            if (route.startsWith('/api/')) {
+                // Remove query parameters for routing
+                const cleanRoute = route.split('?')[0];
+                
+                // Special handling for DELETE /api/checkins/YYYY-MM-DD
+                if (options && options.method === 'DELETE' && cleanRoute.startsWith('/api/checkins/')) {
+                    const date = cleanRoute.split('/').pop();
+                    const result = await LocalAPI.handle('/api/checkins/delete', { date });
+                    return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+
+                let data = {};
+                if (options && options.body) {
+                    if (options.body instanceof FormData) {
+                        const file = options.body.get('file');
+                        if (file) {
+                            try {
+                                const text = await file.text();
+                                data = { data: JSON.parse(text) };
+                            } catch (e) {
+                                console.error("Error parsing backup file:", e);
+                                return new Response(JSON.stringify({ status: "error", message: "Invalid JSON file" }), {
+                                    status: 400,
+                                    headers: { 'Content-Type': 'application/json' }
+                                });
+                            }
+                        }
+                    } else {
+                        try {
+                            data = JSON.parse(options.body);
+                        } catch (e) {
+                            // If not JSON, use as is (e.g. for simple strings)
+                            data = options.body;
+                        }
+                    }
+                }
+
+                try {
+                    const result = await LocalAPI.handle(cleanRoute, data);
+                    return new Response(JSON.stringify(result, null, 2), {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                } catch (error) {
+                    console.error("LocalAPI proxy error:", error);
+                    return new Response(JSON.stringify({ error: error.message }), {
+                        status: 500,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            }
+            return originalFetch(url, options);
+        };
+
         // Initialize listeners
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             initPullToRefresh();
             updateKaoyanCountdown();
+            
+            // Initialize LocalAPI
+            await LocalAPI.init();
+            
+            // Initial data load
+            await loadLearningStatus();
+            await loadSettings();
+            await loadVerbs(); // Changed from loadAllVerbs to loadVerbs
         });
+    </script>
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // Check if we are running from a server (like FastAPI) or locally (like the built dist/ index.html)
+                const swPath = window.location.pathname.includes('/static/') ? '../static/sw.js' : './sw.js';
+                // For the dist/ version, it will be at ./sw.js. For the FastAPI version, it's at /static/sw.js
+                // but registration scope will be /static/ if registered as /static/sw.js.
+                // To have a global scope in FastAPI, we'd need a route for /sw.js.
+                // For now, let's assume the dist/ version is the priority for the APK.
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('SW: Registered successfully with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        // Fallback to /static/sw.js if ./sw.js fails (for dev server)
+                        navigator.serviceWorker.register('./static/sw.js')
+                            .then(reg => console.log('SW: Registered at /static/sw.js'))
+                            .catch(err => console.error('SW: Registration failed:', err));
+                    });
+            });
+        }
     </script>
 </body>
 </html>

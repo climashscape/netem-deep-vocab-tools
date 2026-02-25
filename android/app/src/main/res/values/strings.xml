@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NetemVocab</string>
+    <string name="title_activity_main">NetemVocab</string>
+    <string name="package_name">com.netem.deepvocab</string>
+    <string name="custom_url_scheme">com.netem.deepvocab</string>
+</resources>

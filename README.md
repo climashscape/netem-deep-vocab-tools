@@ -1,6 +1,12 @@
 # 考研词汇词频排序数据与深度背单词工具 (NETEM Deep Vocab Tools)
 
-**版本号：v0.x (Pre-release)**
+**版本号：v1.0.0 (Stable)**
+
+## 项目状态 (Project Status)
+- ✅ **核心词汇数据**：已集成 5530 个考研大纲词汇及详尽词频统计。
+- ✅ **离线化架构**：已完成从 Python 后端向纯前端 (IndexedDB + Dexie.js) 的迁移，支持 100% 离线运行。
+- ✅ **多端支持**：支持 Web 端、移动端 (PWA/APK) 交互。
+- ✅ **AI 深度解析**：支持通过 LLM 进行动词深度解析及视觉助记生成。
 
 本项目是一个专为考研英语设计的**深度背单词工具**。它不仅提供《全国硕士研究生招生考试英语（一）考试大纲》5530 个词汇的科学词频排序数据，还配套了基于 AI 的动词深度解析、视觉助记及多端交互工具，旨在帮助考生通过科学的统计规律和 AI 辅助记忆，高效攻克考研核心词汇。
 
@@ -43,38 +49,54 @@
 1. 直接下载根目录下的 `netem_full_list.json` 或 `netem_full_list.sql` 即可使用。
 2. 也可以去 [Release 页面](https://github.com/exam-data/NETEM-Deep-Vocab-Tools/releases) 下载 PDF 版本。
 
-### 运行 AI 解析工具
-
+### 1. 运行后端解析工具 (Backend/GUI Mode)
 1.  **安装依赖**：
     *   在项目根目录下运行：`pip install -r requirements.txt`。
 2.  **配置 AI 密钥**：
     *   进入 `scripts/explain_verbs/` 目录。
     *   配置 `config.json` 或 `.env` 文件，填入你的 `OPENAI_API_KEY`。
 3.  **启动工具**：
-    *   运行 Web 版：`python app.py`。
-    *   运行 GUI 版：`python gui.py`。
+    *   运行 Web 版 (FastAPI)：`python app.py`。
+    *   运行 GUI 版 (Gradio)：`python gui.py`。
 
-## 项目结构
+### 2. 运行离线版/移动端 (Offline/Mobile)
+*   **Web 预览**：在根目录下直接通过静态服务器（如 `Live Server` 或 `python -m http.server`）打开 `dist/index.html`。
+*   **Android 构建**：
+    1.  安装依赖：`npm install`
+    2.  同步资源：`npx cap sync`
+    3.  通过 Android Studio 构建：打开 `android/` 目录并生成 APK。
+    *   *详细步骤请参考 [OFFLINE_APK_PLAN.md](OFFLINE_APK_PLAN.md)*。
+
+## 项目结构 (Project Structure)
 
 ```text
 .
+├── android/             # Android 原生工程 (Capacitor 托管)
+├── dist/                # 纯前端静态资源 (离线版/PWA/APK 核心)
+│   ├── static/          # JS、CSS 及离线词库数据
+│   └── index.html       # 离线版入口
 ├── scripts/
-│   ├── explain_verbs/       # 动词 AI 解析系统 (FastAPI + Gradio)
-│   ├── spelling-variations/  # 拼写变体处理逻辑 (Node.js)
-│   ├── generate-doc/        # 文档生成工具
-│   ├── generate_json/       # SQL 转 JSON 工具
-│   └── update_def/          # 释义格式化工具
-├── netem_full_list.json     # 核心词频 JSON 数据
-├── netem_full_list.sql      # 核心词频 SQL 数据
-├── requirements.txt         # 统一 Python 依赖管理
-└── vocabulary.db            # 项目数据库
+│   ├── explain_verbs/   # 动词 AI 解析系统 (FastAPI + Gradio)
+│   │   ├── static/      # 前端本地化逻辑 (local_api.js, db.js)
+│   │   ├── templates/   # 网页模板
+│   │   └── app.py       # FastAPI 后端入口
+│   ├── spelling-variations/ # 拼写变体处理逻辑 (Node.js)
+│   ├── generate-doc/    # 文档生成工具
+│   ├── generate_json/   # SQL 转 JSON 工具
+│   └── update_def/      # 释义格式化工具
+├── netem_full_list.json # 核心词频 JSON 数据
+├── netem_full_list.sql  # 核心词频 SQL 数据
+├── requirements.txt     # Python 依赖管理
+├── package.json         # 前端及 Capacitor 依赖管理
+├── capacitor.config.json # Capacitor 配置文件
+└── vocabulary.db        # 项目数据库 (SQLite)
 ```
 
 ## 鸣谢 (Acknowledgements)
 
 感谢以下项目及个人为本项目提供的数据支持与灵感：
 
-*   **[exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEMVocabulary/)**：本项目原始词频数据及 PDF 版本的主要来源。
+*   **[exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEMVocabulary/)**：本项目原始词频数据的主要来源。
 *   **[awxiaoxian2020/spelling-variations](https://github.com/awxiaoxian2020/spelling-variations/)**：提供了考纲词汇的拼写变体数据支持。
 *   所有为本项目提供反馈和建议的用户。
 
