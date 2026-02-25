@@ -7,7 +7,7 @@
 ## 核心数据 (Core Data)
 
 ### 词频排序
-*   **数据源**：基于 [exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEMVocabulary/)，核心数据源于《2024年全国硕士研究生招生考试英语（一）考试大纲词汇表》要求的 5530 个词汇。
+*   **数据源**：基于 [exam-data/NETEMVocabulary](https://github.com/exam-data/NETEMVocabulary/)，核心数据源于《2024年全国硕士研究生招生考试英语（一）考试大纲词汇表》要求的 5530 个词汇。
 *   **统计范围**：分析了约 200 套试卷（包括四六级、考研英语一/二、专四专八等）。
 *   **处理策略**：采用词形还原（Lemmatization）策略，确保词频统计的准确性。
 *   **高频词汇**：前 **2444** 个单词出现 **40** 次以上（平均每 5 套试卷出现一次），定义为高频词汇。
@@ -74,7 +74,7 @@
 
 感谢以下项目及个人为本项目提供的数据支持与灵感：
 
-*   **[exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEM-Deep-Vocab-Tools/)**：本项目原始词频数据及 PDF 版本的主要来源。
+*   **[exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEMVocabulary/)**：本项目原始词频数据及 PDF 版本的主要来源。
 *   **[awxiaoxian2020/spelling-variations](https://github.com/awxiaoxian2020/spelling-variations/)**：提供了考纲词汇的拼写变体数据支持。
 *   所有为本项目提供反馈和建议的用户。
 
