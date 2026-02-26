@@ -270,9 +270,15 @@ init_db()
 # but we want to reload the legacy_data.json content automatically on startup or restart.
 import json
 import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--reload-legacy', action='store_true', help='Force reload of legacy data even if DB is not empty')
+args, unknown = parser.parse_known_args()
+
 LEGACY_DATA_PATH = os.path.join(os.path.dirname(__file__), 'static', 'legacy_data.json')
 
-def load_legacy_data_if_needed():
+def load_legacy_data_if_needed(force=False):
     try:
         if not os.path.exists(LEGACY_DATA_PATH):
             return
@@ -284,35 +290,60 @@ def load_legacy_data_if_needed():
         c.execute("SELECT count(*) FROM explanations")
         count = c.fetchone()[0]
         
-        if count == 0:
-            print("DB is empty. Loading legacy_data.json...")
+        if count == 0 or force:
+            if force:
+                print("Forcing legacy data reload...")
+            else:
+                print("DB is empty. Loading legacy_data.json...")
             with open(LEGACY_DATA_PATH, 'r', encoding='utf-8') as f:
-                # legacy_data.json can be a dict (old format) or list (new export format)
-                # Old format: {"word": "content", ...}
-                # New format (optional but good to support): [{"query_key": "word", "content": "..."}]
+                # legacy_data.json can be:
+                # 1. New object format: {"word": {"content": "...", "image_url": "..."}}
+                # 2. Old dict format: {"word": "content"}
+                # 3. List format (unlikely now but safe to keep): [{"query_key": "word", ...}]
                 data = json.load(f)
                 
             explanations_to_insert = []
             if isinstance(data, dict):
-                 # Check if it has 'explanations' key (new export format wrapped in dict)
+                 # Check if it has 'explanations' key (export format)
                  if 'explanations' in data and isinstance(data['explanations'], list):
                       for item in data['explanations']:
                           if 'query_key' in item and 'content' in item:
-                              explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content']))
+                              explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content'], item.get('image_url'), item.get('image_dicebear'), item.get('image_pollinations')))
                  else:
-                     # Assume old format: {"word": "content", ...}
-                     for word, content in data.items():
+                     # Key-Value format (Old string OR New object)
+                     for word, val in data.items():
+                         # Skip if invalid key
+                         if not word: continue
+                         
+                         content = None
+                         img_url = None
+                         img_dice = None
+                         img_poll = None
+                         
+                         if isinstance(val, dict):
+                             content = val.get('content')
+                             img_url = val.get('image_url')
+                             img_dice = val.get('image_dicebear')
+                             img_poll = val.get('image_pollinations')
+                         elif isinstance(val, str):
+                             content = val
+                             
                          # Skip if content is empty
                          if not content or len(content) < 10: continue
-                         explanations_to_insert.append(('single', word.lower(), content))
+                         
+                         explanations_to_insert.append(('single', word.lower(), content, img_url, img_dice, img_poll))
             elif isinstance(data, list):
                  for item in data:
                      if 'query_key' in item and 'content' in item:
-                         explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content']))
+                         explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content'], item.get('image_url'), item.get('image_dicebear'), item.get('image_pollinations')))
 
             if explanations_to_insert:
                 print(f"Inserting {len(explanations_to_insert)} legacy records...")
-                c.executemany("INSERT OR IGNORE INTO explanations (mode, query_key, content) VALUES (?, ?, ?)", explanations_to_insert)
+                c.executemany("""
+                    INSERT OR IGNORE INTO explanations 
+                    (mode, query_key, content, image_url, image_dicebear, image_pollinations) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, explanations_to_insert)
                 conn.commit()
                 print("Legacy data loaded successfully.")
         
@@ -320,7 +351,9 @@ def load_legacy_data_if_needed():
     except Exception as e:
         print(f"Error loading legacy data: {e}")
 
-load_legacy_data_if_needed()
+# Check if we should force reload from command line args
+should_reload = args.reload_legacy
+load_legacy_data_if_needed(force=should_reload)
 
 import random
 import requests

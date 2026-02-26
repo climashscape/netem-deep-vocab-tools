@@ -23,8 +23,28 @@
     <script src="static/js/db.js"></script>
     <script src="static/js/ebbinghaus.js"></script>
     <script src="static/js/llm.js"></script>
-    <script src="static/js/local_api.js"></script>
+    <!-- Inline Data for Android compatibility -->
+    <script src="static/js/data_full_list.js" defer></script>
+    <script src="static/js/data_legacy.js" defer></script>
+    <script src="static/js/local_api.js" defer></script>
     
+    <script>
+        // Override LocalAPI.init in Dev Mode to use real backend fetch
+        // This is injected ONLY in the Dev Mode template
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.LocalAPI) {
+                // In dev mode, we want LocalAPI to pass through requests to the real backend
+                // instead of trying to handle them locally with IndexedDB/JSON.
+                // However, for some things (like offline capability simulation), we might want mixed mode.
+                // For now, let's keep it simple: Dev mode uses real backend for /api/explain
+                
+                // We don't need to do much here because local_api.js already checks for fetchProxy
+                // But we can set a flag to indicate we are in DEV mode
+                window.IS_DEV_MODE = True;
+            }
+        });
+    </script>
+
     <style>
         /* Safe Area Support */
         :root {
@@ -40,26 +60,55 @@
             letter-spacing: 0.01em;
         }
 
+        /* Global Long Press/Selection Disable - STRICTER */
+        * {
+            -webkit-tap-highlight-color: transparent !important;
+        }
+        
+        /* Apply user-select: none to most elements but NOT inputs */
+        body, div, span, p, h1, h2, h3, h4, h5, h6, img, button, a, i, label, li, ul, nav, header, footer {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        /* Allow selection only on inputs */
+        input, textarea {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+            -webkit-touch-callout: default !important;
+            pointer-events: auto !important;
+            touch-action: manipulation !important; /* Allow tap/pan but block zoom */
+        }
+
         html, body {
             scrollbar-width: none;
             -ms-overflow-style: none;
             height: 100%;
             width: 100%;
             overflow: hidden; /* Lock main body scroll, handle in containers */
-            -webkit-user-select: none; /* Safari */
-            -moz-user-select: none;    /* Firefox */
-            -ms-user-select: none;     /* IE10+ */
-            user-select: none;         /* Standard */
             -webkit-user-drag: none;   /* Safari/Chrome */
-            -webkit-tap-highlight-color: transparent; /* Remove mobile tap highlight blue box */
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh on body */
         }
 
-        /* Re-enable selection for inputs and textareas */
+        /* Re-enable selection and long press for inputs and textareas */
         input, textarea {
             -webkit-user-select: text;
             -moz-user-select: text;
             -ms-user-select: text;
             user-select: text;
+            -webkit-touch-callout: default;
+        }
+
+        /* Prevent image drag/long press */
+        img {
+            pointer-events: none; /* Disables interaction with images completely */
+            -webkit-user-drag: none;
+            user-select: none;
         }
 
         /* Optimize touch interactions */
@@ -67,27 +116,102 @@
             touch-action: manipulation; /* Improves click responsiveness, disables double-tap zoom */
         }
 
-        /* Mobile Tap Feedback Fix */
+        /* Mobile Tap Feedback Fix - STRICTER */
         @media (hover: none) {
-            .active\:scale-95:active {
-                transform: scale(0.95);
+            /* Disable sticky hover/active states completely */
+            *:hover, *:active, *:focus {
+                outline: none !important;
+                -webkit-tap-highlight-color: transparent !important;
             }
-            .active\:scale-90:active {
-                transform: scale(0.9);
+            
+            /* Disable CSS :active completely to prevent stuck states */
+            .neumorphic-btn:active, 
+            .nav-item:active,
+            .verb-card:active,
+            button:active {
+                transform: none !important; 
+                background-color: inherit !important;
             }
-            /* Remove sticky hover effects on mobile */
-            .hover\:scale-105:hover {
-                transform: none;
+        }
+
+        /* Global Pressed State (JS Controlled) */
+        .is-pressed {
+            transform: scale(0.96) !important;
+            transition: all 0.1s ease-out !important;
+        }
+
+        /* Specific Component Press Styles */
+        .neumorphic-btn.is-pressed, 
+        .neumorphic-btn-sm.is-pressed,
+        .neumorphic-toggle-btn.is-pressed {
+            box-shadow: inset 4px 4px 6px 0 rgba(163,177,198, 0.7), 
+                       inset -4px -4px 6px 0 rgba(255,255,255, 0.8) !important;
+            transform: translateY(1px) scale(0.98) !important;
+        }
+
+        /* Fix for nested neumorphic elements inside buttons to look pressed together */
+        .neumorphic-btn.is-pressed .neumorphic {
+            box-shadow: none !important;
+            transform: scale(0.95) !important;
+            background: transparent !important; /* Optional: blend in completely */
+        }
+
+        .chip-btn.is-pressed {
+            transform: scale(0.95) !important;
+            box-shadow: inset 2px 2px 4px 0 rgba(163,177,198, 0.5), 
+                       inset -2px -2px 4px 0 rgba(255,255,255, 0.6) !important;
+        }
+
+        .nav-item.is-pressed {
+            transform: translateY(2px) scale(0.95) !important;
+            opacity: 0.7;
+        }
+
+        .verb-card.is-pressed {
+            transform: scale(0.95) !important;
+            box-shadow: inset 4px 4px 8px rgb(163,177,198,0.5), 
+                       inset -4px -4px 8px rgba(255,255,255, 0.8) !important;
+        }
+        
+        .card-nav-btn.is-pressed {
+            box-shadow: inset 3px 3px 6px #bebebe, inset -3px -3px 6px #ffffff !important;
+            transform: scale(0.9) !important;
+            color: #3b82f6 !important;
+        }
+
+        /* Learning Insight Card Press State */
+        .learning-insight-card.is-pressed,
+        .verb-card-block.is-pressed,
+        .action-card-btn.is-pressed {
+            transform: scale(0.95) !important;
+            transition: all 0.1s ease-out !important;
+            opacity: 0.9;
+            /* Optional: Add inset shadow if desired, but scale/opacity is usually enough for blocks */
+        }
+
+        /* Verb Title Color Transition - Reset on release */
+        @media (hover: hover) {
+            .verb-card:hover .verb-title-text {
+                color: #2563eb;
             }
+        }
+        .verb-card.is-pressed .verb-title-text {
+            color: #2563eb;
+        }
+
+        /* Ensure active state works for other buttons */
+        button.is-pressed {
+            opacity: 0.7;
+            transform: scale(0.95) !important;
         }
 
         body {
             background-color: #e0e5ec;
             color: #4a5568;
-            padding-top: var(--safe-top);
-            padding-bottom: var(--safe-bottom);
-            padding-left: var(--safe-left);
-            padding-right: var(--safe-right);
+            /* padding-top: env(safe-area-inset-top);  REMOVED: Causing double padding issue */
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
         }
 
         /* App Layout Containers */
@@ -143,16 +267,11 @@
 
         .nav-item.active {
             color: #3b82f6;
-            transform: translateY(-3px);
         }
 
         .nav-item i {
             font-size: 1.15rem;
             transition: transform 0.3s ease;
-        }
-
-        .nav-item.active i {
-            transform: scale(1.1);
         }
 
         .nav-item span {
@@ -223,18 +342,6 @@
             color: #4a5568;
             cursor: pointer;
         }
-        
-        .neumorphic-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 8px 8px 12px 0 rgba(163,177,198, 0.7), 
-                       -8px -8px 12px 0 rgba(255,255,255, 0.8);
-        }
-
-        .neumorphic-btn:active {
-            box-shadow: inset 4px 4px 6px 0 rgba(163,177,198, 0.7), 
-                       inset -4px -4px 6px 0 rgba(255,255,255, 0.8);
-            transform: translateY(0);
-        }
 
         .neumorphic-btn:disabled {
             opacity: 0.5;
@@ -252,18 +359,6 @@
             transition: all 0.2s ease-in-out;
             color: #4a5568;
             cursor: pointer;
-        }
-        
-        .neumorphic-btn-sm:hover {
-            transform: translateY(-1px);
-            box-shadow: 4px 4px 8px 0 rgba(163,177,198, 0.7), 
-                       -4px -4px 8px 0 rgba(255,255,255, 0.8);
-        }
-        
-        .neumorphic-btn-sm:active {
-            box-shadow: inset 2px 2px 4px 0 rgba(163,177,198, 0.7), 
-                       inset -2px -2px 4px 0 rgba(255,255,255, 0.8);
-            transform: translateY(0);
         }
 
         /* Chip Buttons for Filters */
@@ -286,20 +381,12 @@
             letter-spacing: 0.05em;
         }
 
-        .chip-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 6px 6px 12px 0 rgba(163,177,198, 0.6), 
-                       -6px -6px 12px 0 rgba(255,255,255, 0.7);
-            color: #4a5568;
-        }
-
         .chip-btn.active {
             background: #3b82f6;
             color: white;
             box-shadow: inset 3px 3px 6px 0 rgba(0,0,0,0.1),
                         0 4px 12px rgba(59,130,246,0.3);
             border-color: rgba(255,255,255,0.2);
-            transform: scale(1.05);
         }
 
         .chip-btn.active span[id^="count-"] {
@@ -313,7 +400,7 @@
             box-shadow: 6px 6px 12px rgb(163,177,198,0.5), 
                        -6px -6px 12px rgba(255,255,255, 0.8);
             border-radius: 24px; /* More rounded */
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s ease-out; /* Faster for JS control */
             cursor: pointer;
             display: flex;
             flex-direction: column;
@@ -325,18 +412,6 @@
             max-width: 160px; /* User request: reduce card size further from 200px to 160px */
             margin-left: auto;
             margin-right: auto;
-        }
-
-        .verb-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 10px 10px 20px rgb(163,177,198,0.6), 
-                       -10px -10px 20px rgba(255,255,255, 0.7);
-        }
-
-        .verb-card:active {
-            transform: scale(0.96);
-            box-shadow: inset 4px 4px 8px rgb(163,177,198,0.5), 
-                       inset -4px -4px 8px rgba(255,255,255, 0.8);
         }
 
         .verb-image-container {
@@ -478,11 +553,6 @@
             letter-spacing: 0.25px;
             color: #d97706; /* orange-600 */
         }
-        .mastery-confirm-btn:active {
-            box-shadow: inset 2px 2px 4px rgba(163,177,198,0.6), 
-                       inset -2px -2px 4px rgba(255,255,255,0.8);
-            transform: scale(0.97);
-        }
         .exclude-cancel-area {
             position: absolute;
             top: 8px;
@@ -528,6 +598,7 @@
         }
         #pull-to-refresh.pulling {
             opacity: 1;
+            transition: none !important;
         }
         #pull-to-refresh i {
             transition: transform 0.2s ease;
@@ -577,9 +648,10 @@
         }
 
         .modal-content {
-            width: 98%;
+            width: 95%;
             max-width: 950px;
-            height: calc(100vh - var(--safe-bottom) - 20px);
+            /* Shrink modal height slightly (more top/bottom margin) */
+            height: calc(100vh - var(--safe-bottom) - 80px);
             display: flex;
             flex-direction: column;
             position: relative;
@@ -748,7 +820,7 @@
             box-shadow: inset 6px 6px 10px 0 rgba(163,177,198, 0.8), 
                        inset -6px -6px 10px 0 rgba(255,255,255, 0.9) !important;
             color: #3b82f6 !important;
-            transform: translateY(2px) scale(0.98);
+            /* transform: translateY(2px) scale(0.98); Removed for JS control */
         }
 
         .peek-active #peekBtn i {
@@ -903,11 +975,8 @@
         }
         .card-nav-btn:hover {
             color: #3b82f6;
-            transform: scale(1.1);
-        }
-        .card-nav-btn:active {
-            box-shadow: inset 5px 5px 10px #bebebe, inset -5px -5px 10px #ffffff;
-            transform: scale(0.95);
+            /* Disabled for JS control */
+            /* transform: scale(1.1); */
         }
         .nav-up { top: 40%; transform: translateY(-50%); }
         .nav-down { top: 60%; transform: translateY(-50%); }
@@ -989,6 +1058,11 @@
             left: 0;
             right: 0;
         }
+        
+        /* Adjust search input for compact header */
+        #search-container input {
+            font-size: 11px;
+        }
         .filter-scroll-container {
             position: relative;
             width: 100%;
@@ -1051,7 +1125,7 @@
             <section id="page-philosophy" class="page-section hidden">
                 <!-- Safe Area Spacer for Mobile Status Bar -->
                 <div class="h-[var(--safe-top)] md:hidden"></div>
-                <div class="px-5 pt-10 pb-24 space-y-8 max-w-2xl mx-auto">
+                <div class="px-5 pt-4 pb-24 space-y-8 max-w-2xl mx-auto">
                     <!-- Hero Section -->
                     <div class="text-center space-y-4 animate-fade-in">
                         <div class="neumorphic-btn-sm w-20 h-20 flex items-center justify-center text-blue-500 mx-auto mb-6">
@@ -1064,7 +1138,7 @@
                     <!-- Philosophy Cards -->
                     <div class="grid gap-6">
                         <!-- Card 1: Dynamic Action -->
-                        <div class="neumorphic p-6 space-y-4 transform hover:scale-[1.01] transition-transform">
+                        <div class="neumorphic p-6 space-y-4">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-white">
                                     <i class="fas fa-running text-xl"></i>
@@ -1078,7 +1152,7 @@
                         </div>
 
                         <!-- Card 2: Space & Logic -->
-                        <div class="neumorphic p-6 space-y-4 transform hover:scale-[1.01] transition-transform">
+                        <div class="neumorphic p-6 space-y-4">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 shadow-sm border border-white">
                                     <i class="fas fa-cubes text-xl"></i>
@@ -1092,7 +1166,7 @@
                         </div>
 
                         <!-- Card 3: AI Augmentation -->
-                        <div class="neumorphic p-6 space-y-4 transform hover:scale-[1.01] transition-transform">
+                        <div class="neumorphic p-6 space-y-4">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 rounded-2xl bg-cyan-50 flex items-center justify-center text-cyan-500 shadow-sm border border-white">
                                     <i class="fas fa-robot text-xl"></i>
@@ -1108,7 +1182,7 @@
 
                     <!-- Bottom CTA -->
                     <div class="pt-8 text-center">
-                        <button onclick="switchPage('learn')" class="neumorphic-btn px-10 py-4 text-blue-600 font-black text-sm uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all">
+                        <button onclick="switchPage('learn')" class="neumorphic-btn px-10 py-4 text-blue-600 font-black text-sm uppercase tracking-[0.2em]">
                             开启感知之旅
                         </button>
                     </div>
@@ -1116,28 +1190,29 @@
             </section>
 
             <!-- Global Header (Logo, Search & Stats) -->
-        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-4 py-1.5 border-b border-white/40 shadow-sm transition-all">
+        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-4 py-0.5 border-b border-white/40 shadow-sm transition-all">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
             
-            <!-- Integrated Row: Logo & Stats -->
-            <div class="flex items-center justify-between mb-1.5 min-h-[32px]">
-                <!-- Logo & Title -->
+            <!-- Integrated Row: Logo & Search -->
+            <div class="flex items-center justify-between gap-3 mb-0.5 min-h-[36px]">
+                <!-- Logo & Title (Compact) -->
                 <div id="logo-container" class="flex items-center gap-2 shrink-0">
-                    <div class="neumorphic-btn-sm w-7 h-7 flex items-center justify-center text-blue-500 text-xs cursor-pointer hover:opacity-80 transition-opacity" onclick="scrollToStudyFocus()">
+                    <div class="neumorphic-btn-sm w-8 h-8 flex items-center justify-center text-blue-500 text-xs cursor-pointer hover:opacity-80 transition-opacity" onclick="scrollToStudyFocus()">
                         <i class="fas fa-brain"></i>
                     </div>
-                    <h1 class="text-lg font-bold text-gray-700 tracking-tight">NETEM <span class="text-xs font-medium text-gray-400 ml-1">Deep Vocab Tools</span></h1>
+                    <div class="flex flex-col leading-none">
+                        <h1 class="text-sm font-black text-gray-700 tracking-tight">NETEM</h1>
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Vocab</span>
+                    </div>
                 </div>
 
-                <!-- Settings/Actions (Optional: can move something here if needed, or keep balanced) -->
-            </div>
-
-            <!-- Search Container (Now below Logo) -->
-            <div id="search-container" class="w-full mb-1.5">
-                <div class="neumorphic-inset flex items-center px-3 py-1">
-                    <i class="fas fa-search text-gray-400 mr-2 text-xs"></i>
-                    <input type="text" id="searchInput" placeholder="Search words..." class="bg-transparent outline-none w-full text-gray-600 font-medium text-[12px]" oninput="filterVerbs()">
+                <!-- Search Container (Flexible) -->
+                <div id="search-container" class="flex-1 min-w-0">
+                    <div class="neumorphic-inset flex items-center px-3 py-1.5 h-8">
+                        <i class="fas fa-search text-gray-400 mr-2 text-[10px]"></i>
+                        <input type="text" id="searchInput" placeholder="Search..." class="bg-transparent outline-none w-full text-gray-600 font-bold text-[11px] placeholder-gray-400/70" oninput="filterVerbs()">
+                    </div>
                 </div>
             </div>
 
@@ -1207,7 +1282,7 @@
                 </div>
                 
                 <div class="px-4 pt-2">
-                    <main id="verbsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-6">
+                    <main id="verbsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
                         <!-- Cards will be injected here -->
                     </main>
                 </div>
@@ -1215,18 +1290,18 @@
 
             <!-- Review Page -->
             <section id="page-review" class="page-section hidden">
-                  <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm">
+                  <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-4 py-0.5 border-b border-white/40 shadow-sm">
                       <!-- Safe Area Spacer for Mobile Status Bar -->
                       <div class="h-[var(--safe-top)] md:hidden"></div>
                       
-                      <div class="flex items-center justify-between mb-3 min-h-[40px]">
+                      <div class="flex items-center justify-between min-h-[36px] mb-0.5">
                           <div class="flex items-center gap-3">
                               <h2 class="text-xl font-bold text-gray-700">Review</h2>
                           </div>
                           <!-- Tab Toggle -->
                           <div class="flex p-1 bg-gray-200/50 rounded-xl neumorphic-inset">
-                              <button onclick="switchReviewTab('session')" id="btn-review-session" class="px-4 py-2 text-[12px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Session</button>
-                              <button onclick="switchReviewTab('library')" id="btn-review-library" class="px-4 py-2 text-[12px] font-bold rounded-lg transition-all text-gray-500">Library</button>
+                              <button onclick="switchReviewTab('session')" id="btn-review-session" class="neumorphic-toggle-btn px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Session</button>
+                              <button onclick="switchReviewTab('library')" id="btn-review-library" class="neumorphic-toggle-btn px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all text-gray-500">Library</button>
                           </div>
                       </div>
                       <div id="review-stats-placeholder"></div>
@@ -1240,11 +1315,11 @@
 
             <!-- Mastery Page -->
             <section id="page-mastery" class="page-section hidden">
-                  <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm">
+                  <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-4 py-0.5 border-b border-white/40 shadow-sm">
                       <!-- Safe Area Spacer for Mobile Status Bar -->
                       <div class="h-[var(--safe-top)] md:hidden"></div>
                       
-                      <div class="flex items-center justify-between mb-3 min-h-[40px]">
+                      <div class="flex items-center justify-between min-h-[36px] mb-0.5">
                           <h2 class="text-xl font-bold text-gray-700">Mastery</h2>
                           <button onclick="openExcludedModal()" class="neumorphic-btn w-9 h-9 flex items-center justify-center text-red-400 relative">
                               <i class="fas fa-trash-alt text-xs"></i>
@@ -1264,7 +1339,7 @@
             <section id="page-me" class="page-section hidden">
                 <!-- Safe Area Spacer for Mobile Status Bar -->
                 <div class="h-[var(--safe-top)] md:hidden"></div>
-                <div class="px-4 pt-3 pb-24 space-y-4 max-w-md mx-auto md:pt-8">
+                <div class="px-4 pt-1 pb-24 space-y-4 max-w-md mx-auto md:pt-8">
                     <!-- Compact Profile Header -->
                     <div class="neumorphic p-4 flex flex-col gap-3 bg-gradient-to-br from-white/40 to-blue-50/20 relative overflow-hidden">
                         <!-- Decorative Background -->
@@ -1278,9 +1353,9 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-0.5 flex-wrap">
                                     <span class="px-1.5 py-0.5 bg-blue-500 text-[9px] md:text-[10px] font-black text-white rounded-md tracking-tighter uppercase shadow-sm shrink-0">NETEM</span>
-                                    <h2 class="text-base md:text-lg font-black text-gray-700 truncate tracking-tight">Deep Vocab Tools</h2>
+                                    <h2 class="text-base md:text-lg font-black text-gray-700 leading-tight tracking-tight">Deep Vocab Tools</h2>
                                 </div>
-                                <p class="text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none truncate">AI-Powered Exam Preparation</p>
+                                <p class="text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-tight">AI-Powered Exam Preparation</p>
                             </div>
                         </div>
                         
@@ -1365,17 +1440,17 @@
                             </div>
                         </div>
 
-                        <!-- Segmented Control -->
-                        <div class="flex p-1 bg-gray-200/40 rounded-xl neumorphic-inset">
-                            <button onclick="switchMeTab('status')" id="btn-me-status" class="flex-1 py-1.5 text-xs font-black rounded-lg transition-all bg-white shadow-sm text-blue-600">Review Status</button>
-                            <button onclick="switchMeTab('breakdown')" id="btn-me-breakdown" class="flex-1 py-1.5 text-xs font-black rounded-lg transition-all text-gray-400">POS Breakdown</button>
+                        <!-- Segmented Control (Toggle) -->
+                        <div class="flex p-1 bg-gray-200/50 rounded-xl neumorphic-inset">
+                            <button onclick="window.globalResetPressedState(); switchMeTab('status')" id="btn-me-status" class="neumorphic-toggle-btn flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Review Status</button>
+                            <button onclick="window.globalResetPressedState(); switchMeTab('breakdown')" id="btn-me-breakdown" class="neumorphic-toggle-btn flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all text-gray-500">POS Breakdown</button>
                         </div>
 
                         <!-- Dynamic Content Area -->
-                        <div id="me-tab-status" class="grid grid-cols-2 gap-2">
+                        <div id="me-tab-status" class="grid grid-cols-2 gap-2 animate-fade-in">
                             <!-- Injected by updateProfileStats() -->
                         </div>
-                        <div id="me-tab-breakdown" class="hidden space-y-3">
+                        <div id="me-tab-breakdown" class="hidden space-y-3 animate-fade-in">
                             <!-- Injected by updateProfileStats() -->
                         </div>
                     </div>
@@ -1470,15 +1545,15 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-3">
-                                <button onclick="openSettings()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-white/40">
-                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                                <button onclick="openSettings()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 bg-white/40">
+                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-blue-500 shadow-sm">
                                         <i class="fas fa-cog text-sm"></i>
                                     </div>
                                     <span class="text-xs font-black uppercase tracking-widest">Settings</span>
                                 </button>
                                 
-                                <button onclick="showAnalytics()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-white/40">
-                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                                <button onclick="showAnalytics()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 bg-white/40">
+                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-purple-500 shadow-sm">
                                         <i class="fas fa-chart-line text-sm"></i>
                                     </div>
                                     <span class="text-xs font-black uppercase tracking-widest">Analytics</span>
@@ -1543,9 +1618,9 @@
 
             <!-- Modal Header -->
             <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
-                <div class="flex items-baseline pr-12 min-w-0 w-full gap-2">
-                    <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm"></h2>
-                    <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-0.5">Stage 0</div>
+                <div class="flex flex-col items-start pr-12 min-w-0 w-full">
+                    <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-1">Stage 0</div>
+                    <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full"></h2>
                 </div>
                 <!-- Refresh Button -->
                 <button onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
@@ -1916,15 +1991,16 @@
             }, { passive: true });
 
             scrollContainer.addEventListener('touchmove', (e) => {
-            if (touchStartPos > 0 && !isRefreshing) {
-                const currentTouch = e.touches[0].pageY;
-                pullDistance = Math.max(0, currentTouch - touchStartPos);
-                
-                if (pullDistance > 0) {
-                    pullElement.classList.add('pulling');
-                    pullElement.style.height = `${Math.min(pullDistance * 0.5, pullThreshold + 20)}px`;
+                if (touchStartPos > 0 && !isRefreshing) {
+                    const currentTouch = e.touches[0].pageY;
+                    pullDistance = Math.max(0, currentTouch - touchStartPos);
                     
-                    pullElement.style.color = '#3b82f6'; // blue-500
+                    if (pullDistance > 0) {
+                        if (e.cancelable) e.preventDefault(); // Stop native scroll
+                        pullElement.classList.add('pulling');
+                        pullElement.style.height = `${Math.min(pullDistance * 0.5, pullThreshold + 20)}px`;
+                        
+                        pullElement.style.color = '#3b82f6'; // blue-500
                     if (pullDistance * 0.5 >= pullThreshold) {
                         pullElement.classList.add('ready');
                         refreshText.innerText = 'Release to refresh';
@@ -2270,7 +2346,8 @@
                 if (reviewVerbsList.length === 0) {
                     grid.innerHTML = `
                         <div class="col-span-full py-20 text-center animate-fade-in">
-                            <div onclick="showAnalytics()" class="neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                            <!-- Action Button: Analytics -->
+                            <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
                                 <i class="fas fa-book-open text-2xl"></i>
                             </div>
                             <h3 class="text-xl font-black text-gray-700 mb-2">Review Session</h3>
@@ -2283,7 +2360,8 @@
                 grid.innerHTML = `
                     <div class="col-span-full py-20 text-center animate-fade-in relative overflow-hidden">
                         <div id="review-session-init" class="transition-opacity duration-300 w-full">
-                            <div onclick="showAnalytics()" class="neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                            <!-- Action Button: Analytics -->
+                            <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
                                 <i class="fas fa-bolt text-2xl"></i>
                             </div>
                             <h3 class="text-xl font-black text-gray-700 mb-2">Review Session</h3>
@@ -2291,7 +2369,7 @@
                                 ${reviewVerbsList.length} words are ready for review
                             </p>
                             
-                            <button onclick="startReviewSession()" class="neumorphic-btn px-10 py-4 text-blue-600 font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all">
+                            <button onclick="window.globalResetPressedState(); startReviewSession()" class="action-card-btn neumorphic-btn px-10 py-4 text-blue-600 font-black text-xs uppercase tracking-[0.2em] transition-all">
                                 Start Reviewing
                             </button>
                         </div>
@@ -2329,7 +2407,8 @@
                 if (learnedVerbs.length === 0) {
                     grid.innerHTML = `
                         <div class="col-span-full py-20 text-center animate-fade-in">
-                            <div onclick="showAnalytics()" class="neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                            <!-- Action Button: Analytics -->
+                            <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
                                 <i class="fas fa-graduation-cap text-2xl"></i>
                             </div>
                             <h3 class="text-xl font-black text-gray-700 mb-2">Library</h3>
@@ -2340,6 +2419,7 @@
 
                 grid.innerHTML = '';
                 learnedVerbs.forEach(v => {
+                    // Ensure createVerbCard generates interactive blocks
                     const card = createVerbCard(v);
                     grid.appendChild(card);
                 });
@@ -2361,7 +2441,8 @@
             
             grid.innerHTML = `
                 <div class="col-span-full py-20 text-center animate-fade-in">
-                    <div onclick="showAnalytics()" class="neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-green-500 mx-auto mb-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                    <!-- Action Button: Analytics -->
+                    <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-green-500 mx-auto mb-6 cursor-pointer transition-transform">
                         <i class="fas fa-trophy text-2xl"></i>
                     </div>
                     <h3 class="text-xl font-black text-gray-700 mb-2">Review Complete!</h3>
@@ -2416,7 +2497,8 @@
             if (masteredVerbs.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full py-20 text-center animate-fade-in">
-                        <div onclick="showAnalytics()" class="neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                        <!-- Action Button: Analytics -->
+                        <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
                             <i class="fas fa-seedling text-2xl"></i>
                         </div>
                         <h3 class="text-xl font-black text-gray-700 mb-2">Mastery</h3>
@@ -2427,6 +2509,7 @@
             
             grid.innerHTML = '';
             masteredVerbs.forEach(v => {
+                // Ensure createVerbCard generates interactive blocks
                 const card = createVerbCard(v);
                 grid.appendChild(card);
             });
@@ -2629,9 +2712,9 @@
             const statusContainer = document.getElementById('me-tab-status');
             if (statusContainer) {
                 const createStatItem = (label, count, colorClass, icon, bgClass) => `
-                    <div class="flex flex-col p-4 neumorphic-inset rounded-2xl bg-gradient-to-br ${bgClass}/10 to-transparent border border-white/60 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+                    <div class="learning-insight-card flex flex-col p-4 neumorphic-inset rounded-2xl bg-gradient-to-br ${bgClass}/10 to-transparent border border-white/60 relative overflow-hidden transition-all duration-300">
                         <!-- Subtle Background Icon -->
-                        <i class="fas ${icon} absolute -right-2 -bottom-2 text-4xl opacity-[0.03] group-hover:opacity-[0.05] transition-opacity"></i>
+                        <i class="fas ${icon} absolute -right-2 -bottom-2 text-4xl opacity-[0.03] transition-opacity"></i>
                         
                         <div class="flex items-center justify-between mb-2.5 relative z-10">
                             <div class="w-8 h-8 rounded-xl bg-white/80 backdrop-blur-sm neumorphic flex items-center justify-center shadow-sm">
@@ -2830,11 +2913,11 @@
                     if (t === tab) {
                         content.classList.remove('hidden');
                         btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-                        btn.classList.remove('text-gray-400');
+                        btn.classList.remove('text-gray-500');
                     } else {
                         content.classList.add('hidden');
                         btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
-                        btn.classList.add('text-gray-400');
+                        btn.classList.add('text-gray-500');
                     }
                 }
             });
@@ -2942,11 +3025,16 @@
                     fetch('/api/checkins', { signal: pageAbortController.signal }),
                     fetch('/api/learn_batch', { signal: pageAbortController.signal })
                 ]);
-                if (checkinsRes.ok) checkinHistory = await checkinsRes.json();
+                if (checkinsRes.ok) {
+                    const data = await checkinsRes.json();
+                    checkinHistory = Array.isArray(data) ? data : [];
+                }
                 if (batchRes.ok) savedBatch = await batchRes.json();
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 console.error("Error loading synced data:", e);
+                // Ensure array even on error
+                if (!Array.isArray(checkinHistory)) checkinHistory = [];
             }
         }
 
@@ -2956,7 +3044,14 @@
             if (localCheckinsRaw) {
                 try {
                     const localCheckins = JSON.parse(localCheckinsRaw);
-                    const localCheckinDates = Object.keys(localCheckins);
+                    // Handle both array (new) and object (old) formats
+                    let localCheckinDates = [];
+                    if (Array.isArray(localCheckins)) {
+                        localCheckinDates = localCheckins;
+                    } else if (typeof localCheckins === 'object' && localCheckins !== null) {
+                        localCheckinDates = Object.keys(localCheckins);
+                    }
+
                     if (localCheckinDates.length > 0) {
                         console.log("Migrating check-ins to backend...");
                         for (const date of localCheckinDates) {
@@ -3471,8 +3566,19 @@
             document.querySelectorAll('.filter-scroll-container > div').forEach(el => handleFilterScroll(el));
         });
 
-        async function loadVerbs(retries = 3) {
+        async function loadVerbs(retries = 5) {
             isLoading = true;
+            // Show loading skeleton if grid is empty
+            const grid = document.getElementById('verbsGrid');
+            if (grid && grid.children.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-20 flex flex-col items-center justify-center space-y-4 animate-fade-in">
+                        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">Loading Vocabulary...</p>
+                    </div>
+                `;
+            }
+
             try {
                 // Load more verbs to ensure we have enough for groups
                 const res = await fetch(`/api/verbs?limit=6000&offset=0&_t=${Date.now()}`);  
@@ -3562,9 +3668,11 @@
                 console.error("Error loading verbs:", e);
                 if (retries > 0) {
                     console.log(`Retrying to load verbs (${retries} attempts left)...`);
-                    setTimeout(() => loadVerbs(retries - 1), 3000);
+                    // Exponential backoff for retry: 1s, 2s, 4s, 8s, 16s
+                    const delay = Math.pow(2, 5 - retries) * 1000;
+                    setTimeout(() => loadVerbs(retries - 1), delay);
                 } else {
-                    document.getElementById('verbsGrid').innerHTML = `<div class="col-span-full text-center text-red-500">Failed to load verbs after multiple attempts. Please refresh the page.</div>`;
+                    document.getElementById('verbsGrid').innerHTML = `<div class="col-span-full text-center text-red-500">Failed to load verbs after multiple attempts. Error: ${e.message} <br> Please refresh the page.</div>`;
                 }
             } finally {
                 isLoading = false;
@@ -4147,6 +4255,9 @@
                         </div>
                         <h3 class="text-xl font-black text-gray-700 mb-2">Learn</h3>
                         <p class="text-gray-400 font-bold text-xs mb-8">No words found in this category.</p>
+                        <button onclick="switchPos('all'); switchFreq('all');" class="px-6 py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-wider hover:bg-blue-100 transition-colors">
+                            Reset Filters
+                        </button>
                     </div>`;
                  return;
             }
@@ -4246,6 +4357,7 @@
             card.onmouseup = cancelLongPress;
             card.onmouseleave = cancelLongPress;
             card.ontouchend = cancelLongPress;
+            card.ontouchcancel = cancelLongPress; // Add touchcancel handler
             card.ontouchmove = handleTouchMove;
             card.oncontextmenu = (e) => {
                 if (currentPage === 'learn' || currentPage === 'mastery') e.preventDefault();
@@ -4288,11 +4400,11 @@
 
             // Exclude / Restore Status
             const isExcluded = excludedVerbs.has(item['单词']);
-            const excludedClass = isExcluded ? 'text-red-400' : 'text-gray-700 group-hover:text-blue-600';
+            const excludedClass = isExcluded ? 'text-red-400' : 'text-gray-700 verb-title-text';
             const animClass = isExcluded ? 'strike-anim active' : 'strike-anim';
 
             let imageHtml = '';
-            let contentClasses = 'verb-content flex-1 flex flex-col items-center p-4 min-h-[100px]';
+            let contentClasses = 'verb-content verb-card-block flex-1 flex flex-col items-center px-3 pt-3 pb-2 min-h-[100px] transition-all duration-200';
             
             // Check image provider setting
             const appSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
@@ -4300,7 +4412,7 @@
             
             if (imageProvider === 'none') {
                 imageHtml = `
-                <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0">
+                <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
                     <div class="frosted-placeholder">
                         <i class="fas fa-image"></i>
                     </div>
@@ -4309,7 +4421,7 @@
                 contentClasses += ' justify-start pt-2';
             } else if (item.image_url) {
                 imageHtml = `
-                <div class="verb-image-container w-full h-32 overflow-hidden relative shrink-0">
+                <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
                     <img src="/api/image/${encodeURIComponent(item['单词'])}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${item['单词']}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
@@ -4350,7 +4462,7 @@
                 }
 
                 ebbinghausBadge = `
-                    <div class="absolute top-2 left-2 z-10 flex flex-col gap-0.5">
+                    <div class="absolute top-2 left-2 z-10 flex flex-col gap-0.5 pointer-events-none">
                         <div class="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center shadow-sm ${dueClass}">
                             ${dueIcon}<span>${label}</span>
                         </div>
@@ -4393,20 +4505,23 @@
             card.innerHTML = `
                 ${excludeOverlay}
                 ${ebbinghausBadge}
-                <span class="absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-md bg-black/5 text-gray-400 text-[10px] font-black tracking-tighter">#${item['序号']}</span>
                 ${imageHtml}
                 <div class="${contentClasses} relative">
-                    <h3 class="text-xl font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight">
+                    <h3 class="${item['单词'].length > 12 ? 'text-base' : item['单词'].length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full break-words leading-tight">
                         ${item['单词']}
                     </h3>
-                    <div class="flex items-center justify-center gap-1.5 mb-2.5">
+                    <div class="flex items-center justify-center gap-1.5 mb-1">
                         <span class="text-[10px] px-2 py-0.5 rounded-lg ${getProbabilityColor(item['词频'])} font-black uppercase tracking-wider border border-white/20 shadow-sm">
                             ${calculateExamProbability(item['词频'])}% Freq
                         </span>
                     </div>
-                    <p class="text-xs leading-relaxed text-gray-500 line-clamp-2 w-full text-center px-2 font-medium" title="${item['释义'] || ''}">${item['释义'] || ''}</p>
+                    
+                    <div class="w-full flex items-center justify-between mt-auto pt-0.5">
+                        <div class="w-6 flex justify-start">${contextIcon}</div>
+                        <p class="text-xs leading-relaxed text-gray-500 text-center font-medium truncate px-1 flex-1" title="${item['释义'] || ''}">${item['释义'] || ''}</p>
+                        <div class="w-6 flex justify-end text-gray-300 text-[10px] font-black tracking-tighter pointer-events-none">#${item['序号']}</div>
+                    </div>
                 </div>
-                ${contextIndicator}
                 ${refreshBtn}
             `;
             return card;
@@ -5077,19 +5192,30 @@
                         const res = await fetch('/api/ebbinghaus/reset', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ verb })
+                            body: JSON.stringify({ verb: verb }) // Correctly pass object with 'verb' key
                         });
                         
                         if (res.ok) {
+                            // Close modal first
+                            resetModal.classList.add('hidden');
+                            
+                            // IMMEDIATE: Reset any pressed buttons
+                            if (window.globalResetPressedState) window.globalResetPressedState();
+                            
+                            // Then update state
                             await loadLearningStatus();
-                            updateCounts();
-                            closeResetModal();
+                            // Update counts in header if function exists
+                            if (typeof updateCounts === 'function') updateCounts();
+                            
+                            // Close the detail modal
                             closeModal();
-                            renderGrid();
+                            
+                            // Re-render grid to reflect changes
+                            if (typeof renderGrid === 'function') renderGrid();
                         }
                     } catch (e) {
                         console.error('Failed to reset word:', e);
-                        closeResetModal();
+                        resetModal.classList.add('hidden');
                     }
                 };
             }
@@ -5264,7 +5390,14 @@
                          if (analysisMode === 'cache_only') {
                              // Backend confirmed: No cache available.
                              // Now we show the manual trigger.
-                             showManualTrigger(verb, 'Cache Not Found');
+                             if (typeof showManualTrigger === 'function') {
+                                 showManualTrigger(verb, 'Cache Not Found');
+                             } else {
+                                 // Fallback if function missing
+                                 console.warn("showManualTrigger not found, refreshing...");
+                                 // Force refresh
+                                 analyzeVerb(verb, false, 'force_refresh');
+                             }
                              return;
                          }
                     }
@@ -5430,7 +5563,9 @@
 
                     chunks.forEach((chunk, chunkIndex) => {
                         const card = document.createElement('div');
-                        card.className = 'result-card';
+                        // Make result cards interactive but ensure they don't hijack clicks from children
+                        // We use 'group' to help with child interactions if needed
+                        card.className = 'result-card rounded-xl overflow-hidden shadow-sm transition-all duration-200';
                         
                         // Clean up Markdown artifacts BEFORE rendering
                         // 1. Fix broken headers: '# # #' -> '###'
@@ -5547,7 +5682,7 @@
                                                         onkeydown="if(event.key==='Enter') checkSpelling(this.value)">
                                                 </div>
                                                 <button onclick="checkSpelling(document.getElementById('spellingInput').value)"
-                                                    class="neumorphic-btn w-11 h-11 rounded-xl text-blue-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shrink-0">
+                                                    class="neumorphic-btn w-11 h-11 rounded-xl text-blue-500 flex items-center justify-center transition-all shrink-0">
                                                     <i class="fas fa-paper-plane"></i>
                                                 </button>
                                             </div>
@@ -5556,7 +5691,7 @@
                                     `;
                                 } else {
                                     essenceHtml = `
-                                        <div class="neumorphic-inset rounded-2xl px-4 py-3 text-center border border-white/40 bg-white/10 backdrop-blur-sm shadow-inner relative overflow-hidden group">
+                                        <div class="verb-card-block neumorphic-inset rounded-2xl px-4 py-3 text-center border border-white/40 bg-white/10 backdrop-blur-sm shadow-inner relative overflow-hidden group transition-all duration-200">
                                             <!-- Decorative Quotes -->
                                             <div class="absolute left-2 top-2 text-blue-400/10 text-4xl -rotate-12">
                                                 <i class="fas fa-quote-left"></i>
@@ -5626,7 +5761,7 @@
                                 colorStyle = "text-orange-600"; borderStyle = "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]";
                             }
 
-                            header.className = `${baseLayout} ${colorStyle}`;
+                            header.className = `${baseLayout} ${colorStyle} verb-card-block rounded-lg transition-all duration-200`;
                             header.innerHTML = `<span class="w-1.5 h-6 ${borderStyle} rounded-full mr-3 shrink-0"></span><span>${headerText}</span>`;
                             card.appendChild(header);
                             
@@ -5657,8 +5792,15 @@
                                     el.className = "space-y-2.5 mb-4";
                                 } else if (el.tagName === 'LI') {
                                     el.className = `list-disc ml-5 pl-2 ${baseText}`;
+                                    // Make list items interactive
+                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
                                 } else if (el.tagName === 'P') {
                                     el.className = `mb-3 ${baseText}`;
+                                    // Make paragraphs interactive
+                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
+                                } else if (el.tagName === 'DIV' && el.parentElement === contentWrapper) {
+                                    // Make direct div children interactive
+                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
                                 }
                         });
                         
@@ -6087,43 +6229,24 @@
             */
         }
         // Vertical Card Navigation Logic
+        // Modified to handle multiple cards from Markdown sections
         function drawPeekCard() {
-            if (!isReviewMode || isClosing) return; // Only allow in review mode and not when closing
+            // No longer "drawing random" - we just show the cards sequentially
+            // This function might be deprecated if we switch to simple scroll
+            // But if we keep card switching logic:
             
             const outputContainer = document.getElementById('outputContainer');
             if (!outputContainer) return;
+            
+            // Re-query cards as they might have been re-rendered
             const cards = Array.from(outputContainer.children).filter(child => child.classList.contains('result-card'));
             if (cards.length === 0) return;
 
-            // Pick a random card index, preferably different from the current one
-            let randomIndex = currentCardIndex;
-            if (cards.length > 1) {
-                while (randomIndex === currentCardIndex) {
-                    randomIndex = Math.floor(Math.random() * cards.length);
-                }
-            } else {
-                randomIndex = 0;
-            }
+            // Ensure current index is valid
+            if (currentCardIndex >= cards.length) currentCardIndex = 0;
             
-            currentCardIndex = randomIndex;
-            
-            // Update classes for all cards to show the newly "drawn" card
-            cards.forEach((card, index) => {
-                card.classList.remove('active', 'prev', 'next', 'next-2');
-                if (index === currentCardIndex) {
-                    card.classList.add('active');
-                    const scrollable = card.querySelector('.flex-1.overflow-y-auto');
-                    if (scrollable) scrollable.scrollTop = 0;
-                } else if (index < currentCardIndex) {
-                    card.classList.add('prev');
-                } else if (index === currentCardIndex + 1) {
-                    card.classList.add('next');
-                } else {
-                    card.classList.add('next-2');
-                }
-            });
-
-            document.getElementById('learningModal').classList.add('peek-active');
+            // Update classes
+            updateCardClasses(cards);
         }
 
         function switchCard(direction) {
@@ -6135,340 +6258,513 @@
             
             let targetIndex = currentCardIndex;
             
-            if (direction === 'down' || direction === 'next') {
-                if (currentCardIndex < cards.length - 1) {
-                    targetIndex++;
-                }
-            } else if (direction === 'up' || direction === 'prev') {
-                if (currentCardIndex > 0) {
-                    targetIndex--;
-                }
+            if (direction === 'next') {
+                targetIndex++;
+            } else if (direction === 'prev') {
+                targetIndex--;
             }
             
-            if (targetIndex === currentCardIndex) return;
+            // Loop or clamp? Let's clamp for now, or loop if user prefers
+            if (targetIndex < 0) targetIndex = 0; // Clamp start
+            if (targetIndex >= cards.length) targetIndex = cards.length - 1; // Clamp end
             
-            currentCardIndex = targetIndex;
-            
-            // Update Classes for animation
+            if (targetIndex !== currentCardIndex) {
+                currentCardIndex = targetIndex;
+                updateCardClasses(cards);
+            }
+        }
+        
+        function updateCardClasses(cards) {
             cards.forEach((card, index) => {
-                // Remove all state classes first
+                // Reset all positioning classes
                 card.classList.remove('active', 'prev', 'next', 'next-2');
                 
-                // Clear inline styles that might interfere
-                card.style.opacity = '';
-                card.style.transform = '';
-                
+                // Active card
                 if (index === currentCardIndex) {
                     card.classList.add('active');
-                    // Reset scroll position of content when it becomes active
+                    // Reset scroll on the newly active card content
                     const scrollable = card.querySelector('.flex-1.overflow-y-auto');
                     if (scrollable) scrollable.scrollTop = 0;
-                } else if (index < currentCardIndex) {
-                    // Previous cards go UP and away
+                } 
+                // Previous cards (above/behind)
+                else if (index < currentCardIndex) {
                     card.classList.add('prev');
-                } else if (index === currentCardIndex + 1) {
-                    // Next card is waiting just below
+                } 
+                // Next card (below/preview)
+                else if (index === currentCardIndex + 1) {
                     card.classList.add('next');
-                } else {
-                    // Subsequent cards are further down/hidden
+                } 
+                // Future cards (deep stack)
+                else {
                     card.classList.add('next-2');
                 }
             });
+            
+            // Update indicator if we have one
+            const indicator = document.getElementById('card-indicator');
+            if (indicator) {
+                indicator.textContent = `${currentCardIndex + 1} / ${cards.length}`;
+            }
         }
         
     </script>
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeSettings()">
-        <div class="bg-[#e0e5ec] w-full max-w-md rounded-[32px] shadow-2xl p-0 transform scale-95 transition-transform duration-300 overflow-hidden mx-4" id="settingsContent" onclick="event.stopPropagation()">
-            <!-- Safe Area Spacer for Mobile Status Bar -->
-            <div class="h-[var(--safe-top)] md:hidden"></div>
-            <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pt-3 pb-1 opacity-40 md:hidden" onclick="closeSettings()">
-                <div class="w-12 h-1.5 bg-gray-400 rounded-full"></div>
-            </div>
-            
-            <!-- Modal Header -->
-            <div class="px-6 py-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl neumorphic flex items-center justify-center text-blue-500">
-                        <i class="fas fa-cog"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-black text-gray-700 leading-tight">App Settings</h3>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Configuration</p>
+    <!-- Settings Modal (Neumorphic Full-Screen Style) -->
+    <div id="settingsModal" class="fixed inset-0 z-[100] bg-[#e0e5ec] transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col">
+        <!-- Safe Area Top Background -->
+        <div class="absolute top-0 left-0 right-0 h-[var(--safe-top)] bg-[#e0e5ec] z-10"></div>
+        
+        <!-- Header -->
+        <div class="relative z-10 bg-[#e0e5ec]/95 backdrop-blur-md border-b border-white/20 shadow-sm px-4 py-3 flex items-center justify-between shrink-0 pt-[calc(var(--safe-top)+12px)]">
+            <h2 class="text-xl font-black text-gray-700 tracking-tight text-shadow-sm">Settings</h2>
+            <button onclick="closeSettings()" class="w-10 h-10 flex items-center justify-center neumorphic-btn rounded-full text-gray-500 active:text-red-400 transition-colors">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto hide-scrollbar overscroll-contain">
+            <form id="settingsForm" class="p-5 space-y-8 pb-32">
+                
+                <!-- Section: Analysis Mode -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-magic text-xs"></i> Analysis Logic
+                    </h3>
+                    <div class="neumorphic p-2 rounded-2xl space-y-2">
+                        <!-- Option 1: Smart Auto -->
+                        <label class="analysis-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <input type="radio" name="analysisMode" value="auto" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-blue-500 mr-3 shrink-0">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">Smart Auto</span>
+                                <span class="text-[10px] font-medium text-gray-400">Prefer cache, auto-generate if missing</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </label>
+
+                        <!-- Option 2: Strict Cache -->
+                        <label class="analysis-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <input type="radio" name="analysisMode" value="cache_only" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-green-600 mr-3 shrink-0">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">Strict Cache</span>
+                                <span class="text-[10px] font-medium text-gray-400">Never generate, only use saved data</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </label>
+
+                        <!-- Option 3: Manual -->
+                        <label class="analysis-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <input type="radio" name="analysisMode" value="manual" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-gray-400 mr-3 shrink-0">
+                                <i class="fas fa-hand-pointer"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">Manual Trigger</span>
+                                <span class="text-[10px] font-medium text-gray-400">Always ask before generating</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </label>
                     </div>
                 </div>
-                <button onclick="closeSettings()" class="w-10 h-10 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-red-400 transition-all active:scale-90 md:flex hidden">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
 
-            <div class="px-6 pb-4 max-h-[60vh] overflow-y-auto hide-scrollbar">
-                <form id="settingsForm" class="space-y-6">
-                    <!-- General Settings -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 mb-2 ml-1">
-                            <i class="fas fa-sliders-h text-gray-400 text-[10px]"></i>
-                            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">General Settings</h4>
+                <!-- Section: LLM Configuration -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-brain text-xs"></i> AI Provider
+                    </h3>
+                    <div class="neumorphic p-5 rounded-2xl space-y-5">
+                        <!-- API Key -->
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">OpenAI API Key</label>
+                            <div class="relative">
+                                <i class="fas fa-key absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="password" name="openai_api_key" 
+                                    class="w-full neumorphic-inset bg-transparent text-gray-700 text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" 
+                                    placeholder="sk-...">
+                            </div>
                         </div>
+
+                        <!-- Base URL -->
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Base URL</label>
+                            <div class="relative">
+                                <i class="fas fa-link absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" name="openai_base_url" 
+                                    class="w-full neumorphic-inset bg-transparent text-gray-700 text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" 
+                                    placeholder="https://api.openai.com/v1">
+                            </div>
+                        </div>
+
+                        <!-- Model -->
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Model Name</label>
+                            <div class="relative">
+                                <i class="fas fa-cube absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" name="openai_model" 
+                                    class="w-full neumorphic-inset bg-transparent text-gray-700 text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" 
+                                    placeholder="gpt-3.5-turbo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Image Provider -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-image text-xs"></i> Visuals
+                    </h3>
+                    <div class="neumorphic p-2 rounded-2xl space-y-2">
+                        <select name="image_provider" id="image_provider_select" class="hidden">
+                            <option value="none">None</option>
+                            <option value="dicebear">DiceBear</option>
+                            <option value="pollinations">Pollinations</option>
+                        </select>
+
+                        <!-- Option: None -->
+                        <div onclick="selectImageProvider('none')" id="provider-card-none" class="provider-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-gray-400 mr-3 shrink-0">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">No Images</span>
+                                <span class="text-[10px] font-medium text-gray-400">Pure text focus</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </div>
+
+                        <!-- Option: DiceBear -->
+                        <div onclick="selectImageProvider('dicebear')" id="provider-card-dicebear" class="provider-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-indigo-500 mr-3 shrink-0">
+                                <i class="fas fa-dice"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">DiceBear</span>
+                                <span class="text-[10px] font-medium text-gray-400">Abstract avatars</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </div>
+
+                        <!-- Option: Pollinations -->
+                        <div onclick="selectImageProvider('pollinations')" id="provider-card-pollinations" class="provider-card relative flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-purple-500 mr-3 shrink-0">
+                                <i class="fas fa-palette"></i>
+                            </div>
+                            <div class="flex-1">
+                                <span class="text-sm font-bold text-gray-700 block">Pollinations.ai</span>
+                                <span class="text-[10px] font-medium text-gray-400">AI generated scenes</span>
+                            </div>
+                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center shadow-inner transition-colors">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 transition-opacity"></div>
+                            </div>
+                        </div>
+
+                        <!-- Pollinations Config (Nested) -->
+                        <div id="pollinationsConfig" class="hidden p-4 mt-2 border-t border-white/20 space-y-4">
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Pollinations API Key</label>
+                                <input type="password" name="pollinations_api_key" class="w-full neumorphic-inset bg-transparent text-gray-700 text-xs font-bold rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-purple-400/20" placeholder="Optional">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Model</label>
+                                <input type="text" name="pollinations_model" class="w-full neumorphic-inset bg-transparent text-gray-700 text-xs font-bold rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-purple-400/20" placeholder="flux">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Data -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-database text-xs"></i> Data & Backup
+                    </h3>
+                    <div class="neumorphic p-2 rounded-2xl space-y-2">
+                        <button type="button" onclick="exportData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-blue-500 mr-3 shrink-0">
+                                <i class="fas fa-file-export"></i>
+                            </div>
+                            <div class="flex-1 text-left">
+                                <span class="text-sm font-bold text-gray-700 block">Export Backup</span>
+                                <span class="text-[10px] font-medium text-gray-400">Save progress to file</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                        </button>
                         
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
-                            <!-- Analysis Mode Selector -->
-                            <div class="flex flex-col gap-3">
-                                <div class="flex items-center gap-3 mb-1">
-                                    <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-white/50">
-                                        <i class="fas fa-magic text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <span class="text-xs font-black text-gray-700 block">Analysis Mode</span>
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Behavior when clicking words</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 gap-2">
-                                    <!-- Option 1: Smart Auto (Prefer Cache, Auto Generate) -->
-                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-blue-400/30 has-[:checked]:bg-blue-50/50">
-                                        <input type="radio" name="analysisMode" value="auto" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
-                                        <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 mr-3 shadow-inner">
-                                            <i class="fas fa-bolt text-xs"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <span class="text-xs font-black text-gray-600 block">Smart Auto (Recommend)</span>
-                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Prefer cache, auto-generate if missing</span>
-                                        </div>
-                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all"></div>
-                                    </label>
-
-                                    <!-- Option 2: Strict Cache (No Auto Gen) -->
-                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-green-400/30 has-[:checked]:bg-green-50/50">
-                                        <input type="radio" name="analysisMode" value="cache_only" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
-                                        <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600 mr-3 shadow-inner">
-                                            <i class="fas fa-database text-xs"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <span class="text-xs font-black text-gray-600 block">Strict Cache Only</span>
-                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Use cache only, never auto-generate</span>
-                                        </div>
-                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-green-500 peer-checked:bg-green-500 transition-all"></div>
-                                    </label>
-
-                                    <!-- Option 3: Manual (Disabled) -->
-                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-gray-400/30 has-[:checked]:bg-gray-50/50">
-                                        <input type="radio" name="analysisMode" value="manual" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
-                                        <div class="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-gray-500 mr-3 shadow-inner">
-                                            <i class="fas fa-hand-pointer text-xs"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <span class="text-xs font-black text-gray-600 block">Manual Only</span>
-                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Always click to start</span>
-                                        </div>
-                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-gray-500 peer-checked:bg-gray-500 transition-all"></div>
-                                    </label>
-                                </div>
+                        <button type="button" onclick="importData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-green-500 mr-3 shrink-0">
+                                <i class="fas fa-file-import"></i>
                             </div>
-                        </div>
+                            <div class="flex-1 text-left">
+                                <span class="text-sm font-bold text-gray-700 block">Restore Data</span>
+                                <span class="text-[10px] font-medium text-gray-400">Load from backup file</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                        </button>
                     </div>
+                </div>
 
-                    <!-- LLM Settings -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 mb-2 ml-1">
-                            <i class="fas fa-brain text-gray-400 text-[10px]"></i>
-                            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">LLM Service</h4>
-                        </div>
-                        
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
-                            <div class="flex flex-col gap-1.5">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                    <i class="fas fa-key scale-75"></i> OpenAI API Key
-                                </label>
-                                <input type="password" name="openai_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="sk-...">
+                <!-- Section: Danger -->
+                <div class="space-y-3 pt-4">
+                    <div class="neumorphic p-2 rounded-2xl bg-red-50/10 border border-red-100/20">
+                        <button type="button" onclick="closeSettings(); setTimeout(clearLearningData, 200);" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-red-50 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset bg-red-50/50 flex items-center justify-center text-red-500 mr-3 shrink-0">
+                                <i class="fas fa-trash-alt"></i>
                             </div>
-                            
-                            <div class="flex flex-col gap-1.5">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                    <i class="fas fa-link scale-75"></i> Base URL
-                                </label>
-                                <input type="text" name="openai_base_url" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="https://api.openai.com/v1">
+                            <div class="flex-1 text-left">
+                                <span class="text-sm font-bold text-red-600 block">Reset Application</span>
+                                <span class="text-[10px] font-medium text-red-400/80">Clear all data and start fresh</span>
                             </div>
-
-                            <div class="flex flex-col gap-1.5">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                    <i class="fas fa-cube scale-75"></i> Model Name
-                                </label>
-                                <input type="text" name="openai_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="">
-                            </div>
-                        </div>
+                        </button>
                     </div>
+                    <p class="text-center text-[10px] text-gray-400 font-black uppercase tracking-widest pt-4 opacity-50">
+                        NETEM Deep Vocab v1.2.0
+                    </p>
+                </div>
+            </form>
+        </div>
 
-                    <!-- Image Settings -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 mb-2 ml-1">
-                            <i class="fas fa-image text-gray-400 text-[10px]"></i>
-                            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Image Provider</h4>
-                        </div>
-                        
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
-                            <div class="flex flex-col gap-1.5">
-                                <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                                    <span class="flex items-center gap-1.5"><i class="fas fa-project-diagram scale-75"></i> Provider Source</span>
-                                </label>
-                                <!-- Hidden Select for Form Submission -->
-                                <select name="image_provider" id="image_provider_select" class="hidden">
-                                    <option value="none">None</option>
-                                    <option value="dicebear">DiceBear</option>
-                                    <option value="pollinations">Pollinations</option>
-                                </select>
-
-                                <!-- Custom Card Selection UI -->
-                                <div class="grid grid-cols-1 gap-3">
-                                    <!-- Option: None -->
-                                    <div onclick="selectImageProvider('none')" id="provider-card-none" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 group-hover:text-gray-600 transition-colors shadow-inner">
-                                                <i class="fas fa-ban text-lg"></i>
-                                            </div>
-                                            <div class="flex-1">
-                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">None</h5>
-                                                <p class="text-[10px] text-gray-400 font-bold">Hide word images completely</p>
-                                            </div>
-                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
-                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Option: DiceBear -->
-                                    <div onclick="selectImageProvider('dicebear')" id="provider-card-dicebear" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 group-hover:text-blue-600 transition-colors shadow-inner">
-                                                <i class="fas fa-dice text-lg"></i>
-                                            </div>
-                                            <div class="flex-1">
-                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">DiceBear Icons</h5>
-                                                <p class="text-[10px] text-gray-400 font-bold">Fast, simple abstract avatars</p>
-                                            </div>
-                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
-                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Option: Pollinations -->
-                                    <div onclick="selectImageProvider('pollinations')" id="provider-card-pollinations" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-500 group-hover:text-purple-600 transition-colors shadow-inner">
-                                                <i class="fas fa-palette text-lg"></i>
-                                            </div>
-                                            <div class="flex-1">
-                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">Pollinations.ai</h5>
-                                                <p class="text-[10px] text-gray-400 font-bold">AI generated artistic scenes</p>
-                                            </div>
-                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
-                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="pollinationsConfig" class="space-y-4 hidden pt-2 border-t border-gray-200/50 mt-2">
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                        <i class="fas fa-key scale-75"></i> API Key (Optional)
-                                    </label>
-                                    <input type="password" name="pollinations_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="Enter key if required">
-                                </div>
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                        <i class="fas fa-microchip scale-75"></i> Model Version
-                                    </label>
-                                    <input type="text" name="pollinations_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="flux">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Data Management -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 mb-2 ml-1">
-                            <i class="fas fa-database text-gray-400 text-[10px]"></i>
-                            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Data Management</h4>
-                        </div>
-                        
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
-                            <!-- Export -->
-                            <button type="button" onclick="exportData()" class="w-full flex items-center justify-between group transition-colors p-2 rounded-xl hover:bg-white/50">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-white/50 group-hover:bg-blue-100 transition-colors">
-                                        <i class="fas fa-file-export text-sm"></i>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-xs font-black text-gray-700 block">Export Data</span>
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Backup progress & settings</span>
-                                    </div>
-                                </div>
-                                <i class="fas fa-download text-gray-300 text-[10px] group-hover:text-blue-400 transition-colors"></i>
-                            </button>
-
-                            <!-- Import -->
-                            <button type="button" onclick="importData()" class="w-full flex items-center justify-between group transition-colors p-2 rounded-xl hover:bg-white/50">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center text-green-500 shadow-sm border border-white/50 group-hover:bg-green-100 transition-colors">
-                                        <i class="fas fa-file-import text-sm"></i>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-xs font-black text-gray-700 block">Import Data</span>
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Restore from backup</span>
-                                    </div>
-                                </div>
-                                <i class="fas fa-upload text-gray-300 text-[10px] group-hover:text-green-400 transition-colors"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Reset Options -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 mb-2 ml-1">
-                            <i class="fas fa-exclamation-triangle text-red-400 text-[10px]"></i>
-                            <h4 class="text-[10px] font-black text-red-400 uppercase tracking-[0.2em]">Danger Zone</h4>
-                        </div>
-
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-red-50/30 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-red-100/50">
-                            <button type="button" onclick="closeSettings(); setTimeout(clearLearningData, 200);" class="w-full flex items-center justify-between group transition-colors">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-400 shadow-sm border border-white/50 group-hover:bg-red-100 transition-colors">
-                                        <i class="fas fa-redo-alt text-sm"></i>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-xs font-black text-gray-700 block">Reset Application</span>
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Clear all data and cache</span>
-                                    </div>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-300 text-[10px] group-hover:text-red-300 transition-colors"></i>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Floating Footer Actions -->
-            <div class="px-6 py-3 bg-[#e0e5ec]/90 backdrop-blur-md border-t border-white/20 flex gap-3 shadow-[0_-10px_20px_rgba(163,177,198,0.2)]">
-                <button type="button" onclick="closeSettings()" class="flex-1 py-3.5 rounded-2xl neumorphic-btn text-gray-500 font-black text-xs uppercase tracking-widest hover:text-gray-700 active:scale-95 transition-all">
-                    Cancel
-                </button>
-                <button type="button" id="saveSettings" class="flex-[2] py-3.5 rounded-2xl neumorphic-btn bg-blue-500 text-white font-black text-xs uppercase tracking-widest shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:bg-blue-600 active:scale-95 transition-all border-none">
-                    Save Changes
-                </button>
-            </div>
+        <!-- Fixed Bottom Action Bar -->
+        <div class="bg-[#e0e5ec] border-t border-white/20 p-4 pb-[calc(var(--safe-bottom)+16px)] shrink-0 z-20 shadow-[0_-4px_20px_rgba(163,177,198,0.2)]">
+            <button type="button" id="saveSettings" class="w-full py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-[6px_6px_12px_rgba(59,130,246,0.3),-6px_-6px_12px_rgba(255,255,255,0.2)] transition-all">
+                Save Changes
+            </button>
         </div>
     </div>
 
     <script>
-        // Fix mobile active state sticky issue
-        document.addEventListener('touchstart', function() {}, {passive: true});
+        // Force Strict Context Menu Disable - SUPER STRICT
+        window.addEventListener('contextmenu', function(e) {
+            // Allow input/textarea long press for cursor/selection
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                // DO NOT prevent default here to allow context menu for inputs
+                return;
+            }
+            // Block everything else
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }, { capture: true }); // Use capture phase to intercept early
 
-        // Disable context menu (long press/right click) and drag
-        document.addEventListener('contextmenu', e => e.preventDefault());
+        // Disable selection globally via JS as backup
+        document.onselectstart = function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+            // Also allow selection inside contenteditable elements
+            if (e.target.isContentEditable) return true;
+            return false;
+        };
+        
+        // FIX INPUT FOCUS: Allow native behavior
+        // We removed the aggressive focus() calls because they interfere with native touch-to-focus logic
+        // and sometimes prevent the keyboard from appearing on mobile.
+        
+        // Ensure click events on inputs bubble up normally or at least aren't blocked
+        window.addEventListener('touchstart', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                // Explicitly allow default behavior and DO NOT manually focus
+                // Manual focus() calls here fight with browser native behavior and cause flashing
+                return true;
+            }
+        }, { passive: false }); // CHANGED to false to allow preventDefault if needed (though we don't call it)
+
+        // Prevent other listeners from hijacking input clicks
+        window.addEventListener('click', function(e) {
+             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                // Don't stop propagation unless necessary, but definitely don't prevent default
+                // e.target.focus(); // REMOVED manual focus here too
+            }
+        }, { passive: false });
+
+        // JS-controlled Active State Logic
+        (function() {
+            let activeElement = null;
+            let startX = 0;
+            let startY = 0;
+            let isScrolling = false;
+
+            function addPressedState(e) {
+                // Ignore inputs/textareas to allow normal typing/selection
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                // Record start position for scroll detection
+                if (e.touches && e.touches[0]) {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                }
+                isScrolling = false;
+
+                // Pre-cleanup: remove any existing pressed states immediately
+                removePressedState();
+
+                // Find closest button-like element OR scrollable card
+                // Expanded list to include ANY element with onclick, button role, or neumorphic class
+                // REMOVED .neumorphic from selector to prevent inner decorative elements from hijacking clicks
+                // ADDED .learning-insight-card to support insights interactions
+                // ADDED .verb-card-block to support granular interactions within verb cards
+                // ADDED .action-card-btn to support central action buttons in review/mastery
+                const target = e.target.closest('button, a, .neumorphic-btn, .neumorphic-btn-sm, .neumorphic-toggle-btn, .nav-item, .verb-card, .learning-insight-card, .verb-card-block, .action-card-btn, [onclick], [role="button"]');
+                if (target && !target.disabled) {
+                    // EXCLUDE MODALS AND SPECIFIC CONTAINERS FROM PRESS EFFECT
+                    // Check if the target is ITSELF a modal or modal content wrapper
+                    if (target.id === 'verbModal' || target.id === 'learningModal' || target.id === 'settingsModal' || target.id === 'analyticsModal' || target.id === 'importConfirmModal' || target.classList.contains('fixed') || target.classList.contains('modal-content') || target.classList.contains('modal-overlay')) {
+                        return;
+                    }
+                    
+                    // Also check if target is inside a modal content area but IS the content area itself (not a button inside)
+                    // The .neumorphic class is often on the modal content wrapper, which we don't want to scale
+                    if (target.classList.contains('neumorphic') && !target.classList.contains('neumorphic-btn') && !target.classList.contains('neumorphic-btn-sm') && !target.classList.contains('verb-card') && !target.classList.contains('learning-insight-card') && !target.classList.contains('verb-card-block') && !target.classList.contains('action-card-btn') && !target.getAttribute('onclick') && target.tagName !== 'BUTTON' && target.tagName !== 'A') {
+                         return;
+                    }
+
+                    activeElement = target;
+
+                    // PROMOTION LOGIC: If target is a block inside a main verb card (List View), transfer press to the card itself
+                    // This ensures the whole card scales as one unit, rather than just the block
+                    if (target.classList.contains('verb-card-block')) {
+                        const parentCard = target.closest('.verb-card');
+                        if (parentCard) {
+                            activeElement = parentCard;
+                        }
+                    }
+
+                    // Delay adding pressed state slightly to prevent flash on quick scroll
+                    // But for responsiveness, we usually want instant. Let's rely on move cancellation.
+                    activeElement.classList.add('is-pressed');
+
+                    // SPECIAL LINKING REMOVED: Since we now promote to parent card, we don't need to manually link siblings.
+                    // Granular feedback for Detail View (which has no .verb-card parent) is preserved automatically.
+                }
+            }
+
+            function removePressedState() {
+                if (activeElement) {
+                    activeElement.classList.remove('is-pressed');
+                    // ONLY blur if it's NOT an input
+                    if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
+                        try { activeElement.blur(); } catch(e){}
+                    }
+                    activeElement = null;
+                }
+                // Cleanup any strays just in case (Global cleanup)
+                const pressed = document.querySelectorAll('.is-pressed');
+                if (pressed.length > 0) {
+                    pressed.forEach(el => {
+                        el.classList.remove('is-pressed');
+                        // ONLY blur if it's NOT an input
+                        if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') {
+                            try { el.blur(); } catch(e){}
+                        }
+                    });
+                }
+                
+                // Clear selection if any exists
+                if (window.getSelection) {
+                    try { window.getSelection().removeAllRanges(); } catch(e){}
+                }
+                
+                // Force focus removal from active element if it's not an input
+                if (document.activeElement && 
+                    document.activeElement.tagName !== 'INPUT' && 
+                    document.activeElement.tagName !== 'TEXTAREA') {
+                    try { document.activeElement.blur(); } catch(e){}
+                }
+            }
+
+            // Attach listeners to WINDOW to capture everything
+            window.addEventListener('touchstart', addPressedState, { passive: false }); // CHANGED: passive: false to allow preventDefault if needed (though we return early for inputs)
+
+            // Reset on ANY release or cancellation - ATTACH TO WINDOW
+            const clearSelectionAndReset = (e) => {
+                removePressedState();
+                // ONLY clear selection if NOT interacting with input
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                    if (window.getSelection) {
+                        try { window.getSelection().removeAllRanges(); } catch(e){}
+                    }
+                }
+            };
+
+            window.addEventListener('touchend', clearSelectionAndReset, { capture: true });
+            window.addEventListener('touchcancel', clearSelectionAndReset, { capture: true });
+            window.addEventListener('mouseup', clearSelectionAndReset, { capture: true });
+            document.addEventListener('mouseleave', removePressedState, { capture: true });
+            window.addEventListener('dragend', removePressedState, { capture: true });
+            window.addEventListener('contextmenu', removePressedState, { capture: true }); 
+            window.addEventListener('scroll', removePressedState, { passive: true, capture: true });
+            
+            // CRITICAL FIX: Reset state on ANY movement (scrolling attempt) with threshold
+            window.addEventListener('touchmove', function(e) {
+                // If interacting with INPUT, allow native behavior (cursor move, selection)
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return; 
+                }
+
+                if (isScrolling) return; // Already scrolling, ignore
+
+                if (e.touches && e.touches[0]) {
+                    const moveX = e.touches[0].clientX;
+                    const moveY = e.touches[0].clientY;
+                    const diffX = Math.abs(moveX - startX);
+                    const diffY = Math.abs(moveY - startY);
+
+                    // Threshold of 10px to consider it a scroll/drag
+                    if (diffX > 10 || diffY > 10) {
+                        isScrolling = true;
+                        removePressedState();
+                    }
+                } else {
+                    // Fallback if no touches info
+                    removePressedState();
+                }
+            }, { passive: true, capture: true });
+            
+            // SUPER AGGRESSIVE VIBRATION KILLER
+            // Intercepts all click/auxclick events that might trigger haptics
+            window.addEventListener('auxclick', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }, { capture: true });
+
+            // Ensure anchors don't trigger context menu on long press
+            document.querySelectorAll('a').forEach(a => {
+                a.style.webkitTouchCallout = 'none';
+                a.style.userSelect = 'none';
+            });
+            
+            // EXPOSE RESET FUNCTION GLOBALLY
+            window.globalResetPressedState = removePressedState;
+            
+        })();
+        
+        // Fix mobile active state sticky issue
+        document.addEventListener('touchstart', function(e) {
+            // Allow default behavior for inputs
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                // Keep passive true but maybe don't need to do anything else
+            }
+        }, {passive: true});
+        
+        // Disable context menu (legacy listener, keep as backup)
+        document.addEventListener('contextmenu', e => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            e.preventDefault();
+        });
         document.addEventListener('dragstart', e => e.preventDefault());
 
         function scrollToTop() {
@@ -6489,14 +6785,55 @@
         const settingsModal = document.getElementById('settingsModal');
         
         function openSettings() {
+            // Push state first
             pushModalState(closeSettings);
-            settingsModal.classList.remove('hidden');
-            // Trigger reflow
-            void settingsModal.offsetWidth;
-            settingsModal.classList.remove('opacity-0');
-            settingsModal.querySelector('#settingsContent').classList.remove('scale-95');
-            settingsModal.querySelector('#settingsContent').classList.add('scale-100');
             
+            // Slide up animation
+            requestAnimationFrame(() => {
+                settingsModal.classList.remove('translate-y-full');
+                settingsModal.classList.add('translate-y-0');
+            });
+            
+            // IMMEDIATE SYNC: Load settings from localStorage directly to avoid async delay
+            try {
+                // 0. Visuals Priority: Check standalone key first
+                const visualKey = localStorage.getItem('visuals_provider');
+                if (visualKey) {
+                    selectImageProvider(visualKey);
+                } else {
+                    const localSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    // 1. Restore Visuals from Object
+                    if (localSettings.image_provider) {
+                        selectImageProvider(localSettings.image_provider);
+                    } else {
+                        selectImageProvider('none');
+                    }
+                }
+                
+                const localSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                
+                // 2. Restore Analysis Mode
+                if (localSettings.analysisMode) {
+                    updateAnalysisModeUI(localSettings.analysisMode);
+                } else if (analysisMode) {
+                    updateAnalysisModeUI(analysisMode);
+                }
+                
+                // 3. Restore Inputs
+                const settingsForm = document.getElementById('settingsForm');
+                if (settingsForm) {
+                    Object.keys(localSettings).forEach(key => {
+                        const input = settingsForm.querySelector(`[name="${key}"]`);
+                        if (input && input.type !== 'radio' && input.type !== 'checkbox') {
+                            input.value = localSettings[key];
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Fast settings load failed", e);
+            }
+            
+            // Then perform full load (which might fetch updated data if we were using a real backend)
             loadSettings();
         }
 
@@ -6640,13 +6977,12 @@
                 // if (idx > -1) modalStack.splice(idx, 1);
                 history.back();
             }
-            settingsModal.classList.add('opacity-0');
-            settingsModal.querySelector('#settingsContent').classList.remove('scale-100');
-            settingsModal.querySelector('#settingsContent').classList.add('scale-95');
             
-            setTimeout(() => {
-                settingsModal.classList.add('hidden');
-            }, 300);
+            // Slide down animation
+            requestAnimationFrame(() => {
+                settingsModal.classList.remove('translate-y-0');
+                settingsModal.classList.add('translate-y-full');
+            });
         }
         
         // Use inline onclick or check existence to avoid TypeError
@@ -6777,6 +7113,7 @@
                 if (data.status === 'success') {
                     // Force clear local storage items that are not handled by backend
                     localStorage.removeItem('app_settings');
+                    localStorage.removeItem('visuals_provider');
                     localStorage.removeItem('excludedVerbs');
                     localStorage.removeItem('analysisMode');
                     localStorage.removeItem('autoAiAnalysis');
@@ -6834,50 +7171,60 @@
                 
                 // 3. Handle Binary Response (Blob)
                 const blob = await res.blob();
+                const isJson = blob.type === 'application/json';
+                const extension = isJson ? 'json' : 'zip';
                 
                 // Detect Capacitor
                 if (window.Capacitor && window.Capacitor.isNative) {
-                    try {
-                        const reader = new FileReader();
-                        reader.readAsDataURL(blob);
-                        reader.onloadend = async () => {
-                            const base64data = reader.result;
-                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.zip`;
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = async () => {
+                        const base64data = reader.result; // This includes "data:application/zip;base64," prefix
+                        // Clean base64 string for Filesystem plugin (it expects pure base64)
+                        const pureBase64 = base64data.split(',')[1];
+                        
+                        const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                        
+                        try {
+                            const { Filesystem, Directory } = Capacitor.Plugins;
                             
-                            try {
-                                const { Filesystem, Directory } = window.Capacitor.Plugins;
-                                // Write file to Documents directory
-                                await Filesystem.writeFile({
-                                    path: filename,
-                                    data: base64data,
-                                    directory: Directory.Documents
-                                });
-                                alert(`Backup saved to Documents/${filename}`);
-                            } catch (fsError) {
-                                console.error("Capacitor FS write failed:", fsError);
-                                // Fallback to share
-                                try {
-                                    const { Share } = window.Capacitor.Plugins;
-                                    await Share.share({
-                                        title: 'NETEM Backup',
-                                        text: 'NETEM Deep Vocab Tools Backup',
-                                        url: base64data,
-                                        dialogTitle: 'Save Backup'
-                                    });
-                                } catch (shareError) {
-                                    console.error("Share failed:", shareError);
-                                    throw new Error("Failed to save file on device.");
-                                }
-                            }
-                        };
-                    } catch (capError) {
-                        console.error("Capacitor export logic failed", capError);
-                        // Fallback to blob url
-                        downloadBlob(blob);
-                    }
+                            // Write file to Documents directory
+                            const result = await Filesystem.writeFile({
+                                path: filename,
+                                data: pureBase64,
+                                directory: Directory.Documents
+                            });
+                            
+                            // Get the full URI to share
+                            const fileUri = result.uri;
+                            
+                            // Share the file
+                            const { Share } = Capacitor.Plugins;
+                            
+                            await Share.share({
+                                title: 'NETEM Backup',
+                                text: 'NETEM Deep Vocab Tools Backup',
+                                url: fileUri, 
+                                dialogTitle: 'Save Backup',
+                                files: [fileUri] 
+                            });
+                            
+                        } catch (fsError) {
+                            console.error("Capacitor Export Error:", fsError);
+                            alert("Export failed on device: " + fsError.message);
+                        }
+                    };
                 } else {
                     // Web/Browser logic
-                    downloadBlob(blob);
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
                 }
                 
                 if (btn) {
@@ -6932,7 +7279,7 @@
             // Create hidden file input
             const input = document.createElement('input');
             input.type = 'file';
-            input.accept = '.zip'; // Expect ZIP now
+            input.accept = '.zip,.json'; 
             input.style.display = 'none';
             document.body.appendChild(input);
             
@@ -7043,15 +7390,19 @@
                 const dot = indicator.querySelector('div');
                 
                 if (card.id === `provider-card-${provider}`) {
-                    card.classList.add('bg-white', 'shadow-md', 'border-blue-100');
-                    card.classList.remove('bg-[#e0e5ec]', 'border-transparent');
-                    indicator.classList.add('border-blue-500');
+                    // Selected: Inset (pressed) look
+                    card.classList.add('neumorphic-inset');
+                    card.classList.remove('hover:bg-white/30');
+                    
+                    indicator.classList.add('border-blue-500', 'bg-blue-50/50');
                     indicator.classList.remove('border-gray-300');
                     dot.classList.remove('opacity-0');
                 } else {
-                    card.classList.remove('bg-white', 'shadow-md', 'border-blue-100');
-                    card.classList.add('bg-[#e0e5ec]', 'border-transparent');
-                    indicator.classList.remove('border-blue-500');
+                    // Unselected: Flat with hover
+                    card.classList.remove('neumorphic-inset');
+                    card.classList.add('hover:bg-white/30');
+                    
+                    indicator.classList.remove('border-blue-500', 'bg-blue-50/50');
                     indicator.classList.add('border-gray-300');
                     dot.classList.add('opacity-0');
                 }
@@ -7087,6 +7438,33 @@
                 localStorage.setItem('autoAiAnalysis', 'false');
                 localStorage.setItem('cacheOnlyMode', 'false');
             }
+            
+            // Update UI
+            updateAnalysisModeVisuals();
+        }
+        
+        function updateAnalysisModeVisuals() {
+            document.querySelectorAll('.analysis-card').forEach(card => {
+                const input = card.querySelector('input[type="radio"]');
+                const indicator = card.querySelector('.check-indicator');
+                const dot = indicator.querySelector('div');
+
+                if (input && input.checked) {
+                    card.classList.add('neumorphic-inset');
+                    card.classList.remove('hover:bg-white/30');
+                    
+                    indicator.classList.add('border-blue-500', 'bg-blue-50/50');
+                    indicator.classList.remove('border-gray-300');
+                    dot.classList.remove('opacity-0');
+                } else {
+                    card.classList.remove('neumorphic-inset');
+                    card.classList.add('hover:bg-white/30');
+                    
+                    indicator.classList.remove('border-blue-500', 'bg-blue-50/50');
+                    indicator.classList.add('border-gray-300');
+                    dot.classList.add('opacity-0');
+                }
+            });
         }
 
         function updateAnalysisModeUI(mode) {
@@ -7095,6 +7473,7 @@
             radios.forEach(r => {
                 if (r.value === mode) r.checked = true;
             });
+            updateAnalysisModeVisuals();
         }
 
         async function loadSettings() {
@@ -7120,10 +7499,20 @@
                     });
                     
                     // Initialize Custom Provider UI
-                    if (data.image_provider) {
+                    // PRIORITY: Standalone Key > API Response > Object Key > Default
+                    const standaloneVisuals = localStorage.getItem('visuals_provider');
+                    
+                    if (standaloneVisuals) {
+                        selectImageProvider(standaloneVisuals);
+                    } else if (data.image_provider) {
                         selectImageProvider(data.image_provider);
                     } else {
-                        selectImageProvider('dicebear'); // Default
+                        const local = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                        if (local.image_provider) {
+                            selectImageProvider(local.image_provider);
+                        } else {
+                            selectImageProvider('none');
+                        }
                     }
                     
                     // Load local analysisMode setting
@@ -7143,6 +7532,9 @@
         }
         
         async function recordReview(result) {
+            // IMMEDIATE: Reset any pressed buttons
+            if (window.globalResetPressedState) window.globalResetPressedState();
+
             const verb = document.getElementById('modalTitle').innerText.toLowerCase();
             if (!verb) return;
 
@@ -7228,6 +7620,9 @@
                             }
 
                             if (nextVerbToReview) {
+                                // Reset button states before transition
+                                if (window.globalResetPressedState) window.globalResetPressedState();
+                                
                                 // Open next word without closing modal (just switch content)
                                 openVerb(nextVerbToReview, true);
                                 // Re-render background UI
@@ -7236,6 +7631,9 @@
                             } else {
                                 // No more words to review, close modal
                                 closeModal();
+                                // Reset buttons again after closing modal
+                                if (window.globalResetPressedState) window.globalResetPressedState();
+
                                 if (currentPage === 'review') {
                                     renderReviewSummary();
                                 } else {
@@ -7247,6 +7645,9 @@
                         // Not in review mode, just close normally
                         setTimeout(() => {
                             closeModal();
+                            // Reset buttons again after closing modal
+                            if (window.globalResetPressedState) window.globalResetPressedState();
+
                             if (currentPage === 'learn') {
                                 applyFilters(); // Re-filter and potentially generate new batch if empty
                             } else {
@@ -7260,48 +7661,118 @@
                 console.error("Error recording review:", e);
             }
         }
-
-        // showToast function removed per user request
-
-        document.getElementById('saveSettings').onclick = async () => {
-            const form = document.getElementById('settingsForm');
-            const formData = new FormData(form);
-            const data = {};
-            formData.forEach((value, key) => {
-                if (key !== 'autoAiAnalysis' && key !== 'cacheOnlyMode' && key !== 'analysisMode') {
-                    data[key] = value;
-                }
-            });
-            
-            // Note: analysisMode is already saved to localStorage on change, no need to submit to backend
-            // unless we want to persist user preferences on server.
-            
+        
+        function saveSettings() {
             const saveBtn = document.getElementById('saveSettings');
-            const originalText = saveBtn.innerText;
+            const originalText = saveBtn ? saveBtn.innerText : 'Save';
             
-            try {
+            if (saveBtn) {
                 saveBtn.innerText = 'Saving...';
                 saveBtn.disabled = true;
+            }
+
+            try {
+                // 1. Load existing settings first to preserve other keys (like daily_goal)
+                const currentSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
                 
-                const res = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
-                    signal: pageAbortController.signal
-                });
+                // 2. Manually capture values from DOM to avoid FormData/hidden input issues
+                const newSettings = { ...currentSettings };
+
+                // Capture API Key
+                const apiKeyInput = document.querySelector('input[name="openai_api_key"]');
+                if (apiKeyInput) newSettings.openai_api_key = apiKeyInput.value.trim();
+
+                // Capture Base URL
+                const baseUrlInput = document.querySelector('input[name="openai_base_url"]');
+                if (baseUrlInput) newSettings.openai_base_url = baseUrlInput.value.trim();
+
+                // Capture Model
+                const modelInput = document.querySelector('input[name="openai_model"]');
+                if (modelInput) newSettings.openai_model = modelInput.value.trim();
+
+                // Capture Pollinations Config
+                const pollKeyInput = document.querySelector('input[name="pollinations_api_key"]');
+                if (pollKeyInput) newSettings.pollinations_api_key = pollKeyInput.value.trim();
+
+                const pollModelInput = document.querySelector('input[name="pollinations_model"]');
+                if (pollModelInput) newSettings.pollinations_model = pollModelInput.value.trim();
+
+                // Capture Analysis Mode (Radio)
+                const analysisModeInput = document.querySelector('input[name="analysisMode"]:checked');
+                if (analysisModeInput) {
+                    newSettings.analysisMode = analysisModeInput.value;
+                    // Also update legacy keys for compatibility
+                    updateAnalysisMode(analysisModeInput.value);
+                }
+
+                // Capture Image Provider (Priority: Hidden Select > UI State > Default)
+                // We revert to trusting the hidden select as the primary source of truth,
+                // because it is explicitly updated by the selection function.
+                let selectedProvider = null;
+                const providerSelect = document.getElementById('image_provider_select');
                 
-                if (res.ok) {
-                    // Silent success
+                if (providerSelect && providerSelect.value) {
+                    selectedProvider = providerSelect.value;
+                }
+                
+                // Fallback to UI state only if select is somehow empty
+                if (!selectedProvider) {
+                    if (document.getElementById('provider-card-none')?.classList.contains('neumorphic-inset')) {
+                        selectedProvider = 'none';
+                    } else if (document.getElementById('provider-card-pollinations')?.classList.contains('neumorphic-inset')) {
+                        selectedProvider = 'pollinations';
+                    } else if (document.getElementById('provider-card-dicebear')?.classList.contains('neumorphic-inset')) {
+                        selectedProvider = 'dicebear';
+                    }
+                }
+                
+                // Final fallback
+                newSettings.image_provider = selectedProvider || 'none';
+
+                // 3. Save merged settings to LocalStorage
+                localStorage.setItem('app_settings', JSON.stringify(newSettings));
+                // DUAL SAVE: Save strictly to a separate key to avoid object merging issues
+                // Explicitly allow saving 'none' or any valid value
+                if (newSettings.image_provider) {
+                    localStorage.setItem('visuals_provider', newSettings.image_provider);
+                } else {
+                    // If somehow empty, default to none
+                    localStorage.setItem('visuals_provider', 'none');
+                }
+                
+                console.log("Settings saved successfully:", newSettings);
+
+                // 4. Visual Feedback
+                if (saveBtn) {
+                    saveBtn.innerText = 'Saved!';
+                    setTimeout(() => {
+                        saveBtn.innerText = originalText;
+                        saveBtn.disabled = false;
+                        closeSettings();
+                        // Force reload settings to apply changes immediately
+                        loadSettings(); 
+                    }, 500);
+                } else {
                     closeSettings();
+                    loadSettings();
                 }
             } catch (e) {
-                if (e.name === 'AbortError') return;
-                console.error('Error saving settings:', e);
-            } finally {
-                saveBtn.innerText = originalText;
-                saveBtn.disabled = false;
+                console.error("Save settings failed:", e);
+                alert("Failed to save settings: " + e.message);
+                if (saveBtn) {
+                    saveBtn.innerText = originalText;
+                    saveBtn.disabled = false;
+                }
             }
-        };
+        }
+
+        // Attach to button if exists
+        const saveBtn = document.getElementById('saveSettings');
+        // Ensure we remove old listeners to prevent duplicates
+        if (saveBtn) {
+            saveBtn.onclick = null; 
+            saveBtn.onclick = saveSettings;
+        }
 
         // Proxy fetch to LocalAPI (only if not running on FastAPI port 8080)
         const originalFetch = window.fetch;
@@ -7328,11 +7799,13 @@
                         const file = options.body.get('file');
                         if (file) {
                             try {
-                                const text = await file.text();
-                                data = { data: JSON.parse(text) };
+                                // IMPORTANT: For LocalAPI import, we pass the raw File object.
+                                // LocalAPI.handle will process it (via JSZip).
+                                // Do NOT try to parse as JSON text here, as it is a binary ZIP file.
+                                data = { file: file };
                             } catch (e) {
-                                console.error("Error parsing backup file:", e);
-                                return new Response(JSON.stringify({ status: "error", message: "Invalid JSON file" }), {
+                                console.error("Error preparing backup file:", e);
+                                return new Response(JSON.stringify({ status: "error", message: "Invalid file" }), {
                                     status: 400,
                                     headers: { 'Content-Type': 'application/json' }
                                 });
@@ -7388,6 +7861,81 @@
             await loadLearningStatus();
             await loadSettings();
             await loadVerbs(); // Changed from loadAllVerbs to loadVerbs
+
+            // Handle Android Hardware Back Button
+            // If Capacitor is available, listen for 'backButton' event
+            if (window.Capacitor) {
+                const { App } = Capacitor.Plugins;
+                App.addListener('backButton', ({ canGoBack }) => {
+                    // 1. Close Learning/Verb Modal if active
+                    const learningModal = document.getElementById('learningModal');
+                    if (learningModal && learningModal.classList.contains('active')) {
+                        closeModal();
+                        return;
+                    }
+
+                    // 2. Close Settings Modal if open
+                    const settingsModal = document.getElementById('settingsModal');
+                    if (settingsModal && settingsModal.classList.contains('translate-y-0')) {
+                        closeSettings();
+                        return;
+                    }
+                    
+                    // 3. Close Excluded Modal if open
+                    const excludedModal = document.getElementById('excludedModal');
+                    if (excludedModal && !excludedModal.classList.contains('hidden')) {
+                        closeExcludedModal();
+                        return;
+                    }
+
+                    // 3.5 Close Analytics Modal if open
+                    const analyticsModal = document.getElementById('analyticsModal');
+                    if (analyticsModal && !analyticsModal.classList.contains('hidden')) {
+                        closeAnalytics();
+                        return;
+                    }
+                    
+                    // 3.6 Close Search Modal if open
+                    const searchModal = document.getElementById('searchModal');
+                    if (searchModal && !searchModal.classList.contains('hidden')) {
+                        closeSearchModal();
+                        return;
+                    }
+
+                    // 4. Close Reset Confirmation Modal if open (dynamically appended)
+                    const resetModal = document.getElementById('resetConfirmModal');
+                    if (resetModal) {
+                        try {
+                            document.body.removeChild(resetModal);
+                        } catch (e) { console.warn("Could not remove resetModal", e); }
+                        return;
+                    }
+                    
+                    // 4.1 Close Import Confirm Modal
+                    const importConfirmModal = document.getElementById('importConfirmModal');
+                    if (importConfirmModal && !importConfirmModal.classList.contains('hidden')) {
+                        closeImportConfirmModal();
+                        return;
+                    }
+                    
+                    // 4.2 Close Clear All Modal
+                    const clearAllModal = document.getElementById('clearAllModal');
+                    if (clearAllModal && !clearAllModal.classList.contains('hidden')) {
+                        closeClearAllModal();
+                        return;
+                    }
+
+                    // 5. If on a sub-page (not Learn/Home), go back to Learn/Home
+                    // Assuming 'learn' is the home page.
+                    if (currentPage !== 'learn') {
+                        switchPage('learn');
+                        return;
+                    }
+
+                    // 6. Otherwise, minimize app (background) instead of exit
+                    App.minimizeApp();
+                });
+            }
         });
     </script>
     <!-- Service Worker Registration -->

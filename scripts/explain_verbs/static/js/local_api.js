@@ -7,6 +7,29 @@ const LocalAPI = {
     verbsData: null,
     legacyData: null,
     originalFetch: null,
+    DATA_VERSION: 5, // Increment this to force re-import of verbs and legacy data
+
+    /**
+     * Helper to fetch resources with path fallback
+     */
+    async fetchResource(filename) {
+        const paths = [
+            `static/${filename}`,
+            `./static/${filename}`,
+            `../static/${filename}`
+        ];
+        
+        for (const path of paths) {
+            try {
+                const resp = await fetch(path);
+                if (resp.ok) return resp;
+                console.warn(`LocalAPI: Path ${path} returned ${resp.status}`);
+            } catch (e) {
+                console.warn(`LocalAPI: Failed to fetch ${path}`, e);
+            }
+        }
+        return null;
+    },
 
     /**
      * Initialize the local API by loading data
@@ -22,54 +45,115 @@ const LocalAPI = {
             await this.syncFromBackend();
 
             // Load legacy data for fallback
-            try {
-                const legacyResp = await fetch('static/legacy_data.json');
-                if (legacyResp.ok) {
-                    this.legacyData = await legacyResp.json();
-                    console.log(`LocalAPI: Loaded ${Object.keys(this.legacyData).length} legacy records.`);
+            // Priority: Window Global (Inline JS) > Fetch Resource
+            if (window.NETEM_LEGACY_DATA) {
+                this.legacyData = window.NETEM_LEGACY_DATA;
+                console.log(`LocalAPI: Loaded ${Object.keys(this.legacyData).length} legacy records from inline JS.`);
+            } else {
+                const legacyResp = await this.fetchResource('legacy_data.json');
+                if (legacyResp) {
+                    try {
+                        this.legacyData = await legacyResp.json();
+                        console.log(`LocalAPI: Loaded ${Object.keys(this.legacyData).length} legacy records.`);
+                    } catch (jsonErr) {
+                        console.error("LocalAPI: JSON parse error for legacy_data", jsonErr);
+                    }
+                } else {
+                    console.error("LocalAPI: Critical - Could not load legacy_data.json from any path.");
                 }
-            } catch (e) {
-                console.warn("LocalAPI: Could not load legacy_data.json", e);
             }
 
             // Wait for DB to be ready
             if (window.db) {
                 try {
-                    await window.db.open();
+                    // Timeout race for initial DB connection
+                    await Promise.race([
+                        window.db.open(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("DB Open Timeout")), 2000))
+                    ]);
                     console.log("LocalAPI: Database opened.");
                     
-                    // 1. Check if we need to import legacy data into explanations table
+                    // Check Data Version
+                    const currentVersion = parseInt(localStorage.getItem('data_version') || '0');
+                    const needsUpdate = currentVersion < this.DATA_VERSION;
+                    
+                    if (needsUpdate) {
+                        console.log(`LocalAPI: Data version mismatch (Current: ${currentVersion}, New: ${this.DATA_VERSION}). Clearing verbs table for fresh import...`);
+                        if (window.db.verbs) await window.db.verbs.clear();
+                        localStorage.setItem('data_version', this.DATA_VERSION.toString());
+                        // Reset legacy imported flag to force re-check
+                        localStorage.removeItem('legacy_data_imported_v3');
+                    }
+
+                    // 1. Smart Import/Merge legacy data into explanations table
+                    // We check if we've fully imported before, or if the DB count is suspiciously low
+                    const legacyImported = localStorage.getItem('legacy_data_imported_v3');
                     const expCount = await window.db.explanations.count();
-                    // If table is empty AND we have legacy data, import it.
-                    // IMPORTANT: We must wait for this import to finish before proceeding,
-                    // otherwise subsequent loads might think the DB is empty.
-                    if (expCount === 0 && this.legacyData && Object.keys(this.legacyData).length > 0) {
-                        console.log("LocalAPI: Explanations table is empty, importing legacy data...");
-                        const explanations = [];
-                        const now = new Date().toISOString();
-                        
-                        for (const [word, content] of Object.entries(this.legacyData)) {
-                            // Ensure content is valid string
-                            if (content && typeof content === 'string' && content.length > 10) {
-                                explanations.push({
-                                    mode: 'single',
-                                    query_key: word.toLowerCase(),
-                                    content: content,
-                                    created_at: now
-                                });
+                    const legacyCount = this.legacyData ? Object.keys(this.legacyData).length : 0;
+
+                    // If not marked as imported, OR DB has fewer records than legacy (indicating partial/failed import)
+                    if (this.legacyData && (!legacyImported || expCount < legacyCount || needsUpdate)) {
+                        const legacyEntries = Object.entries(this.legacyData);
+                        if (legacyEntries.length > 0) {
+                            console.log(`LocalAPI: reconciling legacy data (DB: ${expCount}, Legacy: ${legacyCount})...`);
+                            
+                            // Get all existing keys to perform a "safe insert" (don't overwrite user data)
+                            // This is efficient even for 5000+ keys
+                            const existingKeys = new Set(await window.db.explanations.toCollection().primaryKeys());
+                            
+                            const explanationsToAdd = [];
+                            const now = new Date().toISOString();
+                            
+                            for (const [word, val] of legacyEntries) {
+                                const key = word.toLowerCase();
+                                // Only add if NOT present in DB
+                                if (!existingKeys.has(key)) {
+                                    let content = null;
+                                    let image_url = null;
+                                    let image_dicebear = null;
+                                    let image_pollinations = null;
+
+                                    // Support both string (old) and object (new) formats
+                                    if (typeof val === 'string') {
+                                        content = val;
+                                    } else if (typeof val === 'object' && val !== null) {
+                                        content = val.content;
+                                        image_url = val.image_url;
+                                        image_dicebear = val.image_dicebear;
+                                        image_pollinations = val.image_pollinations;
+                                    }
+
+                                    // Ensure content is valid string
+                                    if (content && typeof content === 'string' && content.length > 10) {
+                                        explanationsToAdd.push({
+                                            mode: 'single',
+                                            query_key: key,
+                                            content: content,
+                                            image_url: image_url,
+                                            image_dicebear: image_dicebear,
+                                            image_pollinations: image_pollinations,
+                                            created_at: now
+                                        });
+                                    }
+                                }
                             }
-                        }
-                        
-                        if (explanations.length > 0) {
-                            try {
-                                await window.db.explanations.bulkPut(explanations);
-                                console.log(`LocalAPI: Imported ${explanations.length} legacy records to explanations.`);
-                            } catch (importErr) {
-                                console.error("LocalAPI: Failed to import legacy data", importErr);
+                            
+                            if (explanationsToAdd.length > 0) {
+                                try {
+                                    console.log(`LocalAPI: Adding ${explanationsToAdd.length} missing records...`);
+                                    await window.db.explanations.bulkAdd(explanationsToAdd);
+                                    console.log(`LocalAPI: Successfully merged legacy data.`);
+                                    localStorage.setItem('legacy_data_imported_v3', 'true');
+                                } catch (importErr) {
+                                    console.error("LocalAPI: Failed to import legacy data", importErr);
+                                }
+                            } else {
+                                console.log("LocalAPI: All legacy records already exist.");
+                                localStorage.setItem('legacy_data_imported_v3', 'true');
                             }
                         }
                     } else if (expCount > 0) {
-                        console.log(`LocalAPI: DB has ${expCount} records, skipping legacy import.`);
+                        console.log(`LocalAPI: DB seems up to date (${expCount} records).`);
                     } else {
                         console.warn("LocalAPI: No legacy data found to import.");
                     }
@@ -79,27 +163,56 @@ const LocalAPI = {
                         const verbCount = await DB.getVerbsCount();
                         // If count is less than 5530, it means we might have missing entries due to casing deduplication
                         // or it's a fresh install. We should reload the full list.
-                        if (verbCount < 5530) {
-                            console.log(`LocalAPI: Verbs table has ${verbCount} entries (expected ~5530), importing full list...`);
-                            const response = await fetch('static/netem_full_list.json');
-                            if (response.ok) {
-                                const rawData = await response.json();
+                        if (verbCount < 5530 || needsUpdate) {
+                            console.log(`LocalAPI: Verbs table has ${verbCount} entries (expected 5530), importing full list...`);
+                            
+                            let rawData = null;
+                            
+                            // Priority: Window Global (Inline JS) > Fetch Resource
+                            if (window.NETEM_FULL_LIST) {
+                                console.log("LocalAPI: Using inline NETEM_FULL_LIST.");
+                                rawData = window.NETEM_FULL_LIST;
+                            } else {
+                                try {
+                                    const response = await this.fetchResource('netem_full_list.json');
+                                    if (response) {
+                                        rawData = await response.json();
+                                    }
+                                } catch (fetchErr) {
+                                    console.error("LocalAPI: Failed to fetch netem_full_list", fetchErr);
+                                }
+                            }
+
+                            if (rawData) {
                                 const list = rawData["5530考研词汇词频排序表"] || [];
                                 
                                 if (list.length > 0) {
-                                    const verbsToInsert = list.map(item => ({
-                                        word: (item["单词"] || "").trim().toLowerCase(), // Lowercase key for lookup
-                                        original_word: (item["单词"] || "").trim(), // Preserve original case
-                                        frequency: item["词频"] || 0,
-                                        definition: item["释义"] || "",
-                                        pos: item["pos"] || "other",
-                                        alternative_spelling: item["其他拼写"] || null,
-                                        sequence: item["序号"] || 0
-                                    }));
+                                    // Clear table first to avoid key constraints if we're re-importing
+                                    if (verbCount > 0 && verbCount < 5530) {
+                                        console.warn("LocalAPI: Clearing incomplete verbs table before re-import...");
+                                        await window.db.verbs.clear();
+                                    }
+
+                                    const verbsToInsert = list.map(item => {
+                                        const original = (item["单词"] || "").trim();
+                                        // STRICT MODE: Use original case as key to ensure 5530 distinct entries
+                                        // This allows 'May' and 'may' to coexist as separate entries
+                                        return {
+                                            word: original, // Primary Key: Exact string match
+                                            original_word: original,
+                                            frequency: item["词频"] || 0,
+                                            definition: item["释义"] || "",
+                                            pos: item["pos"] || "other",
+                                            alternative_spelling: item["其他拼写"] || null,
+                                            sequence: item["序号"] || 0
+                                        };
+                                    });
                                     
                                     await DB.bulkAddVerbs(verbsToInsert);
                                     console.log(`LocalAPI: Imported ${verbsToInsert.length} verbs to IndexedDB.`);
                                 }
+                            } else {
+                                console.error("LocalAPI: Failed to fetch netem_full_list.json");
                             }
                         }
                     } else {
@@ -132,11 +245,15 @@ const LocalAPI = {
                 }
 
                 if (!loadedFromDb) {
-                    // Fallback to fetch if DB import failed or is taking too long
-                    const response = await fetch('static/netem_full_list.json');
-                    if (response.ok) {
-                        const rawData = await response.json();
-                        this.verbsData = rawData["5530考研词汇词频排序表"] || [];
+                    // Fallback to inline JS or fetch
+                    if (window.NETEM_FULL_LIST) {
+                        this.verbsData = window.NETEM_FULL_LIST["5530考研词汇词频排序表"] || [];
+                    } else {
+                        const response = await this.fetchResource('netem_full_list.json');
+                        if (response) {
+                            const rawData = await response.json();
+                            this.verbsData = rawData["5530考研词汇词频排序表"] || [];
+                        }
                     }
                 }
             }
@@ -206,17 +323,106 @@ const LocalAPI = {
                        route.includes('/api/learn_batch') || 
                        route.includes('/api/export') ||
                        route.includes('/api/mastery');
+                       // REMOVED /api/verbs from mandatory DB check to allow fallback
 
-        if (needsDb && !window.db) {
-            console.error(`LocalAPI: Critical - window.db is undefined while handling ${route}`);
-            return { error: "Database instance not found" };
+        if (needsDb) {
+            // Force init if window.db is missing but initDB exists
+            if (window.initDB) {
+                try {
+                    // Add timeout race condition (2000ms)
+                    await Promise.race([
+                        window.initDB(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("DB Init Timeout")), 2000))
+                    ]);
+                } catch(e) { console.error("InitDB failed in handle", e); }
+            }
+
+            if (!window.db || !window.db.learning_progress) {
+                console.error(`LocalAPI: Critical - window.db is undefined or schema missing while handling ${route}`);
+                // Try to reopen if possible using the correct initDB from db.js
+                if (window.initDB) {
+                    try {
+                        console.log("LocalAPI: Attempting to re-initialize database via initDB()...");
+                        await window.initDB();
+                    } catch(e) {
+                         return { error: "Database initialization failed: " + e.message };
+                    }
+                } else {
+                    return { error: "Database instance not found and initDB missing" };
+                }
+            }
+            
+            // Ensure tables exist (double check)
+            if (!window.db.learning_progress || !window.db.explanations) {
+                 console.warn("LocalAPI: Tables still not ready, waiting...");
+                 await new Promise(r => setTimeout(r, 500));
+                 // Last attempt to fix
+                 if (window.initDB && (!window.db || !window.db.learning_progress)) {
+                      await window.initDB();
+                 }
+                 
+                 if (!window.db.learning_progress) return { error: "Database tables not initialized" };
+            }
         }
 
         switch (route) {
+            case '/api/verbs':
+                const limit = parseInt(new URLSearchParams(route.split('?')[1]).get('limit') || 6000);
+                
+                // Attempt to initialize DB if not ready, but don't block heavily
+                if (!window.db && window.initDB) {
+                    try {
+                        await Promise.race([
+                            window.initDB(),
+                            new Promise((_, r) => setTimeout(() => r("Timeout"), 1000))
+                        ]);
+                    } catch(e) {}
+                }
+
+                // Ensure verbsData is populated
+                if (!this.verbsData || this.verbsData.length === 0) {
+                    try {
+                        // 1. Try DB first
+                        if (window.db && window.db.verbs) {
+                            try {
+                                const count = await DB.getVerbsCount();
+                                if (count > 0) {
+                                    this.verbsData = await DB.getAllVerbs();
+                                }
+                            } catch(dbErr) {
+                                console.warn("LocalAPI: DB access failed for verbs, falling back to JSON", dbErr);
+                            }
+                        }
+                        
+                        // 2. Fallback to JSON if DB failed or empty
+                        if (!this.verbsData || this.verbsData.length === 0) {
+                             if (window.NETEM_FULL_LIST) {
+                                this.verbsData = window.NETEM_FULL_LIST["5530考研词汇词频排序表"] || [];
+                            } else {
+                                const response = await this.fetchResource('netem_full_list.json');
+                                if (response) {
+                                    const rawData = await response.json();
+                                    this.verbsData = rawData["5530考研词汇词频排序表"] || [];
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to load verbs data in handle:", e);
+                        return { error: "Failed to load verbs data" };
+                    }
+                }
+                
+                if (this.verbsData) {
+                    return { items: this.verbsData.slice(0, limit), total: this.verbsData.length };
+                }
+                return { items: [], total: 0 };
             case '/api/settings':
                 if (Object.keys(data).length > 0) {
-                    localStorage.setItem('app_settings', JSON.stringify(data));
-                    return { status: "success", settings: data };
+                    // Merge with existing settings instead of overwriting
+                    const current = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    const updated = { ...current, ...data };
+                    localStorage.setItem('app_settings', JSON.stringify(updated));
+                    return { status: "success", settings: updated };
                 } else {
                     return JSON.parse(localStorage.getItem('app_settings') || '{}');
                 }
@@ -392,6 +598,7 @@ const LocalAPI = {
                 }
                 if (data.reset_settings) {
                     localStorage.removeItem('app_settings');
+                    localStorage.removeItem('visuals_provider');
                     localStorage.removeItem('excludedVerbs');
                 }
                 return { status: "success" };
@@ -404,7 +611,23 @@ const LocalAPI = {
                 return { status: "error", message: "Verb required" };
 
             case '/api/import':
-                const importData = data.data;
+                let importData = data.data;
+
+                // Handle file input if provided as Blob/File
+                if (data.file && data.file instanceof Blob) {
+                    try {
+                        const text = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (e) => reject(e);
+                            reader.readAsText(data.file);
+                        });
+                        importData = JSON.parse(text);
+                    } catch (e) {
+                        return { status: "error", message: "Invalid file format. Please import a valid JSON backup file." };
+                    }
+                }
+                
                 if (!importData) return { status: "error", message: "No data provided" };
 
                 try {
@@ -449,6 +672,12 @@ const LocalAPI = {
                     // 4. Restore Settings
                     if (importData.settings) {
                         localStorage.setItem('app_settings', JSON.stringify(importData.settings));
+                        // Sync Visuals Provider if present
+                        if (importData.settings.image_provider) {
+                            localStorage.setItem('visuals_provider', importData.settings.image_provider);
+                        } else {
+                            localStorage.removeItem('visuals_provider');
+                        }
                     }
 
                     // 5. Restore Excluded Verbs
@@ -487,7 +716,11 @@ const LocalAPI = {
             const images = {};
             
             for (const verb of verbList) {
-                const key = verb.toLowerCase();
+                // Use original case as key, fallback to lowercase if not found?
+                // Actually, if we imported with original case, we should query with original case first.
+                // However, user input might be loose.
+                // Let's assume input matches DB for now, or use original verb.
+                const key = verb; 
                 let cachedData = null;
                 
                 if (!refresh) {
@@ -548,13 +781,28 @@ const LocalAPI = {
                 // 3. We are NOT just requesting images (only_images === false)
                 const needLlmCall = (refresh || !hasCachedContent) && !only_images;
                 
-                // If we don't have an image URL in cache, generate one (this is local and fast)
-                if (!imageUrl) {
-                    imageUrl = this.generateImageUrl(verb);
+                // CHECK IMAGE PROVIDER SETTING
+                // PRIORITY: Standalone Key > App Settings > Default
+                const standalone = localStorage.getItem('visuals_provider');
+                let provider = 'none';
+                
+                if (standalone && standalone !== 'null') {
+                    provider = standalone;
+                } else {
+                    const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    if (settings.image_provider) provider = settings.image_provider;
                 }
                 
                 const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
                 const hasApiKey = !!settings.openai_api_key;
+                
+                // If provider is 'none', explicitly set imageUrl to null to override any cache or generation
+                if (provider === 'none') {
+                    imageUrl = null;
+                } else if (!imageUrl) {
+                    // Only generate if provider is NOT 'none' and we don't have one
+                    imageUrl = this.generateImageUrl(verb);
+                }
                 
                 // Strict Cache Mode: If need LLM but no API key, skip LLM and go to fallback directly
                 if (needLlmCall && !hasApiKey) {
@@ -632,13 +880,21 @@ const LocalAPI = {
      */
     getBasicDefinition(verb) {
         if (!this.verbsData) return null;
-        const key = verb.toLowerCase();
         
-        // Find in in-memory cache
-        const found = this.verbsData.find(v => {
-            const word = (v.word || v["单词"] || "").toLowerCase();
-            return word === key;
+        // Try exact match first
+        let found = this.verbsData.find(v => {
+            const word = (v.word || v["单词"] || "").trim();
+            return word === verb;
         });
+
+        // Fallback to case-insensitive match
+        if (!found) {
+             const lowerKey = verb.toLowerCase();
+             found = this.verbsData.find(v => {
+                const word = (v.word || v["单词"] || "").trim().toLowerCase();
+                return word === lowerKey;
+            });
+        }
         
         if (found) {
             const word = found.original_word || found.word || found["单词"];
@@ -655,8 +911,16 @@ const LocalAPI = {
      * Image generation logic
      */
     generateImageUrl(verb) {
+        // PRIORITY: Standalone Key > App Settings > Default
         const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
-        const provider = settings.image_provider || 'dicebear';
+        const standalone = localStorage.getItem('visuals_provider');
+        let provider = 'none';
+
+        if (standalone && standalone !== 'null') {
+             provider = standalone;
+        } else {
+             provider = settings.image_provider || 'none';
+        }
         
         if (provider === 'none') {
             return ''; // Return empty string for no image
