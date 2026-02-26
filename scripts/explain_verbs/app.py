@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
@@ -219,6 +219,13 @@ def init_db():
         )
     ''')
     
+    # Excluded verbs table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS excluded_verbs (
+            verb TEXT PRIMARY KEY
+        )
+    ''')
+    
     # Add new columns for dual storage
     try:
         c.execute("ALTER TABLE explanations ADD COLUMN image_dicebear TEXT")
@@ -258,6 +265,63 @@ def init_db():
 # Initialize DB on startup
 init_db()
 
+# Load Legacy Data into DB if empty
+# This handles the case where the user resets the application (clearing DB)
+# but we want to reload the legacy_data.json content automatically on startup or restart.
+import json
+import os
+LEGACY_DATA_PATH = os.path.join(os.path.dirname(__file__), 'static', 'legacy_data.json')
+
+def load_legacy_data_if_needed():
+    try:
+        if not os.path.exists(LEGACY_DATA_PATH):
+            return
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Check if explanations table is empty
+        c.execute("SELECT count(*) FROM explanations")
+        count = c.fetchone()[0]
+        
+        if count == 0:
+            print("DB is empty. Loading legacy_data.json...")
+            with open(LEGACY_DATA_PATH, 'r', encoding='utf-8') as f:
+                # legacy_data.json can be a dict (old format) or list (new export format)
+                # Old format: {"word": "content", ...}
+                # New format (optional but good to support): [{"query_key": "word", "content": "..."}]
+                data = json.load(f)
+                
+            explanations_to_insert = []
+            if isinstance(data, dict):
+                 # Check if it has 'explanations' key (new export format wrapped in dict)
+                 if 'explanations' in data and isinstance(data['explanations'], list):
+                      for item in data['explanations']:
+                          if 'query_key' in item and 'content' in item:
+                              explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content']))
+                 else:
+                     # Assume old format: {"word": "content", ...}
+                     for word, content in data.items():
+                         # Skip if content is empty
+                         if not content or len(content) < 10: continue
+                         explanations_to_insert.append(('single', word.lower(), content))
+            elif isinstance(data, list):
+                 for item in data:
+                     if 'query_key' in item and 'content' in item:
+                         explanations_to_insert.append((item.get('mode', 'single'), item['query_key'].lower(), item['content']))
+
+            if explanations_to_insert:
+                print(f"Inserting {len(explanations_to_insert)} legacy records...")
+                c.executemany("INSERT OR IGNORE INTO explanations (mode, query_key, content) VALUES (?, ?, ?)", explanations_to_insert)
+                conn.commit()
+                print("Legacy data loaded successfully.")
+        
+        conn.close()
+    except Exception as e:
+        print(f"Error loading legacy data: {e}")
+
+load_legacy_data_if_needed()
+
 import random
 import requests
 import urllib.parse
@@ -266,10 +330,21 @@ from fastapi import Response
 def get_cached_result(mode: str, query_key: str):
     conn = get_db_connection()
     c = conn.cursor()
+    print(f"DEBUG DB: Searching cache for mode='{mode}', query_key='{query_key}'")
     try:
         # Fetch all image columns
         c.execute("SELECT content, image_url, image_dicebear, image_pollinations FROM explanations WHERE mode=? AND query_key=?", (mode, query_key))
         result = c.fetchone()
+        if not result:
+            # Case-insensitive fallback
+            c.execute("SELECT content, image_url, image_dicebear, image_pollinations FROM explanations WHERE mode=? AND LOWER(query_key)=LOWER(?)", (mode, query_key))
+            result = c.fetchone()
+        
+        if not result and mode == "single" and ":" not in query_key:
+            # Try with :verb suffix if not found and no suffix provided
+            query_key_with_suffix = f"{query_key}:verb"
+            c.execute("SELECT content, image_url, image_dicebear, image_pollinations FROM explanations WHERE mode=? AND LOWER(query_key)=LOWER(?)", (mode, query_key_with_suffix))
+            result = c.fetchone()
     except sqlite3.OperationalError:
         # Fallback
         c.execute("SELECT content, image_url FROM explanations WHERE mode=? AND query_key=?", (mode, query_key))
@@ -279,6 +354,7 @@ def get_cached_result(mode: str, query_key: str):
     conn.close()
     
     if result:
+        print(f"DEBUG DB: Found result for '{query_key}'")
         content = result[0]
         legacy_url = result[1]
         img_dicebear = result[2]
@@ -302,6 +378,7 @@ def get_cached_result(mode: str, query_key: str):
             "content": content, 
             "image_url": target_img
         }
+    print(f"DEBUG DB: No result found for '{query_key}'")
     return None
 
 def save_to_cache(mode: str, query_key: str, content: str, image_url: str = None):
@@ -378,6 +455,7 @@ class VerbRequest(BaseModel):
     mode: str
     refresh: bool = False
     skip_content: bool = False
+    strict_cache: bool = False  # If True, do not generate AI content if cache is missing
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -386,6 +464,21 @@ async def read_root(request: Request):
         {"request": request},
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     )
+
+@app.get("/index.html", include_in_schema=False)
+async def index_alias():
+    return RedirectResponse(url="/")
+
+# Alias for /static/index.html to avoid PWA 404s
+@app.get("/static/index.html", include_in_schema=False)
+async def static_index_alias():
+    return RedirectResponse(url="/")
+
+# Service Worker route at root for correct scope
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    sw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "sw.js")
+    return FileResponse(sw_path, media_type="application/javascript")
 
 # Ebbinghaus Intervals (in minutes)
 EBBINGHAUS_STAGES = [
@@ -556,12 +649,57 @@ async def export_data(excluded_verbs: str = ""):
         zip_path = os.path.join(temp_dir, f"netem_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
         
         with zipfile.ZipFile(zip_path, 'w') as zipf:
-            # Add database if exists
+            # Export Database, but filter out legacy data to save space
             if os.path.exists(DB_PATH):
-                # Ensure DB is not locked by connecting/closing or using a copy
-                db_copy = os.path.join(temp_dir, "verbs.db")
-                shutil.copy2(DB_PATH, db_copy)
-                zipf.write(db_copy, "verbs.db")
+                # We need to create a temporary DB to filter data
+                db_copy_path = os.path.join(temp_dir, "verbs.db")
+                shutil.copy2(DB_PATH, db_copy_path)
+                
+                # Connect to the copy and delete legacy data
+                conn_copy = sqlite3.connect(db_copy_path)
+                c_copy = conn_copy.cursor()
+                
+                # Load legacy keys to identify what to delete
+                legacy_keys = set()
+                if os.path.exists(LEGACY_DATA_PATH):
+                    try:
+                        with open(LEGACY_DATA_PATH, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            if isinstance(data, dict):
+                                if 'explanations' in data and isinstance(data['explanations'], list):
+                                    for item in data['explanations']:
+                                        if 'query_key' in item: legacy_keys.add(item['query_key'].lower())
+                                else:
+                                    for k in data.keys(): legacy_keys.add(k.lower())
+                            elif isinstance(data, list):
+                                for item in data:
+                                    if 'query_key' in item: legacy_keys.add(item['query_key'].lower())
+                    except Exception as e:
+                        print(f"Warning: Failed to load legacy data for filtering: {e}")
+
+                if legacy_keys:
+                    print(f"Filtering {len(legacy_keys)} legacy records from export...")
+                    
+                    # Optimization: Use temporary table for bulk deletion
+                    # Creating a temp table and joining is MUCH faster than executemany DELETE
+                    c_copy.execute("CREATE TEMPORARY TABLE legacy_keys_temp (key TEXT PRIMARY KEY)")
+                    c_copy.executemany("INSERT INTO legacy_keys_temp (key) VALUES (?)", [(k,) for k in legacy_keys])
+                    
+                    # Use a single DELETE statement with subquery
+                    c_copy.execute("""
+                        DELETE FROM explanations 
+                        WHERE lower(query_key) IN (SELECT key FROM legacy_keys_temp)
+                    """)
+                    
+                    c_copy.execute("DROP TABLE legacy_keys_temp")
+                    conn_copy.commit()
+                    
+                    # Vacuum to reclaim space
+                    c_copy.execute("VACUUM")
+                    conn_copy.commit()
+                
+                conn_copy.close()
+                zipf.write(db_copy_path, "verbs.db")
             
             # Add config if exists
             if os.path.exists(CONFIG_FILE):
@@ -603,7 +741,18 @@ async def import_data(file: UploadFile = File(...)):
             
             # Restore database
             if "verbs.db" in zipf.namelist():
+                # We need to merge imported DB with current DB to restore legacy data + user data
+                # Strategy: 
+                # 1. Backup current DB to be safe? (Maybe not needed for restore operation which implies overwrite)
+                # 2. Replace current DB with imported DB
+                # 3. Re-inject legacy data if missing
+                
                 shutil.copy2(os.path.join(temp_dir, "verbs.db"), DB_PATH)
+                
+                # Re-inject legacy data
+                # We call the existing function to fill gaps
+                print("Restoring legacy data into imported DB...")
+                load_legacy_data_if_needed()
                 
             # Restore config
             if "config.json" in zipf.namelist():
@@ -626,19 +775,33 @@ async def import_data(file: UploadFile = File(...)):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 @app.post("/api/ebbinghaus/clear_all")
-async def clear_all_learning_progress(reset_settings: bool = False):
+async def clear_all_learning_progress(data: dict = Body(...)):
+    reset_settings = data.get("reset_settings", False)
     try:
-        # 1. Clear learning progress, synced data and AI explanations
         conn = get_db_connection()
         c = conn.cursor()
+        
+        # 1. Clear learning progress, checkins, batches
         c.execute("DELETE FROM learning_progress")
         c.execute("DELETE FROM checkins")
         c.execute("DELETE FROM learn_batch")
+        
+        # 2. Clear explanations but IMMEDIATELY reload legacy data
+        # This ensures that even after a full reset, the base vocabulary is available
         c.execute("DELETE FROM explanations")
+        
+        # 3. Clear excluded verbs if requested (part of reset_settings or general reset)
+        if reset_settings:
+            c.execute("DELETE FROM excluded_verbs")
+            
         conn.commit()
         conn.close()
 
-        # 2. Optionally reset settings
+        # Reload legacy data immediately into the now empty DB
+        print("Reset complete. Reloading legacy data...")
+        load_legacy_data_if_needed()
+
+        # 4. Optionally reset settings
         if reset_settings:
             global settings
             # 1. Clear config file
@@ -675,17 +838,68 @@ async def clear_all_learning_progress(reset_settings: bool = False):
         print(f"Error in clear_all: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/checkins")
-async def get_checkins():
+@app.get("/api/exclude")
+async def get_excluded_verbs():
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT date FROM checkins")
-        dates = [row[0] for row in c.fetchall()]
+        c.execute("SELECT verb FROM excluded_verbs")
+        verbs = [row[0] for row in c.fetchall()]
         conn.close()
-        return dates
+        return verbs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/exclude")
+async def update_exclude_verb(data: dict):
+    verb = data.get("verb")
+    exclude = data.get("exclude", True)
+    if not verb:
+        raise HTTPException(status_code=400, detail="Verb is required")
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        if exclude:
+            c.execute("INSERT OR IGNORE INTO excluded_verbs (verb) VALUES (?)", (verb,))
+        else:
+            c.execute("DELETE FROM excluded_verbs WHERE verb = ?", (verb,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/sync/all_explanations")
+async def sync_all_explanations():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT mode, query_key, content, image_url, created_at FROM explanations")
+        rows = c.fetchall()
+        
+        result = []
+        for row in rows:
+            result.append({
+                "mode": row[0],
+                "query_key": row[1],
+                "content": row[2],
+                "image_url": row[3],
+                "created_at": row[4]
+            })
+        
+        return result
+    finally:
+        conn.close()
+
+@app.get("/api/checkins", response_model=List[str])
+async def get_checkins():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT date FROM checkins")
+        return [row[0] for row in c.fetchall()]
+    finally:
+        conn.close()
 
 @app.post("/api/checkins")
 async def add_checkin(data: dict):
@@ -873,12 +1087,22 @@ def get_verb_info(word: str):
 @app.post("/api/explain")
 def explain_verbs_endpoint(request: VerbRequest):
     try:
+        print(f"DEBUG: explain_verbs_endpoint called with mode={request.mode}, verbs={request.verbs}")
         # Get client but don't fail immediately if we have cached results
-        client = get_client(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+        try:
+            client = get_client(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+            if client is None:
+                print("DEBUG: AI Client initialization failed: No API Key found in .env or config.json")
+            else:
+                print(f"DEBUG: AI Client initialized: True")
+        except Exception as e:
+            print(f"DEBUG: Error initializing AI client: {e}")
+            client = None
         
         verbs_input = request.verbs
         mode = request.mode
         refresh = request.refresh
+        strict_cache = request.strict_cache
         
         if "," in verbs_input:
             verbs = [v.strip() for v in verbs_input.split(",")]
@@ -896,9 +1120,21 @@ def explain_verbs_endpoint(request: VerbRequest):
             for verb in verbs:
                 # Normalize key
                 key = verb.strip().lower()
+                print(f"DEBUG: Processing verb '{verb}', normalized key '{key}'")
                 cached_data = get_cached_result("single", key)
-                cached_content = cached_data["content"] if cached_data else None
-                cached_image = cached_data.get("image_url") if cached_data else None
+                print(f"DEBUG: Cached data for '{key}': {cached_data is not None}")
+                
+                cached_content = None
+                cached_image = None
+                if cached_data:
+                    # In single mode, get_cached_result returns a dict with 'content' and 'image_url' keys
+                    # or it returns a tuple/row if directly from DB (legacy)
+                    if isinstance(cached_data, dict):
+                        cached_content = cached_data.get("content")
+                        cached_image = cached_data.get("image_url")
+                    elif isinstance(cached_data, (list, tuple)):
+                        cached_content = cached_data[0]
+                        cached_image = cached_data[1]
                 
                 # Determine if we need to regenerate content or image
                 need_content = refresh or not cached_content
@@ -913,11 +1149,20 @@ def explain_verbs_endpoint(request: VerbRequest):
                 
                 # Generate Content if needed
                 if need_content:
-                    if not client:
+                    if strict_cache:
+                        print(f"DEBUG: Strict cache mode enabled. Skipping AI generation for '{verb}'.")
+                        # If strict cache and no content, just skip or return empty
+                        # We continue to the next verb or let it return what it has (which is None)
+                        # If we return error here, it might break batch processing.
+                        # Ideally, we return a special signal or just empty content.
+                        new_content = None
+                    elif not client:
                          if cached_content:
                               new_content = cached_content
                          else:
-                              return JSONResponse(content={"error": "API Key not configured and no cache found."}, status_code=500)
+                              error_msg = "API Key not configured and no cache found."
+                              print(f"DEBUG: Error - {error_msg}")
+                              return JSONResponse(content={"error": error_msg}, status_code=500)
                     else:
                         prompt = f"请解析\"{verb}\""
                         # Look up POS
@@ -932,14 +1177,16 @@ def explain_verbs_endpoint(request: VerbRequest):
                         elif verb.strip().lower() in KNOWN_ADJ_ADV:
                             pos = "adj_adv"
                         
+                        print(f"DEBUG: Calling explain_verb for '{verb}' with pos={pos}")
                         raw_res = explain_verb(client, prompt, model=settings.openai_model, pos=pos)
                         if "Error calling API" in raw_res:
-                             if cached_content:
-                                  new_content = cached_content
-                             else:
-                                  return JSONResponse(content={"error": raw_res}, status_code=500)
+                            print(f"DEBUG: API Error for '{verb}': {raw_res}")
+                            if cached_content:
+                                new_content = cached_content
+                            else:
+                                return JSONResponse(content={"error": raw_res}, status_code=500)
                         else:
-                             new_content = clean_markdown(raw_res)
+                            new_content = clean_markdown(raw_res)
                 
                 # Save if anything changed
                 if need_content or need_image:
@@ -952,12 +1199,16 @@ def explain_verbs_endpoint(request: VerbRequest):
             result_text = "\n\n---\n\n".join(results)
             return JSONResponse(content={"result": result_text, "images": images})
 
-
         elif mode == "list":
              # Normalize key: sorted list of lowercase verbs
              key = ",".join(sorted([v.strip().lower() for v in verbs]))
              cached_data = get_cached_result("list", key)
-             cached_content = cached_data["content"] if cached_data else None
+             cached_content = None
+             if cached_data:
+                 if isinstance(cached_data, dict):
+                     cached_content = cached_data.get("content")
+                 elif isinstance(cached_data, (list, tuple)):
+                     cached_content = cached_data[0]
              
              if cached_content and not refresh:
                  result_text = cached_content
@@ -983,7 +1234,12 @@ def explain_verbs_endpoint(request: VerbRequest):
              # Normalize key: sorted list of lowercase verbs
              key = ",".join(sorted([v.strip().lower() for v in verbs]))
              cached_data = get_cached_result("compare", key)
-             cached_content = cached_data["content"] if cached_data else None
+             cached_content = None
+             if cached_data:
+                 if isinstance(cached_data, dict):
+                     cached_content = cached_data.get("content")
+                 elif isinstance(cached_data, (list, tuple)):
+                     cached_content = cached_data[0]
              
              if cached_content and not refresh:
                  result_text = cached_content
@@ -1010,7 +1266,6 @@ def explain_verbs_endpoint(request: VerbRequest):
             
         return JSONResponse(content={"result": result_text})
 
-            
     except Exception as e:
         import traceback
         traceback.print_exc()

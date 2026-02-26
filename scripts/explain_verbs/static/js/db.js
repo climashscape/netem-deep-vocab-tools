@@ -7,12 +7,12 @@
 const db = new Dexie("NetemVocabDB");
 
 // Define table schema
-db.version(2).stores({
-    explanations: '++id, [mode+query_key], mode, query_key, created_at',
+db.version(5).stores({
+    explanations: '[mode+query_key], mode, query_key, created_at',
     learning_progress: 'verb, stage, last_review, next_review, status',
     checkins: 'date',
     learn_batch: 'verb',
-    verbs: 'word, frequency, pos' // Added verbs table for faster lookup
+    verbs: 'word, frequency, pos, original_word' // Added verbs table for faster lookup, word is lowercase
 });
 
 // Helper functions for database operations
@@ -100,18 +100,22 @@ const DB = {
      * Verbs table operations
      */
     async getVerbsCount() {
+        if (!db.verbs) return 0;
         return await db.verbs.count();
     },
 
     async bulkAddVerbs(verbs) {
+        if (!db.verbs) return;
         return await db.verbs.bulkPut(verbs);
     },
 
     async findVerb(word) {
+        if (!db.verbs) return null;
         return await db.verbs.get(word.toLowerCase());
     },
 
     async getAllVerbs() {
+        if (!db.verbs) return [];
         return await db.verbs.toArray();
     },
 

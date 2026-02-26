@@ -45,7 +45,7 @@ class AppSettings(BaseModel):
     # LLM Settings
     openai_api_key: str = ""
     openai_base_url: str = ""
-    openai_model: str = "gpt-4o"
+    openai_model: str = ""
     
     # Image Settings
     image_provider: str = "dicebear" # "dicebear" or "pollinations"
@@ -59,7 +59,7 @@ class AppSettings(BaseModel):
         if 'openai_base_url' not in data:
             data['openai_base_url'] = os.environ.get("OPENAI_BASE_URL", "")
         if 'openai_model' not in data:
-            data['openai_model'] = os.environ.get("DEFAULT_MODEL", "gpt-4o")
+            data['openai_model'] = os.environ.get("DEFAULT_MODEL", "")
         if 'image_provider' not in data:
             data['image_provider'] = os.environ.get("IMAGE_PROVIDER", "dicebear")
         if 'pollinations_api_key' not in data:

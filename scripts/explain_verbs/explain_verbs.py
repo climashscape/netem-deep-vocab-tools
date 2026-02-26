@@ -50,7 +50,7 @@ def get_client(api_key=None, base_url=None):
         api_key = os.environ.get("OPENAI_API_KEY")
     
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable is not set.")
+        # Silently return None if no key found, caller handles error message
         return None
     
     if not base_url:

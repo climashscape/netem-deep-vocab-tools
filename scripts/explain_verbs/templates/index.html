@@ -46,6 +46,39 @@
             height: 100%;
             width: 100%;
             overflow: hidden; /* Lock main body scroll, handle in containers */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none;    /* Firefox */
+            -ms-user-select: none;     /* IE10+ */
+            user-select: none;         /* Standard */
+            -webkit-user-drag: none;   /* Safari/Chrome */
+            -webkit-tap-highlight-color: transparent; /* Remove mobile tap highlight blue box */
+        }
+
+        /* Re-enable selection for inputs and textareas */
+        input, textarea {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        /* Optimize touch interactions */
+        button, a, input, select, textarea, .neumorphic-btn, .verb-card, .nav-item {
+            touch-action: manipulation; /* Improves click responsiveness, disables double-tap zoom */
+        }
+
+        /* Mobile Tap Feedback Fix */
+        @media (hover: none) {
+            .active\:scale-95:active {
+                transform: scale(0.95);
+            }
+            .active\:scale-90:active {
+                transform: scale(0.9);
+            }
+            /* Remove sticky hover effects on mobile */
+            .hover\:scale-105:hover {
+                transform: none;
+            }
         }
 
         body {
@@ -84,14 +117,14 @@
             bottom: var(--safe-bottom);
             left: var(--safe-left);
             right: var(--safe-right);
-            height: 70px;
+            height: 54px;
             background: #e0e5ec;
-            box-shadow: 0 -10px 20px rgba(163,177,198,0.3);
+            box-shadow: 0 -8px 16px rgba(163,177,198,0.25);
             display: flex;
             justify-content: space-around;
             align-items: center;
             z-index: 40;
-            border-top: 1px solid rgba(255,255,255,0.5);
+            border-top: 1px solid rgba(255,255,255,0.4);
             box-sizing: border-box;
         }
 
@@ -99,31 +132,31 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             color: #a0aec0;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
-            padding: 8px;
+            padding: 4px 8px;
             flex: 1;
             position: relative;
         }
 
         .nav-item.active {
             color: #3b82f6;
-            transform: translateY(-5px);
+            transform: translateY(-3px);
         }
 
         .nav-item i {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             transition: transform 0.3s ease;
         }
 
         .nav-item.active i {
-            transform: scale(1.2);
+            transform: scale(1.1);
         }
 
         .nav-item span {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 800;
             opacity: 0.7;
             transition: all 0.3s ease;
@@ -546,12 +579,11 @@
         .modal-content {
             width: 98%;
             max-width: 950px;
-            height: calc(100vh - var(--safe-top) - var(--safe-bottom) - 20px);
+            height: calc(100vh - var(--safe-bottom) - 20px);
             display: flex;
             flex-direction: column;
             position: relative;
             box-sizing: border-box; /* Ensure padding doesn't push width out */
-            padding-top: var(--safe-top);
             padding-bottom: var(--safe-bottom);
         }
 
@@ -1017,6 +1049,8 @@
         <div class="app-content hide-scrollbar w-full max-w-4xl mx-auto overflow-x-hidden">
             <!-- English Thinking Page -->
             <section id="page-philosophy" class="page-section hidden">
+                <!-- Safe Area Spacer for Mobile Status Bar -->
+                <div class="h-[var(--safe-top)] md:hidden"></div>
                 <div class="px-5 pt-10 pb-24 space-y-8 max-w-2xl mx-auto">
                     <!-- Hero Section -->
                     <div class="text-center space-y-4 animate-fade-in">
@@ -1082,81 +1116,83 @@
             </section>
 
             <!-- Global Header (Logo, Search & Stats) -->
-        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm transition-all">
-            <!-- Integrated Row: Logo, Search & Stats -->
-            <div class="flex items-center gap-4 mb-3 min-h-[40px]">
+        <div id="sticky-header" class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-4 py-1.5 border-b border-white/40 shadow-sm transition-all">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            
+            <!-- Integrated Row: Logo & Stats -->
+            <div class="flex items-center justify-between mb-1.5 min-h-[32px]">
                 <!-- Logo & Title -->
-                <div id="logo-container" class="flex items-center gap-3 shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onclick="scrollToStudyFocus()">
-                    <div class="neumorphic-btn-sm w-9 h-9 flex items-center justify-center text-blue-500 text-sm">
+                <div id="logo-container" class="flex items-center gap-2 shrink-0">
+                    <div class="neumorphic-btn-sm w-7 h-7 flex items-center justify-center text-blue-500 text-xs cursor-pointer hover:opacity-80 transition-opacity" onclick="scrollToStudyFocus()">
                         <i class="fas fa-brain"></i>
                     </div>
-                    <h1 class="text-xl font-bold text-gray-700 tracking-tight">NETEM <span class="text-sm font-medium text-gray-400 ml-1">Deep Vocab Tools</span></h1>
+                    <h1 class="text-lg font-bold text-gray-700 tracking-tight">NETEM <span class="text-xs font-medium text-gray-400 ml-1">Deep Vocab Tools</span></h1>
                 </div>
 
-                <!-- Search Container -->
-                    <div id="search-container" class="flex-1 min-w-0 flex items-center gap-3">
-                        <div class="neumorphic-inset flex-1 flex items-center px-3 py-1.5">
-                            <i class="fas fa-search text-gray-400 mr-2 text-sm"></i>
-                            <input type="text" id="searchInput" placeholder="Search words..." class="bg-transparent outline-none w-full text-gray-600 font-medium text-[13px]" oninput="filterVerbs()">
-                        </div>
-                        <button onclick="applyFilters(true)" class="neumorphic-btn w-9 h-9 flex items-center justify-center text-blue-500 shrink-0">
-                            <i class="fas fa-random text-xs"></i>
-                        </button>
-                    </div>
+                <!-- Settings/Actions (Optional: can move something here if needed, or keep balanced) -->
+            </div>
+
+            <!-- Search Container (Now below Logo) -->
+            <div id="search-container" class="w-full mb-1.5">
+                <div class="neumorphic-inset flex items-center px-3 py-1">
+                    <i class="fas fa-search text-gray-400 mr-2 text-xs"></i>
+                    <input type="text" id="searchInput" placeholder="Search words..." class="bg-transparent outline-none w-full text-gray-600 font-medium text-[12px]" oninput="filterVerbs()">
+                </div>
             </div>
 
             <!-- Stats & Progress Bar -->
-            <div id="stats-container" class="space-y-2">
+            <div id="stats-container" class="space-y-1">
                 <!-- Compact Progress Bar -->
                 <div class="px-1">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Mastery</span>
-                        <span id="header-progress-percent" class="text-[12px] font-black text-blue-500">0%</span>
+                    <div class="flex items-center justify-between mb-0.5">
+                        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mastery</span>
+                        <span id="header-progress-percent" class="text-[11px] font-black text-blue-500">0%</span>
                     </div>
-                    <div class="h-2.5 w-full bg-gray-300/30 rounded-full border border-white/40 p-0.5 overflow-hidden">
+                    <div class="h-2 w-full bg-gray-300/30 rounded-full border border-white/40 p-0.5 overflow-hidden">
                         <div id="header-progress-bar" class="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-700" style="width: 0%"></div>
                     </div>
                 </div>
 
-                <div class="p-1.5 flex justify-between items-center bg-white/40 rounded-2xl border border-white/60">
+                <div class="p-1 flex justify-between items-center bg-white/40 rounded-2xl border border-white/60">
                     <!-- Total -->
-                    <div class="flex items-center gap-2 flex-1 justify-center border-r border-gray-300/20">
-                        <div class="w-4 h-4 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
-                            <i class="fas fa-layer-group text-[10px]"></i>
+                    <div class="flex items-center gap-1.5 flex-1 justify-center border-r border-gray-300/20">
+                        <div class="w-3.5 h-3.5 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
+                            <i class="fas fa-layer-group text-[9px]"></i>
                         </div>
-                        <div class="text-left ml-1">
-                            <p class="text-[10px] uppercase font-black text-gray-400 leading-none mb-1">Total</p>
-                            <p id="header-count-total" class="text-[11px] font-black text-gray-700 leading-none">0</p>
+                        <div class="text-left ml-0.5">
+                            <p class="text-[9px] uppercase font-black text-gray-400 leading-none mb-0.5">Total</p>
+                            <p id="header-count-total" class="text-[10px] font-black text-gray-700 leading-none">0</p>
                         </div>
                     </div>
                     <!-- Review -->
-                    <div class="flex items-center gap-2 flex-1 justify-center border-r border-gray-300/20">
-                        <div class="w-4 h-4 rounded-md bg-orange-50 flex items-center justify-center text-orange-400">
-                            <i class="fas fa-history text-[10px]"></i>
+                    <div class="flex items-center gap-1.5 flex-1 justify-center border-r border-gray-300/20">
+                        <div class="w-3.5 h-3.5 rounded-md bg-orange-50 flex items-center justify-center text-orange-400">
+                            <i class="fas fa-history text-[9px]"></i>
                         </div>
-                        <div class="text-left ml-1">
-                            <p class="text-[10px] uppercase font-black text-orange-400 leading-none mb-1">Review</p>
-                            <p id="header-count-review" class="text-[11px] font-black text-orange-500 leading-none">0</p>
+                        <div class="text-left ml-0.5">
+                            <p class="text-[9px] uppercase font-black text-orange-400 leading-none mb-0.5">Review</p>
+                            <p id="header-count-review" class="text-[10px] font-black text-orange-500 leading-none">0</p>
                         </div>
                     </div>
                     <!-- Mastered -->
-                    <div class="flex items-center gap-2 flex-1 justify-center border-r border-gray-300/20">
-                        <div class="w-4 h-4 rounded-md bg-green-50 flex items-center justify-center text-green-400">
-                            <i class="fas fa-check-double text-[10px]"></i>
+                    <div class="flex items-center gap-1.5 flex-1 justify-center border-r border-gray-300/20">
+                        <div class="w-3.5 h-3.5 rounded-md bg-green-50 flex items-center justify-center text-green-400">
+                            <i class="fas fa-check-double text-[9px]"></i>
                         </div>
-                        <div class="text-left ml-1">
-                            <p class="text-[10px] uppercase font-black text-green-400 leading-none mb-1">Mastered</p>
-                            <p id="header-count-mastered" class="text-[11px] font-black text-green-600 leading-none">0</p>
+                        <div class="text-left ml-0.5">
+                            <p class="text-[9px] uppercase font-black text-green-400 leading-none mb-0.5">Mastered</p>
+                            <p id="header-count-mastered" class="text-[10px] font-black text-green-600 leading-none">0</p>
                         </div>
                     </div>
                     <!-- Today -->
-                    <div class="flex items-center gap-2 flex-1 justify-center">
-                        <div class="w-4 h-4 rounded-md bg-blue-50 flex items-center justify-center text-blue-400">
-                            <i class="fas fa-calendar-day text-[10px]"></i>
+                    <div class="flex items-center gap-1.5 flex-1 justify-center">
+                        <div class="w-3.5 h-3.5 rounded-md bg-blue-50 flex items-center justify-center text-blue-400">
+                            <i class="fas fa-calendar-day text-[9px]"></i>
                         </div>
-                        <div class="text-left ml-1">
-                            <p class="text-[10px] uppercase font-black text-blue-400 leading-none mb-1">Today</p>
-                            <p id="header-count-today" class="text-[11px] font-black text-blue-600 leading-none">0</p>
+                        <div class="text-left ml-0.5">
+                            <p class="text-[9px] uppercase font-black text-blue-400 leading-none mb-0.5">Today</p>
+                            <p id="header-count-today" class="text-[10px] font-black text-blue-600 leading-none">0</p>
                         </div>
                     </div>
                 </div>
@@ -1171,7 +1207,7 @@
                 </div>
                 
                 <div class="px-4 pt-2">
-                    <main id="verbsGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 pb-6">
+                    <main id="verbsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-6">
                         <!-- Cards will be injected here -->
                     </main>
                 </div>
@@ -1180,6 +1216,9 @@
             <!-- Review Page -->
             <section id="page-review" class="page-section hidden">
                   <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm">
+                      <!-- Safe Area Spacer for Mobile Status Bar -->
+                      <div class="h-[var(--safe-top)] md:hidden"></div>
+                      
                       <div class="flex items-center justify-between mb-3 min-h-[40px]">
                           <div class="flex items-center gap-3">
                               <h2 class="text-xl font-bold text-gray-700">Review</h2>
@@ -1193,7 +1232,7 @@
                       <div id="review-stats-placeholder"></div>
                   </div>
                 <div class="px-4 pt-2">
-                    <div id="reviewGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 pb-24">
+                    <div id="reviewGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
                         <!-- Review cards will be injected here -->
                     </div>
                 </div>
@@ -1202,6 +1241,9 @@
             <!-- Mastery Page -->
             <section id="page-mastery" class="page-section hidden">
                   <div class="sticky top-0 z-30 bg-[#e0e5ec]/95 backdrop-blur-md px-5 py-3 border-b border-white/40 shadow-sm">
+                      <!-- Safe Area Spacer for Mobile Status Bar -->
+                      <div class="h-[var(--safe-top)] md:hidden"></div>
+                      
                       <div class="flex items-center justify-between mb-3 min-h-[40px]">
                           <h2 class="text-xl font-bold text-gray-700">Mastery</h2>
                           <button onclick="openExcludedModal()" class="neumorphic-btn w-9 h-9 flex items-center justify-center text-red-400 relative">
@@ -1212,7 +1254,7 @@
                       <div id="mastery-stats-placeholder"></div>
                   </div>
                 <div class="px-4 pt-2">
-                    <div id="masteryGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 pb-24">
+                    <div id="masteryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
                         <!-- Mastered cards will be injected here -->
                     </div>
                 </div>
@@ -1220,6 +1262,8 @@
 
             <!-- Me Page (Profile) -->
             <section id="page-me" class="page-section hidden">
+                <!-- Safe Area Spacer for Mobile Status Bar -->
+                <div class="h-[var(--safe-top)] md:hidden"></div>
                 <div class="px-4 pt-3 pb-24 space-y-4 max-w-md mx-auto md:pt-8">
                     <!-- Compact Profile Header -->
                     <div class="neumorphic p-4 flex flex-col gap-3 bg-gradient-to-br from-white/40 to-blue-50/20 relative overflow-hidden">
@@ -1227,34 +1271,34 @@
                         <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl"></div>
                         <div class="absolute -left-4 -bottom-4 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl"></div>
                         
-                        <div class="flex items-center gap-4 relative z-10">
-                            <div class="w-14 h-14 rounded-2xl neumorphic flex items-center justify-center text-blue-500 text-xl shrink-0">
+                        <div class="flex items-center gap-3 md:gap-4 relative z-10 flex-wrap sm:flex-nowrap">
+                            <div class="w-12 h-12 md:w-14 md:h-14 rounded-2xl neumorphic flex items-center justify-center text-blue-500 text-lg md:text-xl shrink-0">
                                 <i class="fas fa-graduation-cap"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    <span class="px-1.5 py-0.5 bg-blue-500 text-[10px] font-black text-white rounded-md tracking-tighter uppercase shadow-sm">NETEM</span>
-                                    <h2 class="text-lg font-black text-gray-700 truncate tracking-tight">Deep Vocab Tools</h2>
+                                <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                                    <span class="px-1.5 py-0.5 bg-blue-500 text-[9px] md:text-[10px] font-black text-white rounded-md tracking-tighter uppercase shadow-sm shrink-0">NETEM</span>
+                                    <h2 class="text-base md:text-lg font-black text-gray-700 truncate tracking-tight">Deep Vocab Tools</h2>
                                 </div>
-                                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none">AI-Powered Exam Preparation</p>
+                                <p class="text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none truncate">AI-Powered Exam Preparation</p>
                             </div>
                         </div>
                         
                         <!-- Kaoyan Countdown & Rounds (Refined Centered Layout) -->
                         <div class="flex items-center justify-around max-w-md mx-auto w-full pt-4 border-t border-gray-200/40 relative z-10">
                             <div class="text-center">
-                                <p class="text-xs uppercase font-black text-blue-500 mb-1 tracking-wider opacity-60">Exam Countdown</p>
+                                <p class="text-[10px] md:text-xs uppercase font-black text-blue-500 mb-1 tracking-wider opacity-60">Exam Countdown</p>
                                 <div class="flex items-baseline justify-center gap-1">
-                                    <span id="kaoyan-countdown" class="text-3xl font-black text-blue-600 leading-none">---</span>
-                                    <span class="text-xs font-black text-blue-400 opacity-60">Days</span>
+                                    <span id="kaoyan-countdown" class="text-2xl md:text-3xl font-black text-blue-600 leading-none">---</span>
+                                    <span class="text-[10px] md:text-xs font-black text-blue-400 opacity-60">Days</span>
                                 </div>
                             </div>
-                            <div class="w-px h-10 bg-gradient-to-b from-transparent via-gray-300/40 to-transparent"></div>
+                            <div class="w-px h-8 md:h-10 bg-gradient-to-b from-transparent via-gray-300/40 to-transparent"></div>
                             <div class="text-center">
-                                <p class="text-xs uppercase font-black text-indigo-500 mb-1 tracking-wider opacity-60">Learning Rounds</p>
+                                <p class="text-[10px] md:text-xs uppercase font-black text-indigo-500 mb-1 tracking-wider opacity-60">Learning Rounds</p>
                                 <div class="flex items-baseline justify-center gap-1">
-                                    <span id="learning-rounds" class="text-3xl font-black text-indigo-600 leading-none">0.0</span>
-                                    <span class="text-xs font-black text-indigo-400 opacity-60">Rnds</span>
+                                    <span id="learning-rounds" class="text-2xl md:text-3xl font-black text-indigo-600 leading-none">0.0</span>
+                                    <span class="text-[10px] md:text-xs font-black text-indigo-400 opacity-60">Rnds</span>
                                 </div>
                             </div>
                         </div>
@@ -1419,47 +1463,31 @@
                     <!-- Action Buttons - Integrated Grid Layout -->
                     <div class="space-y-4">
                         <!-- Primary Actions: Settings & Analytics -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="openSettings()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-gradient-to-br from-white/20 to-transparent">
-                                <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
-                                    <i class="fas fa-sliders-h text-sm"></i>
-                                </div>
-                                <span class="text-xs font-black uppercase tracking-widest">Settings</span>
-                            </button>
-                            
-                            <button onclick="showAnalytics()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-gradient-to-br from-white/20 to-transparent">
-                                <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all duration-300 shadow-sm">
-                                    <i class="fas fa-chart-line text-sm"></i>
-                                </div>
-                                <span class="text-xs font-black uppercase tracking-widest">Analytics</span>
-                            </button>
-                        </div>
-
-                        <!-- Secondary Actions: Backup & Restore -->
                         <div class="neumorphic p-4 space-y-4 bg-gradient-to-br from-white/20 to-transparent">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white neumorphic flex items-center justify-center text-green-500 shadow-sm shrink-0">
-                                    <i class="fas fa-sync-alt text-xs"></i>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <span class="text-xs font-black uppercase tracking-widest block text-gray-700">Backup & Restore</span>
-                                    <span id="sync-status-text" class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter opacity-70 truncate">Keep your data safe</span>
-                                </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-sliders-h text-blue-500 text-xs"></i>
+                                <h3 class="font-black text-gray-700 text-xs uppercase tracking-wider">System &amp; Data</h3>
                             </div>
-                            
+
                             <div class="grid grid-cols-2 gap-3">
-                                <button onclick="cloudSync()" class="neumorphic-btn py-3 flex items-center justify-center gap-2 text-gray-600 active:scale-95 transition-all bg-white/40">
-                                    <i class="fas fa-file-export text-[10px] text-green-500"></i>
-                                    <span class="text-[10px] font-black uppercase tracking-widest">Export</span>
+                                <button onclick="openSettings()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-white/40">
+                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                                        <i class="fas fa-cog text-sm"></i>
+                                    </div>
+                                    <span class="text-xs font-black uppercase tracking-widest">Settings</span>
                                 </button>
-                                <button onclick="triggerImport()" class="neumorphic-btn py-3 flex items-center justify-center gap-2 text-gray-600 active:scale-95 transition-all bg-white/40">
-                                    <i class="fas fa-file-import text-[10px] text-blue-500"></i>
-                                    <span class="text-[10px] font-black uppercase tracking-widest">Import</span>
+                                
+                                <button onclick="showAnalytics()" class="neumorphic-btn p-4 flex flex-col items-center gap-2 text-gray-600 group active:scale-95 transition-all bg-white/40">
+                                    <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                                        <i class="fas fa-chart-line text-sm"></i>
+                                    </div>
+                                    <span class="text-xs font-black uppercase tracking-widest">Analytics</span>
                                 </button>
                             </div>
                         </div>
-
-
+                            
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1479,7 +1507,7 @@
             <div class="nav-item" onclick="switchPage('review')">
                 <i class="fas fa-history"></i>
                 <span>Review</span>
-                <span id="nav-review-badge" class="absolute top-1 right-1/4 bg-red-500 text-white text-xs font-black w-4 h-4 rounded-full flex items-center justify-center border border-white hidden">0</span>
+                <span id="nav-review-badge" class="absolute top-0.5 left-1/2 ml-2 bg-red-500 text-white text-[9px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white hidden">0</span>
             </div>
             <div class="nav-item" onclick="switchPage('mastery')">
                 <i class="fas fa-trophy"></i>
@@ -1494,12 +1522,14 @@
     <!-- Modal for Learning -->
     <div id="learningModal" class="modal-overlay">
         <div class="modal-content relative flex flex-col bg-[#e0e5ec] rounded-[20px] shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
-            <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pt-2 pb-1 opacity-40 md:hidden" onclick="closeModal()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            <!-- Close Indicator (Mobile Friendly) - Hidden as requested -->
+            <div class="w-full flex justify-center pt-2 pb-1 opacity-40 md:hidden hidden" onclick="closeModal()">
                 <div class="w-12 h-1.5 bg-gray-400/40 rounded-full"></div>
             </div>
-            <!-- Close Button (Absolute for better layout) -->
-            <button onclick="closeModal()" class="absolute top-4 right-4 neumorphic-btn w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-500 z-[100] shadow-md md:flex hidden">
+            <!-- Close Button (Absolute for better layout) - Hidden as requested -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 neumorphic-btn w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-500 z-[100] shadow-md hidden">
                 <i class="fas fa-times"></i>
             </button>
 
@@ -1512,11 +1542,15 @@
             </div>
 
             <!-- Modal Header -->
-            <div class="px-5 pt-2 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
-                <div class="flex items-center pr-12 min-w-0 w-full gap-3">
-                    <h2 id="modalTitle" class="text-2xl font-bold text-gray-700 capitalize whitespace-nowrap overflow-hidden min-w-0 flex-shrink drop-shadow-sm"></h2>
-                    <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold border border-blue-200">Stage 0</div>
+            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
+                <div class="flex items-baseline pr-12 min-w-0 w-full gap-2">
+                    <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm"></h2>
+                    <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-0.5">Stage 0</div>
                 </div>
+                <!-- Refresh Button -->
+                <button onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
             </div>
             
             <!-- Content Area (The Stage) -->
@@ -1568,8 +1602,10 @@
     <!-- Reset to Learn Confirmation Modal -->
     <div id="resetModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeResetModal()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
-            <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeResetModal()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            <!-- Close Indicator (Mobile Friendly) - Hidden -->
+            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden hidden" onclick="closeResetModal()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
             </div>
             
@@ -1598,8 +1634,10 @@
     <!-- Confirm Modal (Specific for Refresh) -->
     <div id="refreshConfirmModal" class="fixed inset-0 bg-black/50 z-[60] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeRefreshConfirmModal()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
-            <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeRefreshConfirmModal()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            <!-- Close Indicator (Mobile Friendly) - Hidden -->
+            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden hidden" onclick="closeRefreshConfirmModal()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
             </div>
 
@@ -1611,11 +1649,10 @@
             </div>
 
             <p class="text-gray-600 mb-6 text-sm">
-                Are you sure you want to refresh the explanation for "<span id="confirmVerb" class="font-bold text-blue-600"></span>"?
+                 Are you sure you want to refresh the explanation for "<span id="confirmVerb" class="font-bold text-blue-600"></span>"?
                 <br><br>
-                <span class="text-xs text-amber-600 flex items-center gap-2">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    This will consume AI tokens.
+                <span id="apiCheckStatus" class="text-xs flex items-center gap-2">
+                    <!-- Dynamic status will be inserted here -->
                 </span>
             </p>
             <div class="grid grid-cols-2 gap-3">
@@ -1631,9 +1668,11 @@
 
     <!-- Excluded Verbs Modal -->
     <div id="excludedModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center hidden" onclick="closeExcludedModal(event)">
-        <div class="bg-[#e0e5ec] w-[90%] max-w-md rounded-3xl p-6 neumorphic animate-fade-in flex flex-col max-h-[90vh]" style="padding-top: calc(1.5rem + var(--safe-top)); padding-bottom: calc(1.5rem + var(--safe-bottom));" onclick="event.stopPropagation()">
-            <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeExcludedModal()">
+        <div class="bg-[#e0e5ec] w-[90%] max-w-md rounded-3xl p-6 neumorphic animate-fade-in flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            <!-- Close Indicator (Mobile Friendly) - Hidden -->
+            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden hidden" onclick="closeExcludedModal()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
             </div>
             <div class="flex items-center justify-between mb-6">
@@ -1646,7 +1685,7 @@
                         <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Words you've cleared</p>
                     </div>
                 </div>
-                <button onclick="closeExcludedModal()" class="w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors md:flex hidden">
+                <button onclick="closeExcludedModal()" class="w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors hidden">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -1666,6 +1705,8 @@
     <!-- Confirm Modal -->
     <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500">
                     <i class="fas fa-question-circle"></i>
@@ -1687,6 +1728,8 @@
     <!-- Generic Message Modal (Success/Error) -->
     <div id="messageModal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeMessageModal()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <div class="flex items-center gap-3 mb-4">
                 <div id="messageIcon" class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center">
                     <i class="fas fa-info-circle"></i>
@@ -1702,7 +1745,9 @@
 
     <!-- Search Input Modal -->
     <div id="searchModal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-start justify-center pt-20 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeSearchModal()">
-        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 transform -translate-y-4 transition-transform duration-300 border border-white/50" style="margin-top: var(--safe-top);" onclick="event.stopPropagation()">
+        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 transform -translate-y-4 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500">
                     <i class="fas fa-search"></i>
@@ -1711,7 +1756,7 @@
                     <h3 class="text-lg font-black text-gray-700">Deep Search</h3>
                     <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Type to find words</p>
                 </div>
-                <button onclick="closeSearchModal()" class="ml-auto w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400">
+                <button onclick="closeSearchModal()" class="ml-auto w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400 hidden">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -1732,6 +1777,8 @@
     <!-- Clear All Data Confirmation Modal (Dual Option) -->
     <div id="clearAllModal" class="fixed inset-0 bg-black/50 z-[75] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeClearAllModal()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <!-- Close Indicator (Mobile Friendly) -->
             <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeClearAllModal()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
@@ -1776,6 +1823,8 @@
     <!-- Analytics / Ebbinghaus Chart Modal -->
     <div id="analyticsModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeAnalytics()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-2xl mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <!-- Close Indicator (Mobile Friendly) -->
             <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeAnalytics()">
                 <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
@@ -1804,6 +1853,33 @@
                     Points represent words in your current review scope.<br>
                     Higher stages indicate stronger memory consolidation.
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Confirmation Modal -->
+    <div id="importConfirmModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeImportConfirmModal()">
+        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
+            
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-green-500">
+                    <i class="fas fa-file-import"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-700">Import Data</h3>
+            </div>
+
+            <p class="text-gray-600 mb-6 text-sm">
+                This will <span class="text-red-500 font-bold">OVERWRITE</span> your current progress and settings. Are you sure you want to restore from backup?
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="closeImportConfirmModal()" class="py-3 rounded-xl neumorphic-btn text-gray-500 font-black text-xs uppercase tracking-wider">
+                    Cancel
+                </button>
+                <button id="confirmImportBtn" class="py-3 rounded-xl neumorphic-btn text-green-500 font-black text-xs uppercase tracking-wider">
+                    Restore
+                </button>
             </div>
         </div>
     </div>
@@ -1915,7 +1991,7 @@
         let currentCardIndex = 0; // Track current card in modal
         
         // Auto Image Generation Queue
-        const imageQueue = [];
+        let imageQueue = [];
         let isQueueProcessing = false;
         
         let currentPos = ['all'];
@@ -1929,7 +2005,41 @@
         let limit = 4;
         let offset = 0;
         let isLoading = false;
-        let autoAiAnalysis = localStorage.getItem('autoAiAnalysis') !== 'false'; // Default to true
+        // Migration: Check for legacy settings and default to 'auto' if not set
+        let analysisMode = localStorage.getItem('analysisMode') || 'auto'; 
+
+        // Backwards compatibility migration (run once)
+        if (!localStorage.getItem('analysisMode')) {
+            const legacyAuto = localStorage.getItem('autoAiAnalysis');
+            const legacyCache = localStorage.getItem('cacheOnlyMode');
+            
+            if (legacyAuto === 'false') {
+                analysisMode = 'manual';
+            } else if (legacyCache === 'true') {
+                analysisMode = 'cache_only';
+            } else {
+                analysisMode = 'auto';
+            }
+            localStorage.setItem('analysisMode', analysisMode);
+        }
+        
+        // --- Back Button Support for Modals ---
+        let modalStack = [];
+        window.addEventListener('popstate', (event) => {
+            if (modalStack.length > 0) {
+                const lastModalCloseFn = modalStack.pop();
+                if (typeof lastModalCloseFn === 'function') {
+                    // Call the close function without adding another popstate entry
+                    lastModalCloseFn(true); 
+                }
+            }
+        });
+
+        function pushModalState(closeFn) {
+            modalStack.push(closeFn);
+            history.pushState({ modal: true }, "");
+        }
+        // --- End Back Button Support ---
 
         function matchesPos(v, posArray) {
             if (posArray.includes('all')) return true;
@@ -2043,9 +2153,8 @@
                     renderMasteryPage();
                 } else if (pageId === 'me') {
                     updateProfileStats();
-                    // Sync AI Auto-analysis toggle state
-                    const aiToggle = document.getElementById('ai-auto-toggle');
-                    if (aiToggle) aiToggle.checked = autoAiAnalysis;
+                    // Sync Analysis Mode radio buttons
+                    updateAnalysisModeUI(analysisMode);
                 } else if (pageId === 'learn') {
                     // Ensure learn page is filtered correctly
                     applyFilters();
@@ -2055,11 +2164,7 @@
             // Scroll to top of the content area
             const appContent = document.querySelector('.app-content');
             if (appContent) {
-                if (pageId === 'learn') {
-                    appContent.classList.add('no-scroll');
-                } else {
-                    appContent.classList.remove('no-scroll');
-                }
+                appContent.classList.remove('no-scroll');
                 // Use immediate scroll for page switches to prevent animation conflict
                 appContent.scrollTop = 0;
             }
@@ -2075,19 +2180,26 @@
                 const appContent = document.querySelector('.app-content');
                 
                 if (section && appContent) {
-                    // Calculate target scroll position
-                    const targetTop = section.offsetTop - 20; // 20px padding from top
+                    // Calculate target scroll position to center the element
+                    const elementRect = section.getBoundingClientRect();
+                    const containerRect = appContent.getBoundingClientRect();
+                    
+                    // Center calculation: 
+                    // Target Scroll Top = Current Scroll Top + (Element Top relative to Viewport - Container Top relative to Viewport) - (Container Height / 2) + (Element Height / 2)
+                    // Simplified: We want the element's center to be at the container's center.
+                    
+                    const scrollTop = appContent.scrollTop + elementRect.top - containerRect.top - (containerRect.height / 2) + (elementRect.height / 2);
                     
                     // Smooth scroll
                     appContent.scrollTo({
-                        top: targetTop,
+                        top: scrollTop,
                         behavior: 'smooth'
                     });
                     
                     // 3. Highlight animation
-                    section.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-50', 'scale-[1.01]');
+                    section.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50', 'scale-[1.02]', 'transition-all', 'duration-500');
                     setTimeout(() => {
-                        section.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-50', 'scale-[1.01]');
+                        section.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50', 'scale-[1.02]', 'transition-all', 'duration-500');
                     }, 1500);
                 }
             }, 300); // Wait for page transition
@@ -2126,7 +2238,7 @@
 
             if (currentReviewTab === 'session') {
                 // SESSION MODE: Show words due for review
-                const query = document.getElementById('searchInput')?.value.toLowerCase() || '';
+                const query = document.getElementById('searchInput')?.value || '';
                 reviewVerbsList = allVerbs.filter(v => {
                     const status = learningStatus[v['单词'].toLowerCase()];
                     if (!status) return false;
@@ -2141,7 +2253,7 @@
                     if (!matchesFreq(v, currentFreq)) return false;
 
                     // Search Filter
-                    if (query && !v['单词'].toLowerCase().includes(query)) return false;
+                    if (query && !v['单词'].includes(query)) return false;
 
                     // Include words due for review and learning words (not mastered)
                     const isDue = new Date(status.next_review) <= now;
@@ -2186,7 +2298,7 @@
                     </div>`;
             } else {
                 // LIBRARY MODE: Show all words currently in review (status is learning)
-                const query = document.getElementById('searchInput')?.value.toLowerCase() || '';
+                const query = document.getElementById('searchInput')?.value || '';
                 const learnedVerbs = allVerbs.filter(v => {
                     const status = learningStatus[v['单词'].toLowerCase()];
                     // "Reset to Learn" sets it to Stage 0, we want to see it in Library.
@@ -2202,7 +2314,7 @@
                     if (!matchesFreq(v, currentFreq)) return false;
                     
                     // Search Filter
-                    if (query && !v['单词'].toLowerCase().includes(query)) return false;
+                    if (query && !v['单词'].includes(query)) return false;
                     
                     return true;
                 });
@@ -2275,7 +2387,7 @@
             const grid = document.getElementById('masteryGrid');
             if (!grid) return;
             
-            const query = document.getElementById('searchInput')?.value.toLowerCase() || '';
+            const query = document.getElementById('searchInput')?.value || '';
             
             // User request: "Learn页面的 Total Review Mastered 应该和当前选择的单词库范围相吻合，review和masterey页面同样"
             // We apply the same POS filter logic here
@@ -2293,7 +2405,7 @@
                 if (!matchesFreq(v, currentFreq)) return false;
 
                 // Search Filter
-                if (query && !v['单词'].toLowerCase().includes(query)) return false;
+                if (query && !v['单词'].includes(query)) return false;
 
                 return true;
             });
@@ -2480,11 +2592,11 @@
             autoCheckin();
             // Global statistics: independent of current POS/Freq study filters
             // but respects the current search query and exclusion status
-            const query = document.getElementById('searchInput')?.value.toLowerCase() || '';
+            const query = document.getElementById('searchInput')?.value || '';
             
             const targetVerbs = allVerbs.filter(v => {
                 // Search filter
-                if (query && !v['单词'].toLowerCase().includes(query)) return false;
+                if (query && !v['单词'].includes(query)) return false;
                 // Exclude excluded verbs from progress stats
                 if (excludedVerbs.has(v['单词'])) return false;
                 return true;
@@ -2605,6 +2717,7 @@
             const modal = document.getElementById('analyticsModal');
             if (!modal) return;
             
+            pushModalState(closeAnalytics);
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -2615,9 +2728,15 @@
             }, 10);
         }
 
-        function closeAnalytics() {
+        function closeAnalytics(fromPopState = false) {
             const modal = document.getElementById('analyticsModal');
             if (!modal) return;
+            
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeAnalytics);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             
             modal.classList.add('opacity-0');
             modal.querySelector('div').classList.remove('scale-100');
@@ -2636,6 +2755,7 @@
             // Sync initial value
             modalInput.value = mainInput ? mainInput.value : '';
             
+            pushModalState(closeSearchModal);
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -2645,9 +2765,15 @@
             }, 10);
         }
 
-        function closeSearchModal() {
+        function closeSearchModal(fromPopState = false) {
             const modal = document.getElementById('searchModal');
             if (!modal) return;
+            
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeSearchModal);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             
             modal.classList.add('opacity-0');
             modal.querySelector('div').classList.remove('translate-y-0');
@@ -2750,11 +2876,12 @@
                                     displayedVerbs[vIndex].has_cache = true;
                                     // Update the DOM for this specific card
                                     const card = document.getElementById('verb-card-' + word);
+                                    /* Refresh button removed per user request
                                     if (card && !card.querySelector('button[onclick*="refreshFromCard"]')) {
                                         const refreshBtnHtml = `
                                             <button 
                                                 onclick="refreshFromCard(event, '${word}')"
-                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
+                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
                                                 title="Refresh explanation"
                                             >
                                                 <i class="fas fa-sync-alt text-xs"></i>
@@ -2762,6 +2889,7 @@
                                         `;
                                         card.insertAdjacentHTML('beforeend', refreshBtnHtml);
                                     }
+                                    */
                                 }
                             });
                         }
@@ -2876,6 +3004,7 @@
             const modal = document.getElementById('clearAllModal');
             if (!modal) return;
             
+            pushModalState(closeClearAllModal);
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -2981,9 +3110,15 @@
             showMessage('Error', errorMsg, 'error');
         }
 
-        function closeClearAllModal() {
+        function closeClearAllModal(fromPopState = false) {
             const modal = document.getElementById('clearAllModal');
             if (!modal) return;
+            
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeClearAllModal);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             
             // Clear timer if modal is closed
             if (clearCountdownTimer) {
@@ -3005,6 +3140,7 @@
             
             if (!modal || !titleEl || !textEl || !iconEl) return;
 
+            pushModalState(closeMessageModal);
             titleEl.innerText = title;
             textEl.innerText = text;
             
@@ -3039,13 +3175,19 @@
             titleEl.innerText = title;
             textEl.innerText = text;
 
-            const close = () => {
+            const close = (fromPopState = false) => {
+                if (fromPopState !== true) {
+                    // const idx = modalStack.indexOf(close);
+                    // if (idx > -1) modalStack.splice(idx, 1);
+                    history.back();
+                }
                 modal.classList.add('opacity-0');
                 modal.querySelector('div').classList.remove('scale-100');
                 modal.querySelector('div').classList.add('scale-95');
                 setTimeout(() => modal.classList.add('hidden'), 300);
             };
 
+            pushModalState(close);
             okBtn.onclick = () => {
                 close();
                 if (onOk) onOk();
@@ -3061,9 +3203,16 @@
             }, 10);
         }
 
-        function closeMessageModal() {
+        function closeMessageModal(fromPopState = false) {
             const modal = document.getElementById('messageModal');
             if (!modal) return;
+            
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeMessageModal);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
+            
             modal.classList.add('opacity-0');
             modal.querySelector('div').classList.remove('scale-100');
             modal.querySelector('div').classList.add('scale-95');
@@ -3437,8 +3586,8 @@
             // User request: "所有标签的数量显示以当时搜索的所有结果的分布为准"
             // Reverting logic to respect cross-filtering (linkage) between POS and Frequency
             
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const searchMatches = allVerbs.filter(v => v['单词'].toLowerCase().includes(query));
+            const query = document.getElementById('searchInput').value;
+            const searchMatches = allVerbs.filter(v => v['单词'].includes(query));
 
             // Reset counts
             const posCounts = { noun: 0, verb: 0, noun_verb: 0, other: 0, adj_adv: 0, prep_conj: 0, excluded: 0 };
@@ -3905,43 +4054,54 @@
         }
 
         function applyFilters(force = false) {
-            const query = document.getElementById('searchInput').value.toLowerCase();
+            const query = document.getElementById('searchInput').value;
+            const isSearching = query.length > 0;
             
             displayedVerbs = allVerbs.filter(v => {
                 const verbKey = v['单词'].toLowerCase();
                 const status = learningStatus[verbKey];
-                const matchesSearch = v['单词'].toLowerCase().includes(query);
+                const matchesSearch = v['单词'].includes(query);
                 
                 // Exclude verbs that the user has manually excluded
                 if (typeof excludedVerbs !== 'undefined' && excludedVerbs.has(v['单词'])) return false;
                 
                 if (!matchesPos(v, currentPos)) return false;
                 
-                // User request: learn咋出现了stage的单词了
-                // Fix: Learn page should NOT show any word that is already in the Ebbinghaus cycle (status.status === 'learning')
-                // unless explicitly filtered for 'review' or 'mastered'.
-                const isReviewOrMasteredFilter = currentFreq.includes('review') || currentFreq.includes('mastered');
-                if (!isReviewOrMasteredFilter && status && status.status === 'learning') {
-                    return false;
-                }
+                // Search Filter
+                if (!matchesSearch) return false;
 
                 let isFreqMatched = false;
                 if (currentFreq.includes('all')) {
-                    // For 'all' frequency, we want words that haven't been mastered.
-                    // (Words currently 'learning' are already excluded above if not explicitly filtering for review)
-                    isFreqMatched = !status || status.status !== 'mastered';
+                    // For 'all' frequency, we want to allow everything initially
+                    isFreqMatched = true;
                 } else {
                     isFreqMatched = matchesFreq(v, currentFreq);
                 }
                 
-                return matchesSearch && isFreqMatched;
+                if (!isFreqMatched) return false;
+
+                // User request: Learn page default view (no search) should ONLY show Unlearned words.
+                // But Search should find EVERYTHING (Unlearned, Learning, Mastered).
+                
+                const isReviewOrMastered = currentFreq.includes('review') || currentFreq.includes('mastered');
+                
+                // Only apply strict status filtering if:
+                // 1. We are on Learn page
+                // 2. We are NOT searching
+                // 3. We are NOT explicitly asking for Review/Mastered words
+                if (currentPage === 'learn' && !isSearching && !isReviewOrMastered) {
+                    // If the word has any status (Learning or Mastered), hide it from the default batch
+                    if (status) return false;
+                }
+                
+                return true;
             });
 
             // User request: For Learn page (when NOT in review/mastered filter), handle persistence and random selection
             const isReviewOrMastered = currentFreq.includes('review') || currentFreq.includes('mastered');
             if (currentPage === 'learn' && !isReviewOrMastered) {
                 // If searching, show all matches and don't mess with the batch
-                if (query.length > 0) {
+                if (isSearching) {
                     // Do nothing to displayedVerbs, let it show all search matches
                 } else {
                     // Normal batch logic when not searching
@@ -4033,12 +4193,25 @@
             // Long Press Logic for Exclude (Learn page only)
             let longPressTimer;
             let isLongPress = false;
+            let startX = 0;
+            let startY = 0;
             const longPressDuration = 600;
 
             const startLongPress = (e) => {
                 // User request: Different pages have different card interactions
                 if (currentPage !== 'learn' && currentPage !== 'mastery' && currentPage !== 'review') return;
+                
                 isLongPress = false;
+                
+                // Track start position
+                if (e.type === 'touchstart') {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                } else {
+                    startX = e.clientX;
+                    startY = e.clientY;
+                }
+                
                 card.style.transform = 'scale(0.98)';
                 card.style.transition = 'transform 0.6s ease';
                 
@@ -4056,11 +4229,24 @@
                 if (!isLongPress) card.style.transform = '';
             };
 
+            const handleTouchMove = (e) => {
+                if (!longPressTimer) return;
+                
+                const currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                
+                // If moved more than 10px, cancel long press
+                if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startY) > 10) {
+                    cancelLongPress();
+                }
+            };
+
             card.onmousedown = startLongPress;
             card.ontouchstart = startLongPress;
             card.onmouseup = cancelLongPress;
             card.onmouseleave = cancelLongPress;
             card.ontouchend = cancelLongPress;
+            card.ontouchmove = handleTouchMove;
             card.oncontextmenu = (e) => {
                 if (currentPage === 'learn' || currentPage === 'mastery') e.preventDefault();
             };
@@ -4086,17 +4272,19 @@
             };
             
             let refreshBtn = '';
+            /* Refresh button removed per user request
             if (item.has_cache) {
                 refreshBtn = `
                     <button 
                         onclick="refreshFromCard(event, '${item['单词']}')"
-                        class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
+                        class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
                         title="Refresh explanation"
                     >
                         <i class="fas fa-sync-alt text-xs"></i>
                     </button>
                 `;
             }
+            */
 
             // Exclude / Restore Status
             const isExcluded = excludedVerbs.has(item['单词']);
@@ -4595,8 +4783,11 @@
         // const loader = document.getElementById('loader');
 
         function openVerb(verb, isReview = false, refresh = false) {
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Prevent background scroll
+            if (!modal.classList.contains('active')) {
+                pushModalState(closeModal);
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Prevent background scroll
+            }
             modalTitle.innerText = verb;
             isReviewMode = isReview;
             spellingWord = verb;
@@ -4639,6 +4830,17 @@
                 document.getElementById('reviewModeControls')?.classList.add('hidden');
             }
 
+            // Refresh Button visibility logic
+            // Hide refresh button if in Review Session mode OR if Analysis Mode is Manual
+            const refreshBtn = document.querySelector('#learningModal button[onclick="refreshExplanation()"]');
+            if (refreshBtn) {
+                if (isReviewMode || analysisMode === 'manual') {
+                    refreshBtn.style.display = 'none';
+                } else {
+                    refreshBtn.style.display = ''; // Reset to default
+                }
+            }
+
             // Show/Hide Review Controls (the bottom buttons like "Mark as Learned" or "Already Mastered")
             const controls = document.getElementById('reviewControls');
             if (controls) {
@@ -4677,46 +4879,95 @@
             } catch (e) {}
 
             // Decision: Auto analyze or manual?
-            if (autoAiAnalysis || refresh) {
+            if (refresh) {
+                // Force refresh always triggers analysis
                 analyzeVerbs(verb, refresh);
+            } else if (analysisMode === 'auto') {
+                // Standard Auto Mode: Try cache, if missing generate new
+                analyzeVerbs(verb, false);
+            } else if (analysisMode === 'cache_only') {
+                // In Strict Cache Only mode, we now rely on the backend's "strict_cache" flag.
+                // We attempt to load via API. 
+                // If backend has cache (SQLite), it returns it.
+                // If backend has NO cache, it returns empty (due to strict_cache=true), 
+                // and analyzeVerbs handles showing the manual trigger.
+                analyzeVerbs(verb, false);
             } else {
+                // Manual Mode: Always manual trigger
                 showManualTrigger(verb);
             }
         }
 
-        function showManualTrigger(verb) {
+        // Deprecated: No longer used as primary check, logic moved to analyzeVerbs + backend flag
+        async function checkDbAndDecide(verb) {
+             // ... kept for reference or legacy calls ...
+             // But for now we just redirect to analyzeVerbs with strict mode logic implicitly handled there
+             // actually we can just return since it's not called anymore
+             console.warn("checkDbAndDecide is deprecated.");
+        }
+
+        function showManualTrigger(verb, titleOverride = null) {
             // Hide progress container
             const progressContainer = document.getElementById('progressContainer');
             if (progressContainer) progressContainer.classList.add('hidden');
 
+            const title = titleOverride || 'AI Analysis Disabled';
+            let subtext = '';
+            
+            if (titleOverride === 'Cache Not Found') {
+                subtext = 'This word is not in local cache.<br>Click below to generate new AI analysis.';
+            } else {
+                subtext = 'Auto-analysis is turned off. Click the button below<br>to start deep analysis for this word.';
+            }
+
             // Set content to show a manual "Start Analysis" button
             const outputContainer = document.getElementById('outputContainer');
             if (outputContainer) {
+                const iconClass = titleOverride === 'Cache Not Found' ? 'database' : 'robot';
+                
                 outputContainer.innerHTML = `
                     <div class="absolute inset-0 flex flex-col items-center justify-center p-8 text-center space-y-6">
                         <div class="w-24 h-24 rounded-3xl neumorphic flex items-center justify-center text-indigo-400 mb-2">
-                            <i class="fas fa-robot text-4xl"></i>
+                            <i class="fas fa-${iconClass} text-4xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-xl font-black text-gray-700 mb-1 uppercase tracking-tight">AI Analysis Disabled</h3>
+                            <h3 class="text-xl font-black text-gray-700 mb-1 uppercase tracking-tight">${title}</h3>
                             <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                                Auto-analysis is turned off. Click the button below<br>to start deep analysis for this word.
+                                ${subtext}
                             </p>
                         </div>
-                        <button onclick="analyzeVerbs('${verb}')" class="neumorphic-btn px-10 py-4 text-indigo-600 font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
+                        <button onclick="triggerAnalysis('${verb}')" class="neumorphic-btn px-10 py-4 text-indigo-600 font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
                             <i class="fas fa-bolt text-indigo-400"></i>
-                            Start AI Analysis
+                            Generate with AI
                         </button>
                     </div>
                 `;
             }
         }
 
+        // New wrapper to trigger analysis from manual button
+        function triggerAnalysis(verb) {
+            // Restore refresh button if needed (e.g., if user manually starts it)
+            const refreshBtn = document.querySelector('#learningModal button[onclick="refreshExplanation()"]');
+            if (refreshBtn && !isReviewMode) {
+                refreshBtn.style.display = ''; 
+            }
+            
+            analyzeVerbs(verb);
+        }
+
         let isClosing = false;
 
-        function closeModal() {
+        function closeModal(fromPopState = false) {
             if (isClosing) return;
             isClosing = true;
+
+            if (fromPopState !== true) {
+                // If closed manually (not via back button), remove the state from history
+                // const idx = modalStack.indexOf(closeModal);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
 
             // Abort any ongoing analysis request
             if (analyzeController) {
@@ -4909,11 +5160,21 @@
         let analyzeController = null;
 
         async function analyzeVerbs(verb, refresh = false) {
-            // Abort previous request if any
-            if (analyzeController) {
+            // Abort previous request if any AND we are NOT in force-refresh mode
+            // Force-refresh (user triggered) should always proceed
+            if (analyzeController && !refresh) {
                 analyzeController.abort();
             }
-            analyzeController = new AbortController();
+            
+            const currentController = new AbortController();
+            if (!refresh) {
+                analyzeController = currentController;
+            }
+
+            // Clear image queue if we are refreshing LLM content to prevent mismatch
+            if (refresh) {
+                imageQueue = imageQueue.filter(v => v !== verb);
+            }
 
             // Get fresh references
             const progressContainer = document.getElementById('progressContainer');
@@ -4958,11 +5219,27 @@
             }, 100);
 
             try {
+                // If in Strict Cache Only mode, we now rely on the backend's "strict_cache" flag.
+                // We pass this flag to the backend. If backend has data, it returns it.
+                // If backend does NOT have data, it will return null/empty (instead of generating AI).
+                // This is the most robust way: "Ask backend for cache, but forbid new generation."
+                
+                const requestPayload = { 
+                    verbs: verb, 
+                    mode: 'single', 
+                    refresh: refresh
+                };
+
+                // Add strict_cache flag if needed
+                if (analysisMode === 'cache_only' && !refresh) {
+                    requestPayload.strict_cache = true;
+                }
+                
                 const response = await fetch('/api/explain', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ verbs: verb, mode: 'single', refresh: refresh }),
-                    signal: analyzeController.signal
+                    body: JSON.stringify(requestPayload),
+                    signal: currentController.signal
                 });
 
                 const data = await response.json();
@@ -4972,10 +5249,26 @@
                 if (progressBar) progressBar.style.width = '100%';
                 if (progressText) progressText.innerText = 'Analysis Complete!';
                 
+                // Finalize data
+                if (analyzeController === currentController) {
+                    analyzeController = null;
+                }
+
                 // Short delay to show 100%
                 await new Promise(r => setTimeout(r, 400));
                 
                 if (response.ok) {
+                    // Check if we got valid content
+                    // If strict_cache was true and backend returned no content (or error), data.result might be null/empty
+                    if (!data.result || data.result.length < 10) {
+                         if (analysisMode === 'cache_only') {
+                             // Backend confirmed: No cache available.
+                             // Now we show the manual trigger.
+                             showManualTrigger(verb, 'Cache Not Found');
+                             return;
+                         }
+                    }
+
                     // Handle images update
                     if (data.images) {
                         Object.keys(data.images).forEach(verbKey => {
@@ -5049,7 +5342,7 @@
                                         const refreshBtnHtml = `
                                             <button 
                                                 onclick="refreshFromCard(event, '${originalWord}')"
-                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
+                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
                                                 title="Refresh explanation"
                                             >
                                                 <i class="fas fa-sync-alt text-xs"></i>
@@ -5393,6 +5686,69 @@
                     // 5. Vertical Flip Logic Initialization
                     if (cards.length > 0) {
                         currentCardIndex = 0;
+                        
+                        // Touch handling for mobile flip
+                        let touchStartY = 0;
+                        let touchEndY = 0;
+                        const swipeThreshold = 50; // Minimum distance for swipe
+
+                        outputContainer.ontouchstart = (e) => {
+                            touchStartY = e.touches[0].clientY;
+                        };
+
+                        outputContainer.ontouchend = (e) => {
+                            touchEndY = e.changedTouches[0].clientY;
+                            handleSwipe();
+                        };
+
+                        const handleSwipe = () => {
+                            const activeCard = outputContainer.children[currentCardIndex];
+                            if (!activeCard) return;
+
+                            const scrollableContent = activeCard.querySelector('.flex-1.overflow-y-auto');
+                            if (!scrollableContent) {
+                                // No scrollable content, basic swipe
+                                evaluateSwipe();
+                                return;
+                            }
+
+                            const isScrollable = scrollableContent.scrollHeight > scrollableContent.clientHeight;
+                            const distance = touchStartY - touchEndY; // Positive = Swipe Up (Scroll Down)
+
+                            if (distance > 0) { 
+                                // Swiping Up (Trying to go down)
+                                if (isScrollable) {
+                                    const distanceToBottom = scrollableContent.scrollHeight - (scrollableContent.scrollTop + scrollableContent.clientHeight);
+                                    if (distanceToBottom <= 5 && distance > swipeThreshold) {
+                                        switchCard('down');
+                                    }
+                                } else if (distance > swipeThreshold) {
+                                    switchCard('down');
+                                }
+                            } else {
+                                // Swiping Down (Trying to go up)
+                                if (isScrollable) {
+                                    if (scrollableContent.scrollTop <= 0 && Math.abs(distance) > swipeThreshold) {
+                                        switchCard('up');
+                                    }
+                                } else if (Math.abs(distance) > swipeThreshold) {
+                                    switchCard('up');
+                                }
+                            }
+                        };
+
+                        const evaluateSwipe = () => {
+                            const distance = touchStartY - touchEndY;
+                            if (Math.abs(distance) < swipeThreshold) return;
+                            
+                            if (distance > 0) {
+                                // Swipe Up -> Next Card
+                                switchCard('down');
+                            } else {
+                                // Swipe Down -> Prev Card
+                                switchCard('up');
+                            }
+                        };
                     
                         // Add wheel listener for scrolling
                     // Only flip cards if we hit the top or bottom of the scrollable content
@@ -5491,6 +5847,9 @@
 
             } catch (error) {
                 clearInterval(progressInterval);
+                if (analyzeController === currentController) {
+                    analyzeController = null;
+                }
                 
                 // If the request was aborted, just return silently
                 if (error.name === 'AbortError') {
@@ -5510,18 +5869,19 @@
                 if (progressContainer) progressContainer.classList.add('hidden');
             }
         }
-        function refreshExplanation() {
+        async function refreshExplanation() {
             const verb = modalTitle.innerText;
             if (verb) {
-                openRefreshConfirmModal(verb, () => {
-                    analyzeVerbs(verb, true);
+                await openRefreshConfirmModal(verb, () => {
+                    // Force re-open the word modal to show progress overlay
+                    openVerb(verb, false, true); // Force refresh
                 });
             }
         }
 
-        function refreshFromCard(event, verb) {
+        async function refreshFromCard(event, verb) {
             event.stopPropagation();
-            openRefreshConfirmModal(verb, () => {
+            await openRefreshConfirmModal(verb, () => {
                 // Open modal and start refreshing immediately
                 openVerb(verb, false, true); // Force refresh
             });
@@ -5531,9 +5891,51 @@
         const refreshConfirmModal = document.getElementById('refreshConfirmModal');
         const confirmVerbSpan = document.getElementById('confirmVerb');
         const confirmRefreshBtn = document.getElementById('confirmRefreshBtn');
+        const apiCheckStatus = document.getElementById('apiCheckStatus');
 
-        function openRefreshConfirmModal(verb, onConfirm) {
+        async function openRefreshConfirmModal(verb, onConfirm) {
             confirmVerbSpan.innerText = verb;
+            
+            // Check API settings
+            let settings = {};
+            try {
+                const res = await fetch('/api/settings');
+                if (res.ok) {
+                    settings = await res.json();
+                }
+            } catch (e) {
+                console.error("Failed to fetch settings from server, falling back to local storage", e);
+                settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+            }
+            
+            const hasApiKey = settings.openai_api_key && settings.openai_api_key.trim().length > 0;
+            const hasBaseUrl = settings.openai_base_url && settings.openai_base_url.trim().length > 0;
+            const hasModel = settings.openai_model && settings.openai_model.trim().length > 0;
+            
+            // Note: Settings for the explain_verbs app use 'openai_api_key', 'openai_base_url', 'openai_model'
+            // instead of 'api_key', 'base_url', 'model' used in other contexts.
+            
+            const isApiValid = hasApiKey && hasBaseUrl && hasModel;
+
+            if (isApiValid) {
+                apiCheckStatus.className = "text-xs text-amber-600 flex items-center gap-2";
+                apiCheckStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> This will consume AI tokens.`;
+                confirmRefreshBtn.disabled = false;
+                confirmRefreshBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                confirmRefreshBtn.classList.add('text-blue-500');
+                confirmRefreshBtn.style.pointerEvents = 'auto';
+            } else {
+                apiCheckStatus.className = "text-xs text-red-500 flex items-center gap-2 font-medium";
+                apiCheckStatus.innerHTML = `<i class="fas fa-times-circle"></i> API not configured. Check settings.`;
+                confirmRefreshBtn.disabled = true;
+                confirmRefreshBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                confirmRefreshBtn.classList.remove('text-blue-500');
+                
+                // Extra check for hidden classes that might prevent clicking
+                confirmRefreshBtn.style.pointerEvents = 'none';
+            }
+
+            pushModalState(closeRefreshConfirmModal);
             refreshConfirmModal.classList.remove('hidden');
             // Trigger reflow for transition
             void refreshConfirmModal.offsetWidth;
@@ -5544,11 +5946,22 @@
             // Set up confirm action
             confirmRefreshBtn.onclick = () => {
                 closeRefreshConfirmModal();
-                onConfirm();
+                // Ensure the details modal opens/stays open
+                if (typeof onConfirm === 'function') {
+                    // Small delay to let history.back() from closeRefreshConfirmModal() settle
+                    setTimeout(() => {
+                        onConfirm();
+                    }, 50);
+                }
             };
         }
 
-        function closeRefreshConfirmModal() {
+        function closeRefreshConfirmModal(fromPopState = false) {
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeRefreshConfirmModal);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             refreshConfirmModal.classList.add('opacity-0');
             refreshConfirmModal.querySelector('div').classList.remove('scale-100');
             refreshConfirmModal.querySelector('div').classList.add('scale-95');
@@ -5581,6 +5994,7 @@
             
             try {
                 // Call API to generate images (mode=single, refresh=false)
+                // Use a separate AbortController for images if needed, but for now simple fetch
                 const res = await fetch('/api/explain', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -5657,11 +6071,12 @@
             }
             
             // 2. Ensure Refresh button is present
+            /* Refresh button removed per user request
             if (!card.querySelector('button[onclick*="refreshFromCard"]')) {
                 const refreshBtnHtml = `
                     <button 
                         onclick="refreshFromCard(event, '${verb}')"
-                        class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
+                        class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
                         title="Refresh explanation"
                     >
                         <i class="fas fa-sync-alt text-xs"></i>
@@ -5669,6 +6084,7 @@
                 `;
                 card.insertAdjacentHTML('beforeend', refreshBtnHtml);
             }
+            */
         }
         // Vertical Card Navigation Logic
         function drawPeekCard() {
@@ -5764,13 +6180,15 @@
     <!-- Settings Modal -->
     <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300" onclick="if(event.target === this) closeSettings()">
         <div class="bg-[#e0e5ec] w-full max-w-md rounded-[32px] shadow-2xl p-0 transform scale-95 transition-transform duration-300 overflow-hidden mx-4" id="settingsContent" onclick="event.stopPropagation()">
+            <!-- Safe Area Spacer for Mobile Status Bar -->
+            <div class="h-[var(--safe-top)] md:hidden"></div>
             <!-- Close Indicator (Mobile Friendly) -->
             <div class="w-full flex justify-center pt-3 pb-1 opacity-40 md:hidden" onclick="closeSettings()">
                 <div class="w-12 h-1.5 bg-gray-400 rounded-full"></div>
             </div>
             
             <!-- Modal Header -->
-            <div class="px-6 py-6 flex items-center justify-between">
+            <div class="px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl neumorphic flex items-center justify-center text-blue-500">
                         <i class="fas fa-cog"></i>
@@ -5785,8 +6203,8 @@
                 </button>
             </div>
 
-            <div class="px-6 pb-6 max-h-[70vh] overflow-y-auto hide-scrollbar">
-                <form id="settingsForm" class="space-y-8">
+            <div class="px-6 pb-4 max-h-[60vh] overflow-y-auto hide-scrollbar">
+                <form id="settingsForm" class="space-y-6">
                     <!-- General Settings -->
                     <div class="space-y-4">
                         <div class="flex items-center gap-2 mb-2 ml-1">
@@ -5794,21 +6212,59 @@
                             <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">General Settings</h4>
                         </div>
                         
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
+                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
+                            <!-- Analysis Mode Selector -->
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-center gap-3 mb-1">
                                     <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-white/50">
                                         <i class="fas fa-magic text-sm"></i>
                                     </div>
                                     <div>
-                                        <span class="text-xs font-black text-gray-700 block">AI Auto-Analysis</span>
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Trigger on word click</span>
+                                        <span class="text-xs font-black text-gray-700 block">Analysis Mode</span>
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Behavior when clicking words</span>
                                     </div>
                                 </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" name="autoAiAnalysis" id="ai-auto-toggle-settings" class="sr-only peer">
-                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 shadow-inner"></div>
-                                </label>
+                                
+                                <div class="grid grid-cols-1 gap-2">
+                                    <!-- Option 1: Smart Auto (Prefer Cache, Auto Generate) -->
+                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-blue-400/30 has-[:checked]:bg-blue-50/50">
+                                        <input type="radio" name="analysisMode" value="auto" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                                        <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 mr-3 shadow-inner">
+                                            <i class="fas fa-bolt text-xs"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <span class="text-xs font-black text-gray-600 block">Smart Auto (Recommend)</span>
+                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Prefer cache, auto-generate if missing</span>
+                                        </div>
+                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all"></div>
+                                    </label>
+
+                                    <!-- Option 2: Strict Cache (No Auto Gen) -->
+                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-green-400/30 has-[:checked]:bg-green-50/50">
+                                        <input type="radio" name="analysisMode" value="cache_only" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                                        <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600 mr-3 shadow-inner">
+                                            <i class="fas fa-database text-xs"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <span class="text-xs font-black text-gray-600 block">Strict Cache Only</span>
+                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Use cache only, never auto-generate</span>
+                                        </div>
+                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-green-500 peer-checked:bg-green-500 transition-all"></div>
+                                    </label>
+
+                                    <!-- Option 3: Manual (Disabled) -->
+                                    <label class="relative flex items-center p-3 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)] has-[:checked]:border-gray-400/30 has-[:checked]:bg-gray-50/50">
+                                        <input type="radio" name="analysisMode" value="manual" class="peer sr-only" onchange="updateAnalysisMode(this.value)">
+                                        <div class="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-gray-500 mr-3 shadow-inner">
+                                            <i class="fas fa-hand-pointer text-xs"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <span class="text-xs font-black text-gray-600 block">Manual Only</span>
+                                            <span class="text-[9px] font-bold text-gray-400 uppercase">Always click to start</span>
+                                        </div>
+                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 peer-checked:border-gray-500 peer-checked:bg-gray-500 transition-all"></div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -5820,26 +6276,26 @@
                             <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">LLM Service</h4>
                         </div>
                         
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40">
+                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                                     <i class="fas fa-key scale-75"></i> OpenAI API Key
                                 </label>
-                                <input type="password" name="openai_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all" placeholder="sk-...">
+                                <input type="password" name="openai_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="sk-...">
                             </div>
                             
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                                     <i class="fas fa-link scale-75"></i> Base URL
                                 </label>
-                                <input type="text" name="openai_base_url" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all" placeholder="https://api.openai.com/v1">
+                                <input type="text" name="openai_base_url" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="https://api.openai.com/v1">
                             </div>
 
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                                     <i class="fas fa-cube scale-75"></i> Model Name
                                 </label>
-                                <input type="text" name="openai_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all" placeholder="gpt-4o">
+                                <input type="text" name="openai_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="">
                             </div>
                         </div>
                     </div>
@@ -5851,36 +6307,122 @@
                             <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Image Provider</h4>
                         </div>
                         
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40">
+                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center justify-between">
                                     <span class="flex items-center gap-1.5"><i class="fas fa-project-diagram scale-75"></i> Provider Source</span>
-                                    <span class="text-[8px] opacity-50 font-bold normal-case tracking-normal">Choose how images are generated</span>
                                 </label>
-                                <div class="relative group">
-                                    <select name="image_provider" onchange="const pc = document.getElementById('pollinationsConfig'); if(this.value === 'pollinations') { pc.classList.remove('hidden'); pc.classList.add('animate-fade-in'); } else { pc.classList.add('hidden'); }" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-400/20 transition-all group-hover:bg-white/10">
-                                        <option value="none">None (Hide Word Images)</option>
-                                        <option value="dicebear">DiceBear Icons (Simple & Fast)</option>
-                                        <option value="pollinations">Pollinations.ai (AI Generated Art)</option>
-                                    </select>
-                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[10px] group-hover:text-blue-400 transition-colors"></i>
+                                <!-- Hidden Select for Form Submission -->
+                                <select name="image_provider" id="image_provider_select" class="hidden">
+                                    <option value="none">None</option>
+                                    <option value="dicebear">DiceBear</option>
+                                    <option value="pollinations">Pollinations</option>
+                                </select>
+
+                                <!-- Custom Card Selection UI -->
+                                <div class="grid grid-cols-1 gap-3">
+                                    <!-- Option: None -->
+                                    <div onclick="selectImageProvider('none')" id="provider-card-none" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 group-hover:text-gray-600 transition-colors shadow-inner">
+                                                <i class="fas fa-ban text-lg"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">None</h5>
+                                                <p class="text-[10px] text-gray-400 font-bold">Hide word images completely</p>
+                                            </div>
+                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Option: DiceBear -->
+                                    <div onclick="selectImageProvider('dicebear')" id="provider-card-dicebear" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 group-hover:text-blue-600 transition-colors shadow-inner">
+                                                <i class="fas fa-dice text-lg"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">DiceBear Icons</h5>
+                                                <p class="text-[10px] text-gray-400 font-bold">Fast, simple abstract avatars</p>
+                                            </div>
+                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Option: Pollinations -->
+                                    <div onclick="selectImageProvider('pollinations')" id="provider-card-pollinations" class="provider-card relative p-4 rounded-xl border border-transparent bg-[#e0e5ec] hover:bg-white/50 cursor-pointer transition-all duration-300 group shadow-[5px_5px_10px_rgba(163,177,198,0.4),-5px_-5px_10px_rgba(255,255,255,0.8)]">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-500 group-hover:text-purple-600 transition-colors shadow-inner">
+                                                <i class="fas fa-palette text-lg"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h5 class="text-xs font-black text-gray-600 uppercase tracking-wide">Pollinations.ai</h5>
+                                                <p class="text-[10px] text-gray-400 font-bold">AI generated artistic scenes</p>
+                                            </div>
+                                            <div class="check-indicator w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-colors">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 transition-opacity"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div id="pollinationsConfig" class="space-y-4 hidden pt-2">
+                            <div id="pollinationsConfig" class="space-y-4 hidden pt-2 border-t border-gray-200/50 mt-2">
                                 <div class="flex flex-col gap-1.5">
                                     <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                                         <i class="fas fa-key scale-75"></i> API Key (Optional)
                                     </label>
-                                    <input type="password" name="pollinations_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all" placeholder="Enter key if required">
+                                    <input type="password" name="pollinations_api_key" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="Enter key if required">
                                 </div>
                                 <div class="flex flex-col gap-1.5">
                                     <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                                         <i class="fas fa-microchip scale-75"></i> Model Version
                                     </label>
-                                    <input type="text" name="pollinations_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all" placeholder="flux">
+                                    <input type="text" name="pollinations_model" class="neumorphic-inset w-full px-4 py-3.5 rounded-xl text-sm outline-none bg-transparent text-gray-700 focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" placeholder="flux">
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Management -->
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 mb-2 ml-1">
+                            <i class="fas fa-database text-gray-400 text-[10px]"></i>
+                            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Data Management</h4>
+                        </div>
+                        
+                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-white/40 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-white/20">
+                            <!-- Export -->
+                            <button type="button" onclick="exportData()" class="w-full flex items-center justify-between group transition-colors p-2 rounded-xl hover:bg-white/50">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-white/50 group-hover:bg-blue-100 transition-colors">
+                                        <i class="fas fa-file-export text-sm"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-xs font-black text-gray-700 block">Export Data</span>
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Backup progress & settings</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-download text-gray-300 text-[10px] group-hover:text-blue-400 transition-colors"></i>
+                            </button>
+
+                            <!-- Import -->
+                            <button type="button" onclick="importData()" class="w-full flex items-center justify-between group transition-colors p-2 rounded-xl hover:bg-white/50">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center text-green-500 shadow-sm border border-white/50 group-hover:bg-green-100 transition-colors">
+                                        <i class="fas fa-file-import text-sm"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-xs font-black text-gray-700 block">Import Data</span>
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase">Restore from backup</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-upload text-gray-300 text-[10px] group-hover:text-green-400 transition-colors"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -5891,8 +6433,8 @@
                             <h4 class="text-[10px] font-black text-red-400 uppercase tracking-[0.2em]">Danger Zone</h4>
                         </div>
 
-                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-red-50/30">
-                            <button type="button" onclick="closeSettings(); clearLearningData();" class="w-full flex items-center justify-between group transition-colors">
+                        <div class="space-y-4 p-5 rounded-[24px] neumorphic bg-red-50/30 shadow-[inset_2px_2px_5px_rgba(163,177,198,0.3),inset_-2px_-2px_5px_rgba(255,255,255,0.8)] border border-red-100/50">
+                            <button type="button" onclick="closeSettings(); setTimeout(clearLearningData, 200);" class="w-full flex items-center justify-between group transition-colors">
                                 <div class="flex items-center gap-3">
                                     <div class="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-400 shadow-sm border border-white/50 group-hover:bg-red-100 transition-colors">
                                         <i class="fas fa-redo-alt text-sm"></i>
@@ -5910,11 +6452,11 @@
             </div>
 
             <!-- Floating Footer Actions -->
-            <div class="px-6 py-4 bg-[#e0e5ec]/90 backdrop-blur-md border-t border-white/20 flex gap-3 shadow-[0_-10px_20px_rgba(163,177,198,0.2)]">
-                <button type="button" onclick="closeSettings()" class="flex-1 py-4 rounded-2xl neumorphic-btn text-gray-500 font-black text-xs uppercase tracking-widest hover:text-gray-700 active:scale-95 transition-all">
+            <div class="px-6 py-3 bg-[#e0e5ec]/90 backdrop-blur-md border-t border-white/20 flex gap-3 shadow-[0_-10px_20px_rgba(163,177,198,0.2)]">
+                <button type="button" onclick="closeSettings()" class="flex-1 py-3.5 rounded-2xl neumorphic-btn text-gray-500 font-black text-xs uppercase tracking-widest hover:text-gray-700 active:scale-95 transition-all">
                     Cancel
                 </button>
-                <button type="button" id="saveSettings" class="flex-[2] py-4 rounded-2xl neumorphic-btn bg-blue-500 text-white font-black text-xs uppercase tracking-widest shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:bg-blue-600 active:scale-95 transition-all border-none">
+                <button type="button" id="saveSettings" class="flex-[2] py-3.5 rounded-2xl neumorphic-btn bg-blue-500 text-white font-black text-xs uppercase tracking-widest shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:bg-blue-600 active:scale-95 transition-all border-none">
                     Save Changes
                 </button>
             </div>
@@ -5922,6 +6464,13 @@
     </div>
 
     <script>
+        // Fix mobile active state sticky issue
+        document.addEventListener('touchstart', function() {}, {passive: true});
+
+        // Disable context menu (long press/right click) and drag
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('dragstart', e => e.preventDefault());
+
         function scrollToTop() {
             const content = document.querySelector('.app-content');
             if (content) {
@@ -5940,6 +6489,7 @@
         const settingsModal = document.getElementById('settingsModal');
         
         function openSettings() {
+            pushModalState(closeSettings);
             settingsModal.classList.remove('hidden');
             // Trigger reflow
             void settingsModal.offsetWidth;
@@ -5954,14 +6504,21 @@
             const modal = document.getElementById('excludedModal');
             if (modal) {
                 pendingUnexclude.clear(); // Reset pending list on open
+                pushModalState(closeExcludedModal);
                 modal.classList.remove('hidden');
                 renderExcludedVerbs();
             }
         }
 
-        function closeExcludedModal(e) {
+        function closeExcludedModal(fromPopState = false) {
             const modal = document.getElementById('excludedModal');
             if (modal) {
+                if (fromPopState !== true) {
+                    // Manual close
+                    const idx = modalStack.indexOf(closeExcludedModal);
+                    if (idx > -1) modalStack.splice(idx, 1);
+                    history.back();
+                }
                 pendingUnexclude.clear(); // Clear pending on cancel/close
                 modal.classList.add('hidden');
             }
@@ -6077,7 +6634,12 @@
             }
         }
         
-        function closeSettings() {
+        function closeSettings(fromPopState = false) {
+            if (fromPopState !== true) {
+                // const idx = modalStack.indexOf(closeSettings);
+                // if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             settingsModal.classList.add('opacity-0');
             settingsModal.querySelector('#settingsContent').classList.remove('scale-100');
             settingsModal.querySelector('#settingsContent').classList.add('scale-95');
@@ -6110,8 +6672,13 @@
             }
         }
         
-        function closeResetModal() {
+        function closeResetModal(fromPopState = false) {
             const modal = document.getElementById('resetModal');
+            if (fromPopState !== true) {
+                const idx = modalStack.indexOf(closeResetModal);
+                if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
             modal.classList.add('opacity-0');
             modal.querySelector('div').classList.remove('scale-100');
             modal.querySelector('div').classList.add('scale-95');
@@ -6127,6 +6694,7 @@
             const modal = document.getElementById('resetModal');
             document.getElementById('resetVerbName').textContent = verb;
             
+            pushModalState(closeResetModal);
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -6148,6 +6716,387 @@
             };
         }
 
+        function showResetConfirmation() {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-[3000] flex items-center justify-center animate-fade-in p-4';
+            overlay.id = 'resetConfirmModal';
+            
+            // Create modal content
+            overlay.innerHTML = `
+                <div class="bg-white/90 backdrop-blur-md rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/50 p-6 transform scale-100 opacity-100 animate-scale-in">
+                    <div class="flex flex-col items-center text-center gap-4">
+                        <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-2 animate-bounce-slow">
+                            <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                        </div>
+                        
+                        <h3 class="text-xl font-black text-gray-800">Reset Application?</h3>
+                        
+                        <p class="text-sm text-gray-500 font-medium leading-relaxed px-2">
+                            This will <span class="text-red-500 font-bold">PERMANENTLY DELETE</span> all your learning progress, settings, and cached data.
+                            <br><br>
+                            This action cannot be undone.
+                        </p>
+                        
+                        <div class="flex gap-3 w-full mt-4">
+                            <button onclick="document.getElementById('resetConfirmModal').remove()" 
+                                class="flex-1 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold transition-all hover:scale-[1.02] active:scale-95">
+                                Cancel
+                            </button>
+                            <button onclick="executeReset()" 
+                                class="flex-1 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all hover:scale-[1.02] active:scale-95">
+                                Yes, Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+        }
+
+        async function executeReset() {
+            const modal = document.getElementById('resetConfirmModal');
+            if (modal) {
+                // Show loading state
+                const btn = modal.querySelector('button[onclick="executeReset()"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
+                }
+            }
+
+            try {
+                const res = await fetch('/api/ebbinghaus/clear_all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reset_settings: true })
+                });
+                
+                const data = await res.json();
+                if (data.status === 'success') {
+                    // Force clear local storage items that are not handled by backend
+                    localStorage.removeItem('app_settings');
+                    localStorage.removeItem('excludedVerbs');
+                    localStorage.removeItem('analysisMode');
+                    localStorage.removeItem('autoAiAnalysis');
+                    localStorage.removeItem('cacheOnlyMode');
+                    localStorage.removeItem('checkin_history');
+                    localStorage.removeItem('netem_learn_batch');
+                    
+                    // Show success state briefly before reload
+                    if (modal) {
+                         const content = modal.querySelector('div > div'); // Inner container
+                         if (content) {
+                             content.innerHTML = `
+                                <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                                    <i class="fas fa-check text-3xl text-green-500"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-gray-800">Reset Complete</h3>
+                                <p class="text-sm text-gray-500 font-medium mt-2">Reloading application...</p>
+                             `;
+                         }
+                    }
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    alert("Reset failed: " + (data.message || "Unknown error"));
+                    if (modal) modal.remove();
+                }
+            } catch (e) {
+                console.error("Reset failed", e);
+                alert("Reset failed: " + e.message);
+                if (modal) modal.remove();
+            }
+        }
+
+        // Deprecated: old direct call, now redirects to modal
+        function clearLearningData() {
+            showResetConfirmation();
+        }
+
+        async function exportData() {
+            try {
+                // Show loading
+                const btn = document.querySelector('button[onclick="exportData()"]');
+                const originalText = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+                }
+
+                // 1. Get excluded verbs as string
+                const excludedVerbsList = Array.from(excludedVerbs).join(',');
+                
+                // 2. Request ZIP export
+                const res = await fetch(`/api/export?excluded_verbs=${encodeURIComponent(excludedVerbsList)}`);
+                
+                if (!res.ok) throw new Error('Export failed');
+                
+                // 3. Handle Binary Response (Blob)
+                const blob = await res.blob();
+                
+                // Detect Capacitor
+                if (window.Capacitor && window.Capacitor.isNative) {
+                    try {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(blob);
+                        reader.onloadend = async () => {
+                            const base64data = reader.result;
+                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.zip`;
+                            
+                            try {
+                                const { Filesystem, Directory } = window.Capacitor.Plugins;
+                                // Write file to Documents directory
+                                await Filesystem.writeFile({
+                                    path: filename,
+                                    data: base64data,
+                                    directory: Directory.Documents
+                                });
+                                alert(`Backup saved to Documents/${filename}`);
+                            } catch (fsError) {
+                                console.error("Capacitor FS write failed:", fsError);
+                                // Fallback to share
+                                try {
+                                    const { Share } = window.Capacitor.Plugins;
+                                    await Share.share({
+                                        title: 'NETEM Backup',
+                                        text: 'NETEM Deep Vocab Tools Backup',
+                                        url: base64data,
+                                        dialogTitle: 'Save Backup'
+                                    });
+                                } catch (shareError) {
+                                    console.error("Share failed:", shareError);
+                                    throw new Error("Failed to save file on device.");
+                                }
+                            }
+                        };
+                    } catch (capError) {
+                        console.error("Capacitor export logic failed", capError);
+                        // Fallback to blob url
+                        downloadBlob(blob);
+                    }
+                } else {
+                    // Web/Browser logic
+                    downloadBlob(blob);
+                }
+                
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (e) {
+                console.error("Export failed", e);
+                alert("Export failed: " + e.message);
+                // Restore button
+                const btn = document.querySelector('button[onclick="exportData()"]');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                            <i class="fas fa-file-export text-sm"></i>
+                        </div>
+                        <span class="text-xs font-black uppercase tracking-widest">Export</span>
+                    `;
+                }
+            }
+        }
+
+        function downloadBlob(blob) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `netem_backup_${new Date().toISOString().slice(0,10)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        function closeImportConfirmModal(fromPopState = false) {
+            const modal = document.getElementById('importConfirmModal');
+            if (fromPopState !== true) {
+                const idx = modalStack.indexOf(closeImportConfirmModal);
+                if (idx > -1) modalStack.splice(idx, 1);
+                history.back();
+            }
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.remove('scale-100');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function importData() {
+            // Create hidden file input
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.zip'; // Expect ZIP now
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) {
+                    document.body.removeChild(input);
+                    return;
+                }
+                
+                const modal = document.getElementById('importConfirmModal');
+                pushModalState(closeImportConfirmModal);
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.querySelector('div').classList.remove('scale-95');
+                    modal.querySelector('div').classList.add('scale-100');
+                }, 10);
+
+                document.getElementById('confirmImportBtn').onclick = async () => {
+                    closeImportConfirmModal();
+                    
+                    // Show loading
+                    const btn = document.querySelector('button[onclick="importData()"]');
+                    const originalText = btn ? btn.innerHTML : '';
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+                    }
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        const res = await fetch('/api/import', {
+                            method: 'POST',
+                            body: formData // Send as FormData for file upload
+                        });
+                        
+                        const result = await res.json();
+                        
+                        if (result.status === 'success') {
+                            // Restore excluded verbs if returned
+                            if (result.excluded_verbs) {
+                                try {
+                                    const verbs = result.excluded_verbs.split(',').filter(v => v);
+                                    excludedVerbs = new Set(verbs);
+                                    localStorage.setItem('excludedVerbs', JSON.stringify(Array.from(excludedVerbs)));
+                                } catch (e) {
+                                    console.warn("Failed to restore excluded verbs", e);
+                                }
+                            }
+                            
+                            // Use custom modal for success message instead of alert
+                            showResetConfirmation(); // Reuse the reset confirmation modal structure but for success message
+                            const resetModal = document.getElementById('resetConfirmModal');
+                            if (resetModal) {
+                                const content = resetModal.querySelector('div > div');
+                                if (content) {
+                                    content.innerHTML = `
+                                        <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                                            <i class="fas fa-check text-3xl text-green-500"></i>
+                                        </div>
+                                        <h3 class="text-xl font-black text-gray-800">Import Successful</h3>
+                                        <p class="text-sm text-gray-500 font-medium mt-2">Reloading application...</p>
+                                    `;
+                                    // Remove buttons
+                                    const btns = resetModal.querySelectorAll('button');
+                                    btns.forEach(b => b.remove());
+                                }
+                            }
+                            
+                            setTimeout(() => window.location.reload(), 1500);
+                        } else {
+                            throw new Error(result.detail || result.message || "Unknown error");
+                        }
+                    } catch (e) {
+                        console.error("Import failed", e);
+                        // Show error in a custom way or fallback to alert if complex UI is overkill for error
+                        alert("Import failed: " + e.message);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = originalText;
+                        }
+                    } finally {
+                         document.body.removeChild(input);
+                    }
+                };
+                
+                // If cancelled, clean up input
+                const cancelBtn = modal.querySelector('button[onclick="closeImportConfirmModal()"]');
+                const originalCancel = cancelBtn.onclick;
+                cancelBtn.onclick = () => {
+                    document.body.removeChild(input);
+                    closeImportConfirmModal();
+                    // Restore original handler just in case
+                    cancelBtn.onclick = originalCancel; 
+                };
+            };
+            
+            input.click();
+        }
+
+        function selectImageProvider(provider) {
+            // Update UI
+            document.querySelectorAll('.provider-card').forEach(card => {
+                const indicator = card.querySelector('.check-indicator');
+                const dot = indicator.querySelector('div');
+                
+                if (card.id === `provider-card-${provider}`) {
+                    card.classList.add('bg-white', 'shadow-md', 'border-blue-100');
+                    card.classList.remove('bg-[#e0e5ec]', 'border-transparent');
+                    indicator.classList.add('border-blue-500');
+                    indicator.classList.remove('border-gray-300');
+                    dot.classList.remove('opacity-0');
+                } else {
+                    card.classList.remove('bg-white', 'shadow-md', 'border-blue-100');
+                    card.classList.add('bg-[#e0e5ec]', 'border-transparent');
+                    indicator.classList.remove('border-blue-500');
+                    indicator.classList.add('border-gray-300');
+                    dot.classList.add('opacity-0');
+                }
+            });
+
+            // Update hidden select
+            const select = document.getElementById('image_provider_select');
+            if (select) {
+                select.value = provider;
+                // Trigger change event for Pollinations config visibility
+                const pc = document.getElementById('pollinationsConfig');
+                if (provider === 'pollinations') {
+                    pc.classList.remove('hidden');
+                    pc.classList.add('animate-fade-in');
+                } else {
+                    pc.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateAnalysisMode(value) {
+            analysisMode = value;
+            localStorage.setItem('analysisMode', value);
+            
+            // Sync with old variables just in case
+            if (value === 'auto') {
+                localStorage.setItem('autoAiAnalysis', 'true');
+                localStorage.setItem('cacheOnlyMode', 'false');
+            } else if (value === 'cache_only') {
+                localStorage.setItem('autoAiAnalysis', 'true');
+                localStorage.setItem('cacheOnlyMode', 'true');
+            } else {
+                localStorage.setItem('autoAiAnalysis', 'false');
+                localStorage.setItem('cacheOnlyMode', 'false');
+            }
+        }
+
+        function updateAnalysisModeUI(mode) {
+            // Update settings modal inputs
+            const radios = document.querySelectorAll('input[name="analysisMode"]');
+            radios.forEach(r => {
+                if (r.value === mode) r.checked = true;
+            });
+        }
+
         async function loadSettings() {
             try {
                 const res = await fetch('/api/settings', {
@@ -6162,15 +7111,23 @@
                     Object.keys(data).forEach(key => {
                         const input = settingsForm.querySelector(`[name="${key}"]`);
                         if (input) {
-                            input.value = data[key];
+                            if (input.type === 'checkbox') {
+                                input.checked = data[key] === true || data[key] === 'true';
+                            } else {
+                                input.value = data[key];
+                            }
                         }
                     });
                     
-                    // Load local autoAiAnalysis setting
-                    const aiToggle = settingsForm.querySelector('[name="autoAiAnalysis"]');
-                    if (aiToggle) {
-                        aiToggle.checked = localStorage.getItem('autoAiAnalysis') !== 'false';
+                    // Initialize Custom Provider UI
+                    if (data.image_provider) {
+                        selectImageProvider(data.image_provider);
+                    } else {
+                        selectImageProvider('dicebear'); // Default
                     }
+                    
+                    // Load local analysisMode setting
+                    updateAnalysisModeUI(analysisMode);
 
                     // Trigger change event
                     const providerSelect = settingsForm.querySelector('[name="image_provider"]');
@@ -6311,18 +7268,13 @@
             const formData = new FormData(form);
             const data = {};
             formData.forEach((value, key) => {
-                if (key !== 'autoAiAnalysis') {
+                if (key !== 'autoAiAnalysis' && key !== 'cacheOnlyMode' && key !== 'analysisMode') {
                     data[key] = value;
                 }
             });
             
-            // Handle autoAiAnalysis checkbox explicitly
-            const aiToggle = form.querySelector('[name="autoAiAnalysis"]');
-            if (aiToggle) {
-                const isChecked = aiToggle.checked;
-                localStorage.setItem('autoAiAnalysis', isChecked);
-                autoAiAnalysis = isChecked; // Update global variable
-            }
+            // Note: analysisMode is already saved to localStorage on change, no need to submit to backend
+            // unless we want to persist user preferences on server.
             
             const saveBtn = document.getElementById('saveSettings');
             const originalText = saveBtn.innerText;
@@ -6351,11 +7303,15 @@
             }
         };
 
-        // Proxy fetch to LocalAPI
+        // Proxy fetch to LocalAPI (only if not running on FastAPI port 8080)
         const originalFetch = window.fetch;
         window.fetch = async function(url, options) {
             let route = typeof url === 'string' ? url : url.url;
-            if (route.startsWith('/api/')) {
+            
+            // Disable proxy if running on FastAPI server (port 8080)
+            const isFastApi = window.location.port === '8080' || window.location.port === '8081';
+            
+            if (route.startsWith('/api/') && !isFastApi) {
                 // Remove query parameters for routing
                 const cleanRoute = route.split('?')[0];
                 
@@ -6411,11 +7367,22 @@
 
         // Initialize listeners
         document.addEventListener('DOMContentLoaded', async () => {
+            // FORCE CLEANUP: Remove any lingering refresh buttons that might be cached in DOM
+            const cleanupButtons = () => {
+                document.querySelectorAll('button[onclick*="refreshFromCard"]').forEach(btn => btn.remove());
+            };
+            cleanupButtons();
+            // Also observe for new ones just in case
+            const observer = new MutationObserver((mutations) => {
+                cleanupButtons();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+
             initPullToRefresh();
             updateKaoyanCountdown();
             
             // Initialize LocalAPI
-            await LocalAPI.init();
+            await LocalAPI.init(originalFetch);
             
             // Initial data load
             await loadLearningStatus();
@@ -6425,24 +7392,18 @@
     </script>
     <!-- Service Worker Registration -->
     <script>
+        // Force unregister all old service workers to prevent stale cache issues
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                // Check if we are running from a server (like FastAPI) or locally (like the built dist/ index.html)
-                const swPath = window.location.pathname.includes('/static/') ? '../static/sw.js' : './sw.js';
-                // For the dist/ version, it will be at ./sw.js. For the FastAPI version, it's at /static/sw.js
-                // but registration scope will be /static/ if registered as /static/sw.js.
-                // To have a global scope in FastAPI, we'd need a route for /sw.js.
-                // For now, let's assume the dist/ version is the priority for the APK.
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('SW: Registered successfully with scope:', registration.scope);
-                    })
-                    .catch(error => {
-                        // Fallback to /static/sw.js if ./sw.js fails (for dev server)
-                        navigator.serviceWorker.register('./static/sw.js')
-                            .then(reg => console.log('SW: Registered at /static/sw.js'))
-                            .catch(err => console.error('SW: Registration failed:', err));
-                    });
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    console.log('Unregistering SW:', registration);
+                    registration.unregister();
+                }
+                // Optional: Force reload if we found and removed workers? 
+                // No, just let the new one take over if we were to register it.
+                // But user requested to FORCE UNREGISTER and start page.
+                // So we do NOT register a new one here immediately to ensure clean slate.
+                console.log('All Service Workers unregistered.');
             });
         }
     </script>

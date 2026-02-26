@@ -6,14 +6,20 @@
 const LocalAPI = {
     verbsData: null,
     legacyData: null,
+    originalFetch: null,
 
     /**
      * Initialize the local API by loading data
      */
-    async init() {
+    async init(fetchProxy = null) {
+        if (fetchProxy) this.originalFetch = fetchProxy;
+        
         try {
             // Bootstrap settings from .env if not present
             this.bootstrap();
+
+            // 1. Sync from backend if available
+            await this.syncFromBackend();
 
             // Load legacy data for fallback
             try {
@@ -28,53 +34,82 @@ const LocalAPI = {
 
             // Wait for DB to be ready
             if (window.db) {
-                await window.db.open();
-                console.log("LocalAPI: Database opened.");
-                
-                // 1. Check if we need to import legacy data into explanations table
-                const expCount = await window.db.explanations.count();
-                if (expCount === 0 && this.legacyData) {
-                    console.log("LocalAPI: Explanations table is empty, importing legacy data...");
-                    const explanations = [];
-                    const now = new Date().toISOString();
+                try {
+                    await window.db.open();
+                    console.log("LocalAPI: Database opened.");
                     
-                    for (const [word, content] of Object.entries(this.legacyData)) {
-                        explanations.push({
-                            mode: 'single',
-                            query_key: word.toLowerCase(),
-                            content: content,
-                            created_at: now
-                        });
-                    }
-                    
-                    if (explanations.length > 0) {
-                        await window.db.explanations.bulkPut(explanations);
-                        console.log(`LocalAPI: Imported ${explanations.length} records to explanations.`);
-                    }
-                }
-
-                // 2. Check if we need to import netem_full_list into verbs table
-                const verbCount = await DB.getVerbsCount();
-                if (verbCount === 0) {
-                    console.log("LocalAPI: Verbs table is empty, importing full list...");
-                    const response = await fetch('static/netem_full_list.json');
-                    if (response.ok) {
-                        const rawData = await response.json();
-                        const list = rawData["5530考研词汇词频排序表"] || [];
+                    // 1. Check if we need to import legacy data into explanations table
+                    const expCount = await window.db.explanations.count();
+                    // If table is empty AND we have legacy data, import it.
+                    // IMPORTANT: We must wait for this import to finish before proceeding,
+                    // otherwise subsequent loads might think the DB is empty.
+                    if (expCount === 0 && this.legacyData && Object.keys(this.legacyData).length > 0) {
+                        console.log("LocalAPI: Explanations table is empty, importing legacy data...");
+                        const explanations = [];
+                        const now = new Date().toISOString();
                         
-                        if (list.length > 0) {
-                            const verbsToInsert = list.map(item => ({
-                                word: (item["单词"] || "").toLowerCase(),
-                                frequency: item["词频"] || 0,
-                                definition: item["释义"] || "",
-                                pos: item["pos"] || "other",
-                                alternative_spelling: item["其他拼写"] || null,
-                                sequence: item["序号"] || 0
-                            }));
-                            
-                            await DB.bulkAddVerbs(verbsToInsert);
-                            console.log(`LocalAPI: Imported ${verbsToInsert.length} verbs to IndexedDB.`);
+                        for (const [word, content] of Object.entries(this.legacyData)) {
+                            // Ensure content is valid string
+                            if (content && typeof content === 'string' && content.length > 10) {
+                                explanations.push({
+                                    mode: 'single',
+                                    query_key: word.toLowerCase(),
+                                    content: content,
+                                    created_at: now
+                                });
+                            }
                         }
+                        
+                        if (explanations.length > 0) {
+                            try {
+                                await window.db.explanations.bulkPut(explanations);
+                                console.log(`LocalAPI: Imported ${explanations.length} legacy records to explanations.`);
+                            } catch (importErr) {
+                                console.error("LocalAPI: Failed to import legacy data", importErr);
+                            }
+                        }
+                    } else if (expCount > 0) {
+                        console.log(`LocalAPI: DB has ${expCount} records, skipping legacy import.`);
+                    } else {
+                        console.warn("LocalAPI: No legacy data found to import.");
+                    }
+
+                    // 2. Check if we need to import netem_full_list into verbs table
+                    if (window.db.verbs) {
+                        const verbCount = await DB.getVerbsCount();
+                        // If count is less than 5530, it means we might have missing entries due to casing deduplication
+                        // or it's a fresh install. We should reload the full list.
+                        if (verbCount < 5530) {
+                            console.log(`LocalAPI: Verbs table has ${verbCount} entries (expected ~5530), importing full list...`);
+                            const response = await fetch('static/netem_full_list.json');
+                            if (response.ok) {
+                                const rawData = await response.json();
+                                const list = rawData["5530考研词汇词频排序表"] || [];
+                                
+                                if (list.length > 0) {
+                                    const verbsToInsert = list.map(item => ({
+                                        word: (item["单词"] || "").trim().toLowerCase(), // Lowercase key for lookup
+                                        original_word: (item["单词"] || "").trim(), // Preserve original case
+                                        frequency: item["词频"] || 0,
+                                        definition: item["释义"] || "",
+                                        pos: item["pos"] || "other",
+                                        alternative_spelling: item["其他拼写"] || null,
+                                        sequence: item["序号"] || 0
+                                    }));
+                                    
+                                    await DB.bulkAddVerbs(verbsToInsert);
+                                    console.log(`LocalAPI: Imported ${verbsToInsert.length} verbs to IndexedDB.`);
+                                }
+                            }
+                        }
+                    } else {
+                        console.warn("LocalAPI: Verbs table schema missing, skipping import.");
+                    }
+                } catch (dbError) {
+                    console.warn("LocalAPI: Database initialization issue (switching to fallback mode):", dbError.message || dbError);
+                    // If it's a version error, it usually means another tab is holding the lock
+                    if (dbError.name === 'VersionError' || dbError.name === 'Blocked') {
+                        console.warn("LocalAPI: Database upgrade blocked. Please close other tabs of this application and reload.");
                     }
                 }
             }
@@ -82,11 +117,21 @@ const LocalAPI = {
             // Optional: Keep in-memory cache for ultra-fast access if needed, 
             // but prefer DB for large datasets.
             if (!this.verbsData) {
-                const count = await DB.getVerbsCount();
-                if (count > 0) {
-                    this.verbsData = await DB.getAllVerbs();
-                    console.log(`LocalAPI: Loaded ${this.verbsData.length} verbs from IndexedDB.`);
-                } else {
+                let loadedFromDb = false;
+                if (window.db && window.db.verbs) {
+                    try {
+                        const count = await DB.getVerbsCount();
+                        if (count > 0) {
+                            this.verbsData = await DB.getAllVerbs();
+                            console.log(`LocalAPI: Loaded ${this.verbsData.length} verbs from IndexedDB.`);
+                            loadedFromDb = true;
+                        }
+                    } catch (e) {
+                        console.warn("LocalAPI: Failed to load verbs from DB, falling back to JSON", e);
+                    }
+                }
+
+                if (!loadedFromDb) {
                     // Fallback to fetch if DB import failed or is taking too long
                     const response = await fetch('static/netem_full_list.json');
                     if (response.ok) {
@@ -97,6 +142,35 @@ const LocalAPI = {
             }
         } catch (error) {
             console.error("LocalAPI init error:", error);
+        }
+    },
+
+    /**
+     * Sync data from backend if available
+     */
+    async syncFromBackend() {
+        const fetchFn = this.originalFetch || window.fetch;
+        try {
+            console.log("LocalAPI: Checking for data sync from backend...");
+            const response = await fetchFn('/api/sync/all_explanations');
+            if (response.ok) {
+                const data = await response.json();
+                if (data && Array.isArray(data) && data.length > 0) {
+                    console.log(`LocalAPI: Syncing ${data.length} records from backend...`);
+                    // Prepare data for bulkPut
+                    const records = data.map(item => ({
+                        mode: item.mode,
+                        query_key: item.query_key,
+                        content: item.content,
+                        image_url: item.image_url,
+                        created_at: item.created_at || new Date().toISOString()
+                    }));
+                    await window.db.explanations.bulkPut(records);
+                    console.log(`LocalAPI: Successfully synced ${data.length} records from backend.`);
+                }
+            }
+        } catch (e) {
+            console.warn("LocalAPI: Backend sync unavailable or failed.", e.message);
         }
     },
 
@@ -419,7 +493,38 @@ const LocalAPI = {
                 if (!refresh) {
                     cachedData = await DB.getCachedResult('single', key);
                     
-                    // Fallback to memory-loaded legacy data if not in DB
+                    // NEW: Fallback to backend if not in IndexedDB
+                    if (!cachedData && this.originalFetch) {
+                        try {
+                            console.log(`LocalAPI: ${verb} not in IndexedDB, checking backend...`);
+                            const response = await this.originalFetch('/api/explain', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ verbs: verb, mode: 'single', refresh: false })
+                            });
+                            if (response.ok) {
+                                const backendResult = await response.json();
+                                if (backendResult && backendResult.result) {
+                                    // Extract first content and first image
+                                    const content = backendResult.result;
+                                    const imageUrl = backendResult.images ? Object.values(backendResult.images)[0] : null;
+                                    
+                                    cachedData = {
+                                        content: content,
+                                        image_url: imageUrl
+                                    };
+                                    
+                                    // Save to IndexedDB so it's there next time
+                                    await DB.saveToCache('single', key, content, imageUrl);
+                                    console.log(`LocalAPI: Saved backend result for ${verb} to IndexedDB.`);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`LocalAPI: Backend check failed for ${verb}:`, e.message);
+                        }
+                    }
+
+                    // Fallback to memory-loaded legacy data if still not found
                     if (!cachedData && this.legacyData && this.legacyData[key]) {
                         console.log(`LocalAPI: Found ${verb} in legacy fallback data.`);
                         cachedData = {
@@ -448,7 +553,19 @@ const LocalAPI = {
                     imageUrl = this.generateImageUrl(verb);
                 }
                 
-                if (needLlmCall) {
+                const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                const hasApiKey = !!settings.openai_api_key;
+                
+                // Strict Cache Mode: If need LLM but no API key, skip LLM and go to fallback directly
+                if (needLlmCall && !hasApiKey) {
+                    console.warn(`LocalAPI: Strict Cache Mode - No API Key for ${verb}, skipping LLM call.`);
+                    const basicDef = this.getBasicDefinition(verb);
+                    if (basicDef) {
+                        content = basicDef;
+                    } else {
+                        throw new Error("No API key and no local definition found.");
+                    }
+                } else if (needLlmCall) {
                     try {
                         console.log(`LocalAPI: Fetching new AI explanation for ${verb}...`);
                         content = await LLM.explainVerb(verb, pos || 'verb');
@@ -524,7 +641,7 @@ const LocalAPI = {
         });
         
         if (found) {
-            const word = found.word || found["单词"];
+            const word = found.original_word || found.word || found["单词"];
             const def = found.definition || found["释义"] || "暂无释义";
             const pos = found.pos || "other";
             const freq = found.frequency || found["词频"] || 0;

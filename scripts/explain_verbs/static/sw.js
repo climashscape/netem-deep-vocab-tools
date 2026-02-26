@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netem-deep-vocab-v1';
+const CACHE_NAME = 'netem-deep-vocab-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
