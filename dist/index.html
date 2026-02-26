@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>NETEM Deep Vocab Tools</title>
+    <link rel="icon" href="static/img/icon-192.png">
     <!-- PWA Manifest -->
     <link rel="manifest" href="static/manifest.json">
     <!-- Tailwind CSS (Local) -->
@@ -2064,6 +2065,7 @@
         let limit = 4;
         let offset = 0;
         let isLoading = false;
+        let currentRenderId = 0;
         // Migration: Check for legacy settings and default to 'auto' if not set
         let analysisMode = localStorage.getItem('analysisMode') || 'auto'; 
 
@@ -2102,23 +2104,38 @@
 
         function matchesPos(v, posArray) {
             if (posArray.includes('all')) return true;
-            if (posArray.includes('excluded')) return excludedVerbs.has(v['单词']);
-            if (excludedVerbs.has(v['单词'])) return false; // Other tabs hide excluded
+            const verb = v.word || v['单词'];
+            if (!verb) return false;
+            
+            if (posArray.includes('excluded')) return excludedVerbs.has(verb);
+            if (excludedVerbs.has(verb)) return false; // Other tabs hide excluded
 
             return posArray.some(pos => {
-                if (pos === 'prep_conj') return (v.pos === 'prep' || v.pos === 'prep_conj');
-                if (pos === 'adj_adv') return (v.pos === 'adj' || v.pos === 'adv' || v.pos === 'adj_adv');
-                if (pos === 'other') {
-                    const knownPos = ['noun', 'verb', 'noun_verb', 'adj', 'adv', 'adj_adv', 'prep', 'prep_conj'];
-                    return v.pos === 'other' || !knownPos.includes(v.pos);
+                // Dynamic POS correction inside matchesPos
+                let effectivePos = v.pos;
+                const word = (v.word || v['单词']).toLowerCase();
+                const knownPrepConj = new Set(['and', 'but', 'or', 'so', 'for', 'nor', 'yet', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'with', 'from', 'as', 'about', 'after', 'against', 'among', 'around', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond', 'during', 'except', 'inside', 'into', 'near', 'off', 'outside', 'over', 'past', 'since', 'through', 'throughout', 'till', 'toward', 'under', 'underneath', 'until', 'upon', 'within', 'without', 'although', 'because', 'if', 'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose', 'why', 'how']);
+                
+                if (knownPrepConj.has(word)) {
+                    effectivePos = 'prep_conj';
                 }
-                return v.pos === pos;
+
+                if (pos === 'prep_conj') return (effectivePos === 'prep' || effectivePos === 'prep_conj' || effectivePos === 'conj');
+                if (pos === 'adj_adv') return (effectivePos === 'adj' || effectivePos === 'adv' || effectivePos === 'adj_adv');
+                if (pos === 'other') {
+                    const knownPos = ['noun', 'verb', 'noun_verb', 'adj', 'adv', 'adj_adv', 'prep', 'prep_conj', 'conj'];
+                    return effectivePos === 'other' || !knownPos.includes(effectivePos);
+                }
+                return effectivePos === pos;
             });
         }
 
         function matchesFreq(v, freqArray) {
             if (freqArray.includes('all')) return true;
-            const verbKey = v['单词'].toLowerCase();
+            const verb = v.word || v['单词'];
+            if (!verb) return false;
+            
+            const verbKey = verb.toLowerCase();
             const status = learningStatus[verbKey];
             
             return freqArray.some(freq => {
@@ -2215,8 +2232,10 @@
                     // Sync Analysis Mode radio buttons
                     updateAnalysisModeUI(analysisMode);
                 } else if (pageId === 'learn') {
-                    // Ensure learn page is filtered correctly
-                    applyFilters();
+                    // Ensure learn page is filtered correctly if data is already loaded
+                    if (allVerbs.length > 0) {
+                        applyFilters();
+                    }
                 }
             }, 50);
             
@@ -2456,11 +2475,12 @@
             // User request: "Learn页面的 Total Review Mastered 应该和当前选择的单词库范围相吻合，review和masterey页面同样"
             // We apply the same POS filter logic here
             const masteredVerbs = allVerbs.filter(v => {
-                const status = learningStatus[v['单词'].toLowerCase()];
+                const word = (v.word || v['单词']).toLowerCase();
+                const status = learningStatus[word];
                 if (!status || status.status !== 'mastered') return false;
 
                 // Excluded Logic
-                if (excludedVerbs.has(v['单词'])) return false;
+                if (excludedVerbs.has(word)) return false;
                 
                 // POS Filter logic
                 if (!matchesPos(v, currentPos)) return false;
@@ -2469,7 +2489,7 @@
                 if (!matchesFreq(v, currentFreq)) return false;
 
                 // Search Filter
-                if (query && !v['单词'].includes(query)) return false;
+                if (query && !word.includes(query)) return false;
 
                 return true;
             });
@@ -3557,10 +3577,16 @@
                 
                 if (data.items) {
                     allVerbs = data.items.map(item => {
+                        // Ensure frequency is valid number, handle both legacy Chinese key and normalized English key
+                        const freq = parseInt(item['词频'] || item.frequency || item.freq) || 0;
                         // Pre-calculate group
-                        item.group = getGroup(item['词频']);
+                        item.group = getGroup(freq);
+                        // Normalize word key for easier access later
+                        const word = (item.word || item['单词'] || '').trim();
+                        item.word = word;
+                        item['单词'] = word; // Backfill for legacy access
                         return item;
-                    });
+                    }).filter(item => item.word);
                     
                     // Restore State
                     try {
@@ -3650,13 +3676,45 @@
         }
 
         function getGroup(freq) {
-            const f = parseInt(freq) || 0;
+            // Default to 'must' if freq is 0 or undefined to avoid 'rare' for common words
+            const f = parseInt(freq);
+            if (isNaN(f)) return 'must'; // Fallback for invalid frequency
+            
             const prob = parseFloat(calculateExamProbability(f));
             if (prob >= 80) return 'must';
             if (prob >= 44) return 'core';
             if (prob >= 25) return 'advanced';
             if (prob >= 10) return 'basic';
             return 'rare';
+        }
+
+        function calculateExamProbability(freq) {
+            // Use same formula as backend
+            // 86000 -> 100%
+            // 1 -> 0%
+            // Logarithmic scale?
+            // Actually, let's use a simplified version for frontend display
+            // Based on backend logic:
+            // > 7000 (approx top 2000 words) -> > 80% (Must)
+            // > 2000 (approx top 4000 words) -> > 44% (Core)
+            // > 500  -> > 25% (Advanced)
+            // > 100  -> > 10% (Basic)
+            // <= 100 -> Rare
+            
+            // Re-calibrated based on "5530" list distribution
+            // Rank 1-1500: Must
+            // Rank 1501-3000: Core
+            // Rank 3001-4500: Advanced
+            // Rank 4501-5530: Basic
+            
+            // Wait, input is FREQUENCY (count), not RANK.
+            // High frequency = Low Rank = High Probability
+            
+            if (freq >= 7000) return 90;
+            if (freq >= 2000) return 60;
+            if (freq >= 500) return 35;
+            if (freq >= 100) return 15;
+            return 5;
         }
 
         function updateCounts(filteredSubset = null) {
@@ -3682,10 +3740,19 @@
                 // Count excluded regardless of frequency filter
                 if (isExcluded) return true;
                 
+                // Dynamic POS correction for filtering logic
+                let tempV = { ...v };
+                const word = (v.word || v['单词']).toLowerCase();
+                const knownPrepConj = new Set(['and', 'but', 'or', 'so', 'for', 'nor', 'yet', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'with', 'from', 'as', 'about', 'after', 'against', 'among', 'around', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond', 'during', 'except', 'inside', 'into', 'near', 'off', 'outside', 'over', 'past', 'since', 'through', 'throughout', 'till', 'toward', 'under', 'underneath', 'until', 'upon', 'within', 'without', 'although', 'because', 'if', 'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose', 'why', 'how']);
+                
+                if (knownPrepConj.has(word)) {
+                    tempV.pos = 'prep_conj';
+                }
+
                 // User request: Stats should be "Full" (include Review/Mastered words)
                 // We no longer filter out isLearned here for the COUNTS
                 
-                return matchesFreq(v, currentFreq);
+                return matchesFreq(tempV, currentFreq);
             });
 
             matchesForPos.forEach(v => {
@@ -3694,13 +3761,25 @@
                 if (isExcluded) {
                     posCounts.excluded++;
                 } else {
+                    // Normalize pos string
+                    let pos = v.pos || v.part_of_speech || 'other';
+                    
+                    // Dynamic POS correction based on word identity for common mislabeled words
+                    // Source data has many mislabeled POS (e.g. 'and' as 'other', 'but' as 'adj_adv')
+                    const word = (v.word || v['单词']).toLowerCase();
+                    const knownPrepConj = new Set(['and', 'but', 'or', 'so', 'for', 'nor', 'yet', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'with', 'from', 'as', 'about', 'after', 'against', 'among', 'around', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond', 'during', 'except', 'inside', 'into', 'near', 'off', 'outside', 'over', 'past', 'since', 'through', 'throughout', 'till', 'toward', 'under', 'underneath', 'until', 'upon', 'within', 'without', 'although', 'because', 'if', 'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose', 'why', 'how']);
+                    
+                    if (knownPrepConj.has(word)) {
+                        pos = 'prep_conj';
+                    }
+
                     // Only count regular POS if NOT excluded
-                    if (v.pos === 'prep' || v.pos === 'prep_conj') {
+                    if (pos === 'prep' || pos === 'prep_conj' || pos === 'conj') {
                         posCounts.prep_conj++;
-                    } else if (v.pos === 'adj' || v.pos === 'adv' || v.pos === 'adj_adv') {
+                    } else if (pos === 'adj' || pos === 'adv' || pos === 'adj_adv') {
                         posCounts.adj_adv++;
-                    } else if (v.pos && posCounts[v.pos] !== undefined) {
-                        posCounts[v.pos]++;
+                    } else if (pos && posCounts[pos] !== undefined) {
+                        posCounts[pos]++;
                     } else {
                         // Fallback to other
                         posCounts.other++;
@@ -4241,9 +4320,11 @@
             const grid = document.getElementById('verbsGrid');
             
             if (reset) {
+                currentRenderId++;
                 grid.innerHTML = '';
                 offset = 0;
             }
+            const myRenderId = currentRenderId;
 
             const slice = displayedVerbs.slice(offset, offset + limit);
             if (slice.length === 0 && offset === 0) {
@@ -4270,6 +4351,10 @@
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ verbs: verbsToCheck })
                     });
+                    
+                    // If a newer reset has started, abort this render to prevent duplicates
+                    if (reset && myRenderId !== currentRenderId) return;
+
                     if (res.ok) {
                         const cachedVerbs = await res.json();
                         cachedVerbs.forEach(verb => {
@@ -4282,6 +4367,9 @@
                 console.error("Cache pre-check failed:", e);
             }
 
+            // Double check before appending to prevent duplicate cards during race conditions
+            if (reset && myRenderId !== currentRenderId) return;
+
             slice.forEach(item => {
                 const card = createVerbCard(item);
                 grid.appendChild(card);
@@ -4291,13 +4379,20 @@
         }
 
         function createVerbCard(item) {
+            const verb = item.word || item['单词'];
+            if (!verb) {
+                 const div = document.createElement('div');
+                 div.style.display = 'none';
+                 return div;
+            }
+
             const card = document.createElement('div');
-            card.id = 'verb-card-' + item['单词'];
+            card.id = 'verb-card-' + verb;
             card.className = 'verb-card group relative flex flex-col items-stretch'; 
             
             // Auto-generate image/explanation if missing
             if (!item.image_url && !item.has_cache) {
-                addToQueue(item['单词']);
+                addToQueue(verb);
             }
             
             // Long Press Logic for Exclude (Learn page only)
@@ -4329,7 +4424,7 @@
                     isLongPress = true;
                     if (window.navigator.vibrate) window.navigator.vibrate(50); // Haptic feedback
                     
-                    showExcludeOverlay(card, item['单词']);
+                    showExcludeOverlay(card, verb);
                     card.style.transform = '';
                 }, longPressDuration);
             };
@@ -4416,7 +4511,7 @@
             const imageProvider = appSettings.image_provider || 'dicebear';
             
             // Fix: ensure we have a valid word string before generating image URL
-            const itemWord = item.word || item['单词'];
+            const itemWord = verb;
             
             if (imageProvider === 'none') {
                 imageHtml = `
@@ -4430,7 +4525,7 @@
             } else if (item.image_url && itemWord) {
                 imageHtml = `
                 <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
-                    <img src="/api/image/${encodeURIComponent(itemWord)}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
+                    <img src="${item.image_url}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
                 contentClasses += ' justify-start pt-2';
@@ -4439,7 +4534,7 @@
             }
 
             // Ebbinghaus Status
-            const status = learningStatus[(item.word || item['单词']).toLowerCase()];
+            const status = learningStatus[verb.toLowerCase()];
             let ebbinghausBadge = '';
             if (status) {
                 const isMastered = status.status === 'mastered';
@@ -4602,11 +4697,14 @@
                             // Update batch and counts
                             if (currentPage === 'learn') {
                                 updateSavedBatch(word);
-                                displayedVerbs = displayedVerbs.filter(v => v['单词'].toLowerCase() !== word.toLowerCase());
+                                displayedVerbs = displayedVerbs.filter(v => (v.word || v['单词']).toLowerCase() !== word.toLowerCase());
                             } else if (currentPage === 'review') {
                                 renderReviewPage();
+                            } else if (currentPage === 'mastery') {
+                                renderMasteryPage();
                             }
-                            card.remove();
+                            
+                            if (card) card.remove();
                             updateCounts();
                             updateProfileStats();
                             
@@ -5299,6 +5397,7 @@
         let analyzeController = null;
 
         async function analyzeVerbs(verb, refresh = false) {
+            if (!verb) return;
             // Abort previous request if any AND we are NOT in force-refresh mode
             // Force-refresh (user triggered) should always proceed
             if (analyzeController && !refresh) {
@@ -5429,7 +5528,8 @@
                                 const originalWord = allVerbs[vIndex]['单词'];
                                 const card = document.getElementById('verb-card-' + originalWord);
                                 
-                                const proxyUrl = `/api/image/${encodeURIComponent(originalWord)}?t=${Date.now()}`;
+                                // Use direct URL instead of proxy for static build compatibility
+                                const imageUrl = imgUrl; 
                                 
                                 if (card) {
                                     // 1. Update image
@@ -5446,7 +5546,7 @@
                                                 <i class="fas fa-image"></i>
                                             </div>`;
                                         } else {
-                                            innerHtml = `<img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">`;
+                                            innerHtml = `<img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">`;
                                         }
 
                                         const newImgHtml = `
@@ -5471,13 +5571,13 @@
                                         } else {
                                             const img = imgContainer.querySelector('img');
                                             if (img) {
-                                                img.src = proxyUrl;
+                                                img.src = imageUrl;
                                                 imgContainer.style.display = '';
                                                 img.onerror = () => showFrostedPlaceholder(img);
                                             } else {
                                                 // Replace placeholder with img if provider changed from none
                                                 imgContainer.innerHTML = `
-                                                <img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
+                                                <img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                                                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>`;
                                             }
                                         }
@@ -6191,6 +6291,7 @@
         }
         
         function updateCardWithImage(verb) {
+            if (!verb) return;
             const card = document.getElementById('verb-card-' + verb);
             if (!card) return;
             
@@ -6206,8 +6307,19 @@
                         <i class="fas fa-image"></i>
                     </div>`;
                 } else {
-                    const proxyUrl = `/api/image/${encodeURIComponent(verb)}?t=${Date.now()}`;
-                    innerHtml = `<img src="${proxyUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${verb}" onload="this.parentElement.classList.remove('opacity-0')" onerror="showFrostedPlaceholder(this)">`;
+                    // Find image url from global data
+                    const vData = allVerbs.find(v => v['单词'] === verb);
+                    const imageUrl = vData ? vData.image_url : null;
+                    
+                    if (imageUrl) {
+                        innerHtml = `<img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${verb}" onload="this.parentElement.classList.remove('opacity-0')" onerror="showFrostedPlaceholder(this)">`;
+                    } else {
+                        // Fallback placeholder if no image URL found yet
+                         innerHtml = `
+                        <div class="frosted-placeholder">
+                            <i class="fas fa-image"></i>
+                        </div>`;
+                    }
                 }
 
                 const newImgHtml = `
@@ -6250,6 +6362,12 @@
             
             const outputContainer = document.getElementById('outputContainer');
             if (!outputContainer) return;
+            
+            // CRITICAL FIX: Add peek-active class to show content in review mode
+            const modal = document.getElementById('learningModal');
+            if (modal) {
+                modal.classList.add('peek-active');
+            }
             
             // Re-query cards as they might have been re-rendered
             const cards = Array.from(outputContainer.children).filter(child => child.classList.contains('result-card'));
@@ -7810,7 +7928,12 @@
             // Disable proxy if running on FastAPI server (port 8080)
             const isFastApi = window.location.port === '8080' || window.location.port === '8081';
             
-            if (route.startsWith('/api/') && !isFastApi) {
+            // Check for bypass header
+            const headers = (options && options.headers) || {};
+            const isBypass = headers['X-Bypass-Local'] === 'true' || 
+                             (headers.get && headers.get('X-Bypass-Local') === 'true');
+
+            if (route.startsWith('/api/') && !isFastApi && !isBypass) {
                 // Remove query parameters for routing
                 const cleanRoute = route.split('?')[0];
                 
@@ -7822,6 +7945,15 @@
                 }
 
                 let data = {};
+                
+                // Parse Query Parameters for GET requests
+                if (route.includes('?')) {
+                    const searchParams = new URLSearchParams(route.split('?')[1]);
+                    for (const [key, value] of searchParams.entries()) {
+                        data[key] = value;
+                    }
+                }
+
                 if (options && options.body) {
                     if (options.body instanceof FormData) {
                         const file = options.body.get('file');

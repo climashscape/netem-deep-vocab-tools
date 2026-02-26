@@ -351,7 +351,10 @@ const LLM = {
         else if (pos === 'other') systemPrompt = SYSTEM_PROMPTS.concept;
 
         // Auto-detect and use local dev proxy if running on port 8000 or 8001
-        if (window.location.port === '8000' || window.location.port === '8001') {
+        // ONLY if we are NOT in the static 'dist' directory (heuristic check)
+        const isDistBuild = window.location.pathname.includes('/dist/') || !window.location.pathname.includes('templates');
+        
+        if ((window.location.port === '8000' || window.location.port === '8001') && !isDistBuild) {
             const proxyBase = `${window.location.origin}/proxy/llm`;
             // Pass the original target base URL to the proxy via header
             const response = await fetch(`${proxyBase}/chat/completions`, {

@@ -7,7 +7,7 @@ const LocalAPI = {
     verbsData: null,
     legacyData: null,
     originalFetch: null,
-    DATA_VERSION: 5, // Increment this to force re-import of verbs and legacy data
+    DATA_VERSION: 9, // Increment this to force re-import of verbs and legacy data
 
     /**
      * Helper to fetch resources with path fallback
@@ -105,7 +105,12 @@ const LocalAPI = {
                             const now = new Date().toISOString();
                             
                             for (const [word, val] of legacyEntries) {
-                                const key = word.toLowerCase();
+                                // Normalize key to handle word:verb suffix
+                                let key = word.toLowerCase();
+                                if (key.endsWith(':verb')) {
+                                    key = key.substring(0, key.length - 5);
+                                }
+
                                 // Only add if NOT present in DB
                                 if (!existingKeys.has(key)) {
                                     let content = null;
@@ -125,15 +130,20 @@ const LocalAPI = {
 
                                     // Ensure content is valid string
                                     if (content && typeof content === 'string' && content.length > 10) {
-                                        explanationsToAdd.push({
-                                            mode: 'single',
-                                            query_key: key,
-                                            content: content,
-                                            image_url: image_url,
-                                            image_dicebear: image_dicebear,
-                                            image_pollinations: image_pollinations,
-                                            created_at: now
-                                        });
+                                        // Check if this key is already in our pending list (handle duplicates in legacyData itself)
+                                        // Although legacyData is object, maybe key normalization caused collision?
+                                        const isDuplicate = explanationsToAdd.some(e => e.query_key === key);
+                                        if (!isDuplicate) {
+                                            explanationsToAdd.push({
+                                                mode: 'single',
+                                                query_key: key,
+                                                content: content,
+                                                image_url: image_url,
+                                                image_dicebear: image_dicebear,
+                                                image_pollinations: image_pollinations,
+                                                created_at: now
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -141,7 +151,8 @@ const LocalAPI = {
                             if (explanationsToAdd.length > 0) {
                                 try {
                                     console.log(`LocalAPI: Adding ${explanationsToAdd.length} missing records...`);
-                                    await window.db.explanations.bulkAdd(explanationsToAdd);
+                                    // Use bulkPut instead of bulkAdd to avoid ConstraintError if keys exist
+                                    await window.db.explanations.bulkPut(explanationsToAdd);
                                     console.log(`LocalAPI: Successfully merged legacy data.`);
                                     localStorage.setItem('legacy_data_imported_v3', 'true');
                                 } catch (importErr) {
@@ -275,6 +286,31 @@ const LocalAPI = {
                             this.verbsData = rawData["5530考研词汇词频排序表"] || [];
                         }
                     }
+                    
+                    // Data Sanitization
+                    if (this.verbsData && Array.isArray(this.verbsData)) {
+                        this.verbsData = this.verbsData.filter(v => v && (v.word || v['单词']));
+                        
+                        // Populate DB with initial data if loaded from JSON
+                        // This ensures consistent access via DB later and fixes schema issues
+                        if (window.db && window.db.verbs) {
+                            const dbCount = await DB.getVerbsCount();
+                            if (dbCount === 0) {
+                                console.log("LocalAPI: Populating verbs table from JSON...");
+                                const dbRecords = this.verbsData.map(v => ({
+                                    word: v.word || v['单词'],
+                                    frequency: parseInt(v.frequency || v['词频'] || v.freq) || 0,
+                                    pos: v.pos || v.part_of_speech || 'other',
+                                    original_word: v.original_word || v.word || v['单词'],
+                                    definition: v.definition || v['释义'],
+                                    alternative_spelling: v.alternative_spelling || v['其他拼写'],
+                                    sequence: v.sequence || v['序号']
+                                }));
+                                await DB.bulkAddVerbs(dbRecords);
+                                console.log(`LocalAPI: Populated ${dbRecords.length} verbs to DB.`);
+                            }
+                        }
+                    }
                 }
             }
         } catch (error) {
@@ -286,6 +322,13 @@ const LocalAPI = {
      * Sync data from backend if available
      */
     async syncFromBackend() {
+        // Static build optimization: skip backend sync by default to avoid 404s
+        // Only enable if explicitly configured (e.g. in a non-static deployment)
+        if (!window.ENABLE_BACKEND_SYNC) {
+             // console.log("LocalAPI: Backend sync disabled (static mode).");
+             return;
+        }
+
         const fetchFn = this.originalFetch || window.fetch;
         try {
             console.log("LocalAPI: Checking for data sync from backend...");
@@ -429,6 +472,15 @@ const LocalAPI = {
                                     const rawData = await response.json();
                                     this.verbsData = rawData["5530考研词汇词频排序表"] || [];
                                 }
+                            }
+                        }
+
+                        // Data Sanitization: Filter out invalid entries
+                        if (this.verbsData && Array.isArray(this.verbsData)) {
+                            const originalLength = this.verbsData.length;
+                            this.verbsData = this.verbsData.filter(v => v && (v.word || v['单词']));
+                            if (this.verbsData.length < originalLength) {
+                                console.warn(`LocalAPI: Filtered out ${originalLength - this.verbsData.length} invalid verb records.`);
                             }
                         }
                     } catch (e) {
@@ -783,12 +835,9 @@ const LocalAPI = {
             const images = {};
             
             for (const verb of verbList) {
-                // Use original case as key, fallback to lowercase if not found?
-                // Actually, if we imported with original case, we should query with original case first.
-                // However, user input might be loose.
-                // Let's assume input matches DB for now, or use original verb.
-                const key = verb; 
-                let cachedData = null;
+                try {
+                    const key = verb; 
+                    let cachedData = null;
                 
                 if (!refresh) {
                     cachedData = await DB.getCachedResult('single', key);
@@ -807,25 +856,37 @@ const LocalAPI = {
                             
                             // NOTE: In the pure static build (dist), this is expected to fail 404.
                             // But we should catch it gracefully.
-                            const backendUrl = `/api/explain?verbs=${verb}&mode=single`;
-                            console.log(`LocalAPI: ${verb} not in IndexedDB, checking backend...`);
+                            // Only check backend if we are NOT on a purely static host (e.g. GitHub Pages)
+                            // Or if we specifically want to try connecting to a local backend
+                            // For now, let's skip backend check if window.location.protocol is 'file:' or if we know we are static
+                            const isStatic = true; // Assume static for dist build unless configured otherwise
                             
-                            const res = await window.fetch(backendUrl);
-                            if (res.ok) {
-                                const backendResult = await res.json();
-                                if (backendResult && backendResult.explanations && backendResult.explanations[key]) {
-                                    const content = backendResult.explanations[key];
-                                    const imageUrl = backendResult.images ? Object.values(backendResult.images)[0] : null;
-                                    
-                                    cachedData = {
-                                        content: content,
-                                        image_url: imageUrl
-                                    };
-                                    
-                                    // Save to IndexedDB so it's there next time
-                                    await DB.saveToCache('single', key, content, imageUrl);
-                                    console.log(`LocalAPI: Saved backend result for ${verb} to IndexedDB.`);
+                            if (!isStatic) {
+                                const backendUrl = `/api/explain?verbs=${verb}&mode=single`;
+                                console.log(`LocalAPI: ${verb} not in IndexedDB, checking backend...`);
+                                
+                                // Add bypass header to prevent infinite recursion in static mode
+                                const res = await window.fetch(backendUrl, {
+                                    headers: { 'X-Bypass-Local': 'true' }
+                                });
+                                if (res.ok) {
+                                    const backendResult = await res.json();
+                                    if (backendResult && backendResult.explanations && backendResult.explanations[key]) {
+                                        const content = backendResult.explanations[key];
+                                        const imageUrl = backendResult.images ? Object.values(backendResult.images)[0] : null;
+                                        
+                                        cachedData = {
+                                            content: content,
+                                            image_url: imageUrl
+                                        };
+                                        
+                                        // Save to IndexedDB so it's there next time
+                                        await DB.saveToCache('single', key, content, imageUrl);
+                                        console.log(`LocalAPI: Saved backend result for ${verb} to IndexedDB.`);
+                                    }
                                 }
+                            } else {
+                                // console.log(`LocalAPI: Skipping backend check for ${verb} (static mode).`);
                             }
                         } catch (e) {
                             console.warn(`LocalAPI: Backend check failed for ${verb}:`, e.message);
@@ -833,14 +894,40 @@ const LocalAPI = {
                     }
 
                     // Fallback to memory-loaded legacy data if still not found
-                    if (!cachedData && this.legacyData && this.legacyData[key]) {
-                        console.log(`LocalAPI: Found ${verb} in legacy fallback data.`);
-                        cachedData = {
-                            content: this.legacyData[key],
-                            image_url: null
-                        };
-                        // Optionally save to DB now so it's there next time
-                        DB.saveToCache('single', key, cachedData.content, null);
+                    if (!cachedData && this.legacyData) {
+                        // Normalize key: try exact, then verb, then with :verb suffix
+                        const exactKey = key;
+                        const verbKey = `${key}:verb`; // Most legacy data keys are "word:verb"
+                        
+                        let legacyContent = this.legacyData[exactKey] || this.legacyData[verbKey];
+                        
+                        // Try case-insensitive lookup if still not found
+                        if (!legacyContent) {
+                            const lowerKey = key.toLowerCase();
+                            const lowerVerbKey = `${lowerKey}:verb`;
+                            
+                            // Find case-insensitive match in keys
+                            const allKeys = Object.keys(this.legacyData);
+                            const foundKey = allKeys.find(k => 
+                                k.toLowerCase() === lowerKey || 
+                                k.toLowerCase() === lowerVerbKey
+                            );
+                            if (foundKey) legacyContent = this.legacyData[foundKey];
+                        }
+
+                        if (legacyContent) {
+                            console.log(`LocalAPI: Found ${verb} in legacy fallback data.`);
+                            // Legacy content might be an object { content: "...", ... } or just string? 
+                            // Based on json file, it is an object with "content" property.
+                            const contentStr = typeof legacyContent === 'string' ? legacyContent : legacyContent.content;
+                            
+                            cachedData = {
+                                content: contentStr,
+                                image_url: null
+                            };
+                            // Optionally save to DB now so it's there next time
+                            DB.saveToCache('single', key, cachedData.content, null);
+                        }
                     }
                 }
                 
@@ -856,28 +943,41 @@ const LocalAPI = {
                 // 3. We are NOT just requesting images (only_images === false)
                 const needLlmCall = (refresh || !hasCachedContent) && !only_images;
                 
-                // CHECK IMAGE PROVIDER SETTING
-                // PRIORITY: Standalone Key > App Settings > Default
+                // Image Provider Logic
                 const standalone = localStorage.getItem('visuals_provider');
                 let provider = 'none';
-                
                 if (standalone && standalone !== 'null') {
                     provider = standalone;
                 } else {
                     const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
                     if (settings.image_provider) provider = settings.image_provider;
                 }
+
+                // If provider is 'none', we don't want an image
+                if (provider === 'none') {
+                    imageUrl = null;
+                } else {
+                    // We want an image. Do we have one?
+                    if (!imageUrl) {
+                        // No image in cache, generate one
+                        imageUrl = this.generateImageUrl(verb);
+                    } else {
+                        // We have an image in cache. Does it match the current provider?
+                        const isDiceBearUrl = typeof imageUrl === 'string' && imageUrl.includes('dicebear.com');
+                        const isPollinationsUrl = typeof imageUrl === 'string' && imageUrl.includes('pollinations.ai');
+                        
+                        if (provider === 'dicebear' && !isDiceBearUrl) {
+                            console.log(`LocalAPI: Provider mismatch (expected dicebear), regenerating image for ${verb}`);
+                            imageUrl = this.generateImageUrl(verb);
+                        } else if (provider === 'pollinations' && !isPollinationsUrl) {
+                            console.log(`LocalAPI: Provider mismatch (expected pollinations), regenerating image for ${verb}`);
+                            imageUrl = this.generateImageUrl(verb);
+                        }
+                    }
+                }
                 
                 const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
                 const hasApiKey = !!settings.openai_api_key;
-                
-                // If provider is 'none', explicitly set imageUrl to null to override any cache or generation
-                if (provider === 'none') {
-                    imageUrl = null;
-                } else if (!imageUrl) {
-                    // Only generate if provider is NOT 'none' and we don't have one
-                    imageUrl = this.generateImageUrl(verb);
-                }
                 
                 // Strict Cache Mode: If need LLM but no API key, skip LLM and go to fallback directly
                 if (needLlmCall && !hasApiKey) {
@@ -909,16 +1009,26 @@ const LocalAPI = {
                             }
                         }
                     }
-                } else if (!cachedData?.image_url && imageUrl) {
-                    // Case A: only_images is true, so we just want to save/update the image
-                    // Case B: We already had content but no image_url in cache
-                    console.log(`LocalAPI: Updating cache with image URL for ${verb}`);
-                    // Use existing content if any, otherwise save with null content (to be filled later by analyzeVerbs)
-                    await DB.saveToCache('single', key, content, imageUrl);
-                }
+                } else if ((!cachedData?.image_url && imageUrl) || (cachedData?.image_url !== imageUrl)) {
+                        console.log(`LocalAPI: Updating cache with image URL for ${verb}`);
+                        
+                        // CRITICAL FIX: If we are updating only the image, do NOT overwrite existing content with null
+                        const contentToSave = content || (cachedData ? cachedData.content : null);
+                        
+                        // Only save if we have either content OR we are explicitly requesting only_images
+                        // If only_images is true, we allow saving null content IF there was no content before
+                        // but if only_images is false (user requested detail), we should have content.
+                        if (contentToSave || only_images) {
+                            await DB.saveToCache('single', key, contentToSave, imageUrl);
+                        }
+                    }
                 
-                results.push(content);
-                if (imageUrl) images[verb] = imageUrl;
+                    results.push(content);
+                    if (imageUrl) images[verb] = imageUrl;
+                } catch (err) {
+                    console.error(`LocalAPI Error processing verb ${verb}:`, err);
+                    results.push(null);
+                }
             }
             
             return {
@@ -1017,7 +1127,9 @@ const LocalAPI = {
                 return `https://image.pollinations.ai/prompt/${prompt}?model=${settings.pollinations_model || 'flux'}&nologo=true&seed=${seed}`;
             }
         } else {
-            return `https://api.dicebear.com/9.x/icons/svg?seed=${encodeURIComponent(verb)}`;
+            // Use 'identicon' style which is algorithmically generated and more reliable than 'icons'
+            // which depends on a finite set of icons that may fail for some seeds.
+            return `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(verb)}`;
         }
     }
 };
