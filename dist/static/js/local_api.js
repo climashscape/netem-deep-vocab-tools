@@ -368,9 +368,15 @@ const LocalAPI = {
                 openai_base_url: '',
                 openai_model: '',
                 image_provider: 'dicebear',
-                daily_goal: '20'
+                daily_goal: '40'
             };
             localStorage.setItem('app_settings', JSON.stringify(defaults));
+        } else {
+            // Ensure daily_goal has a default if missing in existing settings
+            if (!currentSettings.daily_goal) {
+                currentSettings.daily_goal = '40';
+                localStorage.setItem('app_settings', JSON.stringify(currentSettings));
+            }
         }
     },
 
@@ -589,6 +595,38 @@ const LocalAPI = {
                 const allProgress = await window.db.learning_progress.toArray();
                 const allCheckins = await window.db.checkins.toArray();
                 
+                // Ensure legacy data is loaded for filtering
+                if (!this.legacyData) {
+                    try {
+                        if (window.NETEM_LEGACY_DATA) {
+                            this.legacyData = window.NETEM_LEGACY_DATA;
+                        } else {
+                            const legacyResp = await this.fetchResource('legacy_data.json');
+                            if (legacyResp) {
+                                this.legacyData = await legacyResp.json();
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("LocalAPI: Failed to reload legacy data for export filtering", e);
+                    }
+                }
+
+                // Build a normalized map of legacy data for accurate filtering
+                const legacyMap = new Map();
+                if (this.legacyData) {
+                    Object.entries(this.legacyData).forEach(([k, v]) => {
+                        let key = k.toLowerCase();
+                        if (key.endsWith(':verb')) key = key.substring(0, key.length - 5);
+                        
+                        let content = '';
+                        if (typeof v === 'string') content = v;
+                        else if (v && typeof v === 'object') content = v.content || '';
+                        
+                        // Normalize content: remove ALL whitespace to be robust against formatting changes
+                        if (content) legacyMap.set(key, content.replace(/\s+/g, ''));
+                    });
+                }
+
                 // Filter out legacy data (from default library) to reduce export size
                 const filteredExplanations = allExplanations.filter(exp => {
                     // Only filter 'single' word explanations
@@ -597,10 +635,12 @@ const LocalAPI = {
                     const queryKey = exp.query_key.toLowerCase();
                     
                     // If word is in legacy library AND content matches exactly, exclude it
-                    if (this.legacyData && this.legacyData[queryKey]) {
-                        // Check if the content is the same as the legacy version
-                        // This allows user-updated explanations (refresh) to still be exported
-                        if (this.legacyData[queryKey] === exp.content) {
+                    if (legacyMap.has(queryKey)) {
+                        const legacyContent = legacyMap.get(queryKey);
+                        const currentContent = (exp.content || '').replace(/\s+/g, '');
+                        
+                        // Check if the normalized content is the same
+                        if (currentContent === legacyContent) {
                             return false;
                         }
                     }

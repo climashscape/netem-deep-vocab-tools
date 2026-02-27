@@ -317,6 +317,22 @@
             border-radius: 15px;
         }
 
+        /* FIX INPUT INTERACTION ON MOBILE */
+        input, textarea {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+            -webkit-touch-callout: default !important;
+            touch-action: manipulation !important; /* Allow pan/zoom but not double-tap zoom if conflicting */
+        }
+        
+        /* Ensure inputs in neumorphic containers are clickable */
+        .neumorphic input, .neumorphic textarea,
+        .neumorphic-inset input, .neumorphic-inset textarea {
+            pointer-events: auto !important;
+            z-index: 10 !important;
+            position: relative;
+        }
+
         .neumorphic-btn {
             background: #e0e5ec;
             box-shadow: 6px 6px 10px 0 rgba(163,177,198, 0.7), 
@@ -824,6 +840,16 @@
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
             50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
             100% { transform: scale(1); }
+        }
+
+        /* Refresh Confirmation Modal */
+        #refreshConfirmModal {
+            z-index: 200 !important; /* Above everything */
+            touch-action: none; /* Prevent scroll chaining */
+        }
+        #refreshConfirmModal > div {
+            /* Prevent clicks on modal content from propagating to overlay */
+            pointer-events: auto;
         }
 
         /* Carousel / Slider Styles */
@@ -5604,6 +5630,9 @@
                     let rawMarkdown = data.result;
                     
                     // Pre-processing: Insert specific delimiters for reliable splitting
+                    // NEW LOGIC: Use a simpler split if no clear section headers are found
+                    // This handles raw text or fallback responses
+                    
                     const SEPARATOR = '|||CARD_SPLIT|||';
                     
                     // 0. Pre-clean BROKEN headers BEFORE splitting logic
@@ -5637,26 +5666,19 @@
                     
                     // We want to split before these sections
                     // NOW we only need to look for '#### Key' because we normalized them above!
-                    const sections = [
-                        '### ', // Keep splitting main title if present
-                        // Old
-                        '#### 三维理解', '#### 本质动作', '#### 关键洞察', '#### 场景比喻', '#### 深度解析', '#### 应用场景', '#### 错误纠正', '#### 对比分析', '#### 本质',
-                        // New
-                        '#### 视觉本源', '#### 感官本源', '#### 物理本源', '#### 空间/逻辑图式',
-                        '#### 逻辑演化', '#### 概念图式', '#### 认知标尺', '#### 功能演化', '#### 抽象映射',
-                        '#### 动作维度', '#### 认知差异', '#### 逻辑投射', '#### 关键辨析',
-                        '#### 地道场景', '#### 地道搭配',
-                        '#### 词性转换',
-                        '#### 一言蔽之'
-                    ];
-
-                    sections.forEach(sec => {
-                        // Replace only the first occurrence or all? All is safer for robustness but structure implies order.
-                        // We use global replace to catch them all.
-                        // We need to escape special regex chars in 'sec' if we used regex, but here we can use split/join
-                        // or replaceAll if supported. Let's use split/join for safety.
-                        rawMarkdown = rawMarkdown.split(sec).join(SEPARATOR + sec);
-                    });
+                    // We also include H3 (###) for the title card
+                    const splitRegex = /(^|\n)(?=#{3,4}\s)/g;
+                    
+                    // Only use splitRegex if we actually have H3/H4 headers
+                    if (rawMarkdown.match(splitRegex)) {
+                        rawMarkdown = rawMarkdown.replace(splitRegex, '$1' + SEPARATOR);
+                    } else {
+                        // Fallback: Just treat the whole thing as one card if no structure found
+                        // Or try splitting by paragraphs if it's huge?
+                        // For now, let's just ensure we have at least one separator at start
+                        // But wait, our logic below handles start-separator removal.
+                        // If no separator added, the whole text is one chunk.
+                    }
 
                     // Remove the very first separator if it exists (empty first card)
                     if (rawMarkdown.startsWith(SEPARATOR)) {
@@ -5942,73 +5964,141 @@
                     if (cards.length > 0) {
                         currentCardIndex = 0;
                         
-                        // Touch handling for mobile flip
+                        // Touch handling for mobile flip (1:1 tracking)
                         let touchStartY = 0;
-                        let touchEndY = 0;
-                        const swipeThreshold = 50; // Minimum distance for swipe
+                        let isDragging = false;
+                        let activeCard = null;
+                        let isScrollGesture = false; // Flag to lock gesture type
+                        const swipeThreshold = 80; // Distance to trigger flip
 
                         outputContainer.ontouchstart = (e) => {
-                            touchStartY = e.touches[0].clientY;
-                        };
-
-                        outputContainer.ontouchend = (e) => {
-                            touchEndY = e.changedTouches[0].clientY;
-                            handleSwipe();
-                        };
-
-                        const handleSwipe = () => {
-                            const activeCard = outputContainer.children[currentCardIndex];
-                            if (!activeCard) return;
-
-                            const scrollableContent = activeCard.querySelector('.flex-1.overflow-y-auto');
-                            if (!scrollableContent) {
-                                // No scrollable content, basic swipe
-                                evaluateSwipe();
+                            // IGNORE touch start on inputs to allow native focus
+                            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                                 return;
                             }
 
-                            const isScrollable = scrollableContent.scrollHeight > scrollableContent.clientHeight;
-                            const distance = touchStartY - touchEndY; // Positive = Swipe Up (Scroll Down)
-
-                            if (distance > 0) { 
-                                // Swiping Up (Trying to go down)
-                                if (isScrollable) {
-                                    const distanceToBottom = scrollableContent.scrollHeight - (scrollableContent.scrollTop + scrollableContent.clientHeight);
-                                    if (distanceToBottom <= 5 && distance > swipeThreshold) {
-                                        switchCard('down');
-                                    }
-                                } else if (distance > swipeThreshold) {
-                                    switchCard('down');
-                                }
-                            } else {
-                                // Swiping Down (Trying to go up)
-                                if (isScrollable) {
-                                    if (scrollableContent.scrollTop <= 0 && Math.abs(distance) > swipeThreshold) {
-                                        switchCard('up');
-                                    }
-                                } else if (Math.abs(distance) > swipeThreshold) {
-                                    switchCard('up');
-                                }
-                            }
-                        };
-
-                        const evaluateSwipe = () => {
-                            const distance = touchStartY - touchEndY;
-                            if (Math.abs(distance) < swipeThreshold) return;
+                            touchStartY = e.touches[0].clientY;
+                            isDragging = false;
+                            isScrollGesture = false; // Reset gesture flag
                             
-                            if (distance > 0) {
-                                // Swipe Up -> Next Card
-                                switchCard('down');
-                            } else {
-                                // Swipe Down -> Prev Card
-                                switchCard('up');
+                            // Find active card
+                            const cards = Array.from(outputContainer.querySelectorAll('.result-card'));
+                            activeCard = cards[currentCardIndex];
+                            
+                            if (activeCard) {
+                                // Determine initial scroll state to see if this should be a scroll gesture
+                                const scrollable = activeCard.querySelector('.flex-1.overflow-y-auto');
+                                if (scrollable) {
+                                     // Use a stricter tolerance for "safe scroll zone" detection
+                                     const isAtTop = scrollable.scrollTop <= 2;
+                                     const isAtBottom = Math.ceil(scrollable.scrollTop + scrollable.clientHeight) >= scrollable.scrollHeight - 2;
+                                     
+                                     // If we are NOT at a boundary, this is purely a scroll gesture.
+                                     // We should NOT allow it to become a card drag later in the same touch.
+                                     const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
+                                     if (isScrollable && !isAtTop && !isAtBottom) {
+                                         isScrollGesture = true;
+                                     }
+                                }
+
+                                // Disable transition for direct 1:1 control
+                                activeCard.style.transition = 'none';
                             }
                         };
+
+                        outputContainer.ontouchmove = (e) => {
+                            if (!activeCard) return;
+
+                            // IGNORE touch move on inputs to allow native text selection/cursor movement
+                            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                                return;
+                            }
+                            
+                            // If the gesture started as a scroll (in the middle of content), LOCK it as a scroll.
+                            // Do not switch to card drag even if we hit the boundary now.
+                            if (isScrollGesture) return;
+
+                            const currentY = e.touches[0].clientY;
+                            const diff = currentY - touchStartY;
+                            
+                            // Check if we should allow drag based on scroll position
+                            let allowDrag = false;
+                            const scrollable = activeCard.querySelector('.flex-1.overflow-y-auto');
+                            
+                            // 1. If touching non-scrollable area (header), always allow
+                            const isTouchInScrollable = scrollable && scrollable.contains(e.target);
+                            
+                            if (!isTouchInScrollable || !scrollable) {
+                                allowDrag = true;
+                            } else {
+                                // 2. If touching scrollable area, check boundaries
+                                const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
+                                
+                                if (!isScrollable) {
+                                    allowDrag = true;
+                                } else {
+                                    // Use tolerance for "at top/bottom"
+                                    const isAtTop = scrollable.scrollTop <= 5;
+                                    const isAtBottom = Math.ceil(scrollable.scrollTop + scrollable.clientHeight) >= scrollable.scrollHeight - 5;
+                                    
+                                    // Pulling DOWN (diff > 0) allowed only if at TOP
+                                    if (diff > 0 && isAtTop) allowDrag = true;
+                                    
+                                    // Pulling UP (diff < 0) allowed only if at BOTTOM
+                                    if (diff < 0 && isAtBottom) allowDrag = true;
+                                }
+                            }
+                            
+                            if (allowDrag) {
+                                // Prevent native pull-to-refresh or scrolling if we are taking over
+                                if (Math.abs(diff) > 5) {
+                                    e.preventDefault(); 
+                                    isDragging = true;
+                                    
+                                    // Apply transform: translate(-50%, -50%) is the base center position
+                                    // We add the diff to the Y translation
+                                    // Using calc to combine percentage and pixel values
+                                    activeCard.style.transform = `translate(-50%, calc(-50% + ${diff}px)) scale(1) rotateX(0deg)`;
+                                }
+                            }
+                        };
+
+                        outputContainer.ontouchend = (e) => {
+                            if (!activeCard) return;
+                            
+                            // Restore smooth transition
+                            // Use the same timing as CSS to ensure consistency
+                            activeCard.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'; 
+                            
+                            const currentY = e.changedTouches[0].clientY;
+                            const diff = currentY - touchStartY;
+                            
+                            // Clear manual transform so CSS classes can take over
+                            activeCard.style.transform = '';
+                            
+                            if (isDragging) {
+                                if (diff < -swipeThreshold) {
+                                    switchCard('next');
+                                } else if (diff > swipeThreshold) {
+                                    switchCard('prev');
+                                }
+                                // If threshold not met, clearing transform above automatically handles "spring back"
+                            }
+                            
+                            isDragging = false;
+                            activeCard = null;
+                        };
+
+                        // Clean up legacy handlers if they exist
+                        const handleSwipe = null;
+                        const evaluateSwipe = null;
                     
                         // Add wheel listener for scrolling
                     // Only flip cards if we hit the top or bottom of the scrollable content
                     outputContainer.onwheel = (e) => {
-                        const activeCard = outputContainer.children[currentCardIndex];
+                        // Fix: Select only result cards, ignoring progressContainer
+                        const cards = Array.from(outputContainer.querySelectorAll('.result-card'));
+                        const activeCard = cards[currentCardIndex];
                         if (!activeCard) return;
 
                         // Find the scrollable content wrapper inside the card
@@ -6016,7 +6106,7 @@
                         if (!scrollableContent) {
                             // If no wrapper (unlikely now), fall back to basic switch
                             e.preventDefault();
-                            switchCard(e.deltaY > 0 ? 'down' : 'up');
+                            switchCard(e.deltaY > 0 ? 'next' : 'prev');
                             return;
                         }
 
@@ -6032,13 +6122,13 @@
                                 if (distanceToBottom <= 5) { // Increased threshold slightly for better reliability
                                     // At bottom, switch to next card
                                     e.preventDefault();
-                                    switchCard('down');
+                                    switchCard('next');
                                 }
                                 // Else: let native scroll happen inside scrollableContent
                             } else {
                                 // Not scrollable, switch card
                                 e.preventDefault();
-                                switchCard('down');
+                                switchCard('next');
                             }
                         } else {
                             // Scrolling Up
@@ -6046,13 +6136,13 @@
                                 if (scrollableContent.scrollTop <= 0) {
                                     // At top, switch to prev card
                                     e.preventDefault();
-                                    switchCard('up');
+                                    switchCard('prev');
                                 }
                                 // Else: let native scroll happen
                             } else {
                                 // Not scrollable, switch card
                                 e.preventDefault();
-                                switchCard('up');
+                                switchCard('prev');
                             }
                         }
                     };
@@ -6062,11 +6152,11 @@
                         if (modal.classList.contains('active')) {
                             if (e.key === 'ArrowUp') {
                                 e.preventDefault(); 
-                                switchCard('up');
+                                switchCard('prev');
                             }
                             if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                switchCard('down');
+                                switchCard('next');
                             }
                         }
                     };
@@ -6700,25 +6790,32 @@
         };
         
         // FIX INPUT FOCUS: Allow native behavior
-        // We removed the aggressive focus() calls because they interfere with native touch-to-focus logic
-        // and sometimes prevent the keyboard from appearing on mobile.
-        
-        // Ensure click events on inputs bubble up normally or at least aren't blocked
+        // Ensure that touch events on inputs are NOT prevented by any global listener
         window.addEventListener('touchstart', function(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                // Explicitly allow default behavior and DO NOT manually focus
-                // Manual focus() calls here fight with browser native behavior and cause flashing
+                // IMPORTANT: Stop propagation to prevent parent listeners (like card swipe)
+                // from seeing this event and potentially calling preventDefault()
+                e.stopPropagation();
                 return true;
             }
-        }, { passive: false }); // CHANGED to false to allow preventDefault if needed (though we don't call it)
+        }, { passive: false });
+
+        // Ensure touchend also propagates cleanly for inputs
+        window.addEventListener('touchend', function(e) {
+             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                e.stopPropagation();
+                return true;
+            }
+        }, { passive: false });
 
         // Prevent other listeners from hijacking input clicks
         window.addEventListener('click', function(e) {
              if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                // Don't stop propagation unless necessary, but definitely don't prevent default
-                // e.target.focus(); // REMOVED manual focus here too
+                e.stopPropagation();
+                // Ensure focus happens
+                e.target.focus();
             }
-        }, { passive: false });
+        }, { passive: false, capture: true }); // Use capture to intercept before others
 
         // JS-controlled Active State Logic
         (function() {
@@ -6730,6 +6827,7 @@
             function addPressedState(e) {
                 // Ignore inputs/textareas to allow normal typing/selection
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    // CRITICAL: Ensure we don't accidentally blur an active input when touching another part of it
                     return;
                 }
 
@@ -6771,6 +6869,12 @@
                         const parentCard = target.closest('.verb-card');
                         if (parentCard) {
                             activeElement = parentCard;
+                        } else {
+                            // If block is NOT inside a verb-card (e.g. detail view), it should NOT be pressable
+                            // unless it explicitly has an onclick or button role.
+                            if (!target.hasAttribute('onclick') && target.getAttribute('role') !== 'button') {
+                                return;
+                            }
                         }
                     }
 
@@ -6805,21 +6909,22 @@
                 }
                 
                 // Clear selection if any exists
-                if (window.getSelection) {
+                // BUT skip clearing if focus is inside an input/textarea
+                const activeEl = document.activeElement;
+                const isInputActive = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+                
+                if (window.getSelection && !isInputActive) {
                     try { window.getSelection().removeAllRanges(); } catch(e){}
                 }
                 
                 // Force focus removal from active element if it's not an input
-                if (document.activeElement && 
-                    document.activeElement.tagName !== 'INPUT' && 
-                    document.activeElement.tagName !== 'TEXTAREA') {
-                    try { document.activeElement.blur(); } catch(e){}
+                if (activeEl && !isInputActive) {
+                    try { activeEl.blur(); } catch(e){}
                 }
             }
-
-            // Attach listeners to WINDOW to capture everything
-            window.addEventListener('touchstart', addPressedState, { passive: false }); // CHANGED: passive: false to allow preventDefault if needed (though we return early for inputs)
-
+            
+            // ... (rest of listeners) ...
+            
             // Reset on ANY release or cancellation - ATTACH TO WINDOW
             const clearSelectionAndReset = (e) => {
                 removePressedState();
@@ -6830,13 +6935,23 @@
                     }
                 }
             };
+            
+            // Attach listeners to WINDOW to capture everything
+            // CRITICAL CHANGE: Do NOT use passive: false for window-level touchstart if possible, unless blocking default
+            // But here we need to intercept for custom press logic.
+            // We ALREADY handle input exception inside addPressedState.
+            window.addEventListener('touchstart', addPressedState, { passive: false });
 
             window.addEventListener('touchend', clearSelectionAndReset, { capture: true });
             window.addEventListener('touchcancel', clearSelectionAndReset, { capture: true });
             window.addEventListener('mouseup', clearSelectionAndReset, { capture: true });
             document.addEventListener('mouseleave', removePressedState, { capture: true });
             window.addEventListener('dragend', removePressedState, { capture: true });
-            window.addEventListener('contextmenu', removePressedState, { capture: true }); 
+            
+            // REMOVE AGGRESSIVE CONTEXT MENU BLOCKER FROM HERE IF IT EXISTS
+            // (We already have a safer one above)
+            // window.addEventListener('contextmenu', removePressedState, { capture: true }); 
+            
             window.addEventListener('scroll', removePressedState, { passive: true, capture: true });
             
             // CRITICAL FIX: Reset state on ANY movement (scrolling attempt) with threshold
@@ -7338,39 +7453,69 @@
                             const result = await Filesystem.writeFile({
                                 path: filename,
                                 data: pureBase64,
-                                directory: Directory.Documents
+                                directory: Directory.Documents,
+                                recursive: true // Create directory if needed
                             });
                             
                             // Get the full URI to share
                             const fileUri = result.uri;
                             
-                            // Share the file
+                            // Share the file using Capacitor Share plugin
                             const { Share } = Capacitor.Plugins;
                             
-                            await Share.share({
-                                title: 'NETEM Backup',
-                                text: 'NETEM Deep Vocab Tools Backup',
-                                url: fileUri, 
-                                dialogTitle: 'Save Backup',
-                                files: [fileUri] 
-                            });
+                            // Attempt to share the file directly
+                            try {
+                                await Share.share({
+                                    title: 'NETEM Backup',
+                                    text: 'NETEM Deep Vocab Tools Backup',
+                                    url: fileUri, 
+                                    dialogTitle: 'Save Backup',
+                                    files: [fileUri] 
+                                });
+                            } catch (shareError) {
+                                console.warn("Share failed, trying fallback...", shareError);
+                                // Fallback: Just show an alert with the path
+                                alert(`Backup saved to Documents: ${filename}`);
+                            }
                             
                         } catch (fsError) {
                             console.error("Capacitor Export Error:", fsError);
-                            alert("Export failed on device: " + fsError.message);
+                            // Fallback to Web/Browser logic if native filesystem fails
+                            // This might work if the WebView handles downloads natively
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(() => {
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                            }, 100);
                         }
                     };
                 } else {
-                    // Web/Browser logic
+                    // Web/Browser logic (Works for PC and Mobile Web)
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
                     a.download = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                    
+                    // CRITICAL FIX FOR MOBILE: 
+                    // 1. Must be attached to body
+                    // 2. target="_blank" helps some mobile browsers handle the blob download better
                     document.body.appendChild(a);
+                    
+                    // Trigger click
                     a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
+                    
+                    // Clean up with slight delay to ensure mobile browser registers the click
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    }, 100);
                 }
                 
                 if (btn) {
@@ -7425,7 +7570,8 @@
             // Create hidden file input
             const input = document.createElement('input');
             input.type = 'file';
-            input.accept = '.zip,.json'; 
+            // input.accept = '.zip,.json'; 
+            input.accept = '.json'; // Only accept JSON for now as ZIP logic is deprecated/removed from frontend handling
             input.style.display = 'none';
             document.body.appendChild(input);
             
@@ -7436,7 +7582,21 @@
                     return;
                 }
                 
+                // MOVE MODAL LOGIC: Ensure modal is inside Settings if open
                 const modal = document.getElementById('importConfirmModal');
+                const settingsModal = document.getElementById('settingsModal');
+                
+                // If Settings Modal is open (has transform-translate-y-0), move import modal inside it to ensure z-index correctness
+                if (settingsModal && !settingsModal.classList.contains('translate-y-full')) {
+                    settingsModal.appendChild(modal);
+                    modal.style.position = 'absolute'; // Ensure it's absolute within the settings modal
+                    modal.style.zIndex = '500'; // High z-index within settings
+                } else {
+                    document.body.appendChild(modal); // Fallback to body
+                    modal.style.position = 'fixed';
+                    modal.style.zIndex = '2000'; // Very high global z-index
+                }
+                
                 pushModalState(closeImportConfirmModal);
                 modal.classList.remove('hidden');
                 setTimeout(() => {
@@ -7482,6 +7642,12 @@
                             // Use custom modal for success message instead of alert
                             showResetConfirmation(); // Reuse the reset confirmation modal structure but for success message
                             const resetModal = document.getElementById('resetConfirmModal');
+                            
+                            // Ensure success modal is also visible on top of settings
+                            if (settingsModal && !settingsModal.classList.contains('translate-y-full')) {
+                                settingsModal.appendChild(resetModal.parentElement || resetModal); // resetConfirmModal is created as child of body usually
+                            }
+                            
                             if (resetModal) {
                                 const content = resetModal.querySelector('div > div');
                                 if (content) {
@@ -7634,11 +7800,14 @@
                 if (settingsForm) {
                     // Load server settings
                     Object.keys(data).forEach(key => {
+                        // SKIP input fields that are radio buttons or checkboxes managed separately
+                        if (key === 'analysisMode' || key === 'image_provider') return;
+                        
                         const input = settingsForm.querySelector(`[name="${key}"]`);
                         if (input) {
                             if (input.type === 'checkbox') {
                                 input.checked = data[key] === true || data[key] === 'true';
-                            } else {
+                            } else if (input.type !== 'radio') { // Ensure we don't accidentally check radios here
                                 input.value = data[key];
                             }
                         }
@@ -7662,6 +7831,24 @@
                     }
                     
                     // Load local analysisMode setting
+                    // PRIORITY: Local Storage (User Preference) > Server Setting (Synced) > Legacy
+                    // We prioritize Local Storage because it reflects the most recent user action on this device.
+                    
+                    if (localStorage.getItem('analysisMode')) {
+                        // Fallback to local storage explicit key
+                        analysisMode = localStorage.getItem('analysisMode');
+                    } else if (data.analysisMode) {
+                         // Prioritize server setting
+                         analysisMode = data.analysisMode;
+                    } else {
+                        // Fallback to legacy keys if no modern key exists
+                        const autoAi = localStorage.getItem('autoAiAnalysis') === 'true';
+                        const cacheOnly = localStorage.getItem('cacheOnlyMode') === 'true';
+                        
+                        if (cacheOnly) analysisMode = 'cache_only';
+                        else if (autoAi) analysisMode = 'auto';
+                        else analysisMode = 'manual';
+                    }
                     updateAnalysisModeUI(analysisMode);
 
                     // Trigger change event
@@ -7787,18 +7974,50 @@
                                 }
                             }
                         }, 800);
+                    } else if (currentPage === 'learn') {
+                        // NEW LOGIC: In Learn Mode, automatically jump to next learnable word
+                        setTimeout(() => {
+                            // Determine which list to use (displayedVerbs is the current batch)
+                            const sourceList = displayedVerbs;
+                            
+                            // Find current verb index
+                            const currentIndex = sourceList.findIndex(v => v['单词'].toLowerCase() === verb);
+                            
+                            let nextVerbToLearn = null;
+                            
+                            // Look for the next word that hasn't been mastered or is new
+                            // We prioritize words in the current batch first
+                            for (let i = currentIndex + 1; i < sourceList.length; i++) {
+                                const v = sourceList[i];
+                                // Simple check: if it's in the list, it's part of the current learn batch
+                                nextVerbToLearn = v['单词'];
+                                break;
+                            }
+                            
+                            if (nextVerbToLearn) {
+                                // Reset button states
+                                if (window.globalResetPressedState) window.globalResetPressedState();
+                                
+                                // Transition to next word seamlessly
+                                // IMPORTANT: Pass false for isReviewMode to keep it in Learn style
+                                openVerb(nextVerbToLearn, false);
+                                
+                                // Update background grid
+                                renderGrid();
+                            } else {
+                                // End of batch
+                                closeModal();
+                                if (window.globalResetPressedState) window.globalResetPressedState();
+                                applyFilters(); // This will refresh the grid and potentially load new batch
+                            }
+                        }, 800);
                     } else {
-                        // Not in review mode, just close normally
+                        // Default fallback (e.g. search result, me page)
                         setTimeout(() => {
                             closeModal();
                             // Reset buttons again after closing modal
                             if (window.globalResetPressedState) window.globalResetPressedState();
-
-                            if (currentPage === 'learn') {
-                                applyFilters(); // Re-filter and potentially generate new batch if empty
-                            } else {
-                                renderGrid(true);
-                            }
+                            renderGrid(true);
                         }, 800);
                     }
                 }
@@ -7844,11 +8063,45 @@
                 if (pollModelInput) newSettings.pollinations_model = pollModelInput.value.trim();
 
                 // Capture Analysis Mode (Radio)
+                // FORCE RE-QUERY: Explicitly query for the checked radio again
+                let analysisModeValue = null;
                 const analysisModeInput = document.querySelector('input[name="analysisMode"]:checked');
+                
                 if (analysisModeInput) {
-                    newSettings.analysisMode = analysisModeInput.value;
+                    analysisModeValue = analysisModeInput.value;
+                }
+                
+                // CRITICAL FIX: If no radio is checked, DO NOT fallback to global variable blindly.
+                // The global variable 'analysisMode' might be stale if the user clicked a radio
+                // but the DOM update hasn't propagated or the variable wasn't updated correctly.
+                // Instead, trust the DOM state first. If absolutely nothing is checked (which shouldn't happen),
+                // then and only then consider the global variable.
+                
+                // Update: Re-enabling fallback because sometimes DOM query fails in certain contexts
+                if (!analysisModeValue && analysisMode) {
+                     analysisModeValue = analysisMode;
+                }
+                
+                if (analysisModeValue) {
+                    newSettings.analysisMode = analysisModeValue;
                     // Also update legacy keys for compatibility
-                    updateAnalysisMode(analysisModeInput.value);
+                    updateAnalysisMode(analysisModeValue);
+                    
+                    // FORCE SYNC: Manually update legacy keys in newSettings to ensure backend receives them
+                    // USE STRINGS "true"/"false" to match LocalStorage format exactly
+                    // AND update the global analysisMode variable immediately to ensure consistency
+                    analysisMode = analysisModeValue;
+                    
+                    if (analysisModeValue === 'auto') {
+                        newSettings.autoAiAnalysis = 'true';
+                        newSettings.cacheOnlyMode = 'false';
+                    } else if (analysisModeValue === 'cache_only') {
+                        newSettings.autoAiAnalysis = 'true';
+                        newSettings.cacheOnlyMode = 'true';
+                    } else {
+                        newSettings.autoAiAnalysis = 'false';
+                        newSettings.cacheOnlyMode = 'false';
+                    }
                 }
 
                 // Capture Image Provider (Priority: Hidden Select > UI State > Default)
