@@ -5792,11 +5792,21 @@
                         '词性转换',
                         '一言蔽之'
                     ];
+                    // IMPORTANT: Some words (e.g. Christian) might return plain text with NO headers or separators.
+                    // In this case, we MUST ensure at least one card is created.
+                    
                     const keyPattern = sectionKeys.join('|').replace(/\//g, '\\/'); // Escape slashes for regex
                     // Regex: Start of line/chunk, optional MD chars, Key, optional MD chars/colons
                     // We use replaceAll to normalize headers BEFORE splitting
                     // UPDATED: Now supports space-separated markers like '* *' or '# #'
                     const headerRegexGlobal = new RegExp('(^|\\n)\\s*(?:[*#]\\s*)*(' + keyPattern + ')(?:\\s*[*#：:])*\\s*', 'g');
+                    
+                    // Check if we found ANY headers
+                    const hasHeaders = headerRegexGlobal.test(rawMarkdown);
+                    
+                    // Reset regex lastIndex
+                    headerRegexGlobal.lastIndex = 0;
+                    
                     rawMarkdown = rawMarkdown.replace(headerRegexGlobal, '$1#### $2\n\n');
                     
                     // We want to split before these sections
@@ -5807,12 +5817,10 @@
                     // Only use splitRegex if we actually have H3/H4 headers
                     if (rawMarkdown.match(splitRegex)) {
                         rawMarkdown = rawMarkdown.replace(splitRegex, '$1' + SEPARATOR);
-                    } else {
-                        // Fallback: Just treat the whole thing as one card if no structure found
-                        // Or try splitting by paragraphs if it's huge?
-                        // For now, let's just ensure we have at least one separator at start
-                        // But wait, our logic below handles start-separator removal.
-                        // If no separator added, the whole text is one chunk.
+                    } else if (!hasHeaders) {
+                        // Fallback: If no known headers found, force the whole content into one card
+                        // This handles cases like 'Christian' returning just a definition without structure
+                        rawMarkdown = SEPARATOR + rawMarkdown;
                     }
 
                     // Remove the very first separator if it exists (empty first card)
@@ -7473,7 +7481,8 @@
             newBtn.onclick = async () => {
                 try {
                     // Update DB status to 'learning' and reset stage
-                    await db.updateProgress(verb, 1, new Date(), new Date(), 'learning', 0);
+                    // Use window.DB (helper) instead of window.db (Dexie instance)
+                    await window.DB.updateProgress(verb, 1, new Date().toISOString(), new Date().toISOString(), 'learning', 0);
                     
                     // Update memory
                     learningStatus[verb] = {

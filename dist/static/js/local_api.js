@@ -531,13 +531,14 @@ const LocalAPI = {
                 return await this.handleExplain(data);
 
             case '/api/ebbinghaus/record':
-                return await Ebbinghaus.recordReview(data.verb, data.result);
+                // Use window.Ebbinghaus to ensure we use the global instance
+                return await window.Ebbinghaus.recordReview(data.verb, data.result);
 
             case '/api/mastery':
-                return await Ebbinghaus.markMastered(data.verb);
+                return await window.Ebbinghaus.markMastered(data.verb);
 
             case '/api/ebbinghaus/due':
-                return await Ebbinghaus.getDueVerbs();
+                return await window.Ebbinghaus.getDueVerbs();
 
             case '/api/checkins':
                 if (Object.keys(data).length > 0) {

@@ -204,8 +204,20 @@ const DB = {
      */
     async updateProgress(verb, stage, lastReview, nextReview, status, reviewCount) {
         try {
+            // Normalize verb to lowercase to prevent duplicates (e.g. "Christian" vs "christian")
+            const normalizedVerb = verb.toLowerCase();
+            
+            // Optional: Clean up any potential duplicate with different casing
+            if (verb !== normalizedVerb) {
+                // We try to delete the non-normalized version just in case
+                // This is a "cleanup as we go" strategy
+                try {
+                    await db.learning_progress.delete(verb);
+                } catch(e) { /* ignore if not exists */ }
+            }
+
             await db.learning_progress.put({
-                verb,
+                verb: normalizedVerb,
                 stage,
                 last_review: lastReview,
                 next_review: nextReview,
