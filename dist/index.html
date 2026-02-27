@@ -737,8 +737,8 @@
             border: none;
             width: 88%; /* Narrower width for better focus */
             max-width: 550px; /* Constrain width for desktop */
-            height: 165%; /* Reaching further down */
-            top: 82%; /* Shift down so top is near 0% and bottom is way down near buttons */
+            height: 200%; /* ADJUSTED: Slightly less than 220% but more than 185% */
+            top: 100%; /* ADJUSTED: Keep top edge near 0% (100 - 100 = 0) */
             border-radius: 20px; /* Match modal's radius perfectly */
             
             /* Solid integration with background */
@@ -4539,6 +4539,13 @@
             // Fix: ensure we have a valid word string before generating image URL
             const itemWord = verb;
             
+            // Auto-generate DiceBear URL if missing and provider is active
+            let displayImageUrl = item.image_url;
+            if (!displayImageUrl && imageProvider === 'dicebear' && itemWord) {
+                // Use a consistent seed logic
+                displayImageUrl = `https://api.dicebear.com/9.x/icons/svg?seed=${encodeURIComponent(itemWord)}`;
+            }
+
             if (imageProvider === 'none') {
                 imageHtml = `
                 <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
@@ -4548,10 +4555,10 @@
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
                 contentClasses += ' justify-start pt-2';
-            } else if (item.image_url && itemWord) {
+            } else if (displayImageUrl && itemWord) {
                 imageHtml = `
                 <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
-                    <img src="${item.image_url}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
+                    <img src="${displayImageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
                 contentClasses += ' justify-start pt-2';
@@ -4782,11 +4789,15 @@
         function hideExcludeOverlay(overlay) {
             if (overlay) {
                 overlay.classList.remove('active');
-                // Ensure isLongPress is reset to allow clicking card details after canceling
-                const card = overlay.parentElement;
+                
+                // Add scale-out effect to parent card to match dismissal
+                const card = overlay.closest('.verb-card');
                 if (card) {
-                    // We don't have direct access to isLongPress here as it's scoped to createVerbCard
-                    // but we can trigger a cleanup by setting isLongPress=false in onclick later
+                    card.style.transform = 'scale(1)'; // Reset scale first
+                    // Optional: trigger a small bounce or reset
+                    setTimeout(() => {
+                         card.style.transform = '';
+                    }, 200);
                 }
             }
         }
@@ -5046,19 +5057,34 @@
             const status = learningStatus[verb.toLowerCase()];
 
             // Show Ebbinghaus Stage immediately
+            // Ensure stageBadge is always available in the DOM first
+            // We want to move this badge to the bottom-right of the modal content
+            // Let's find the badge element first.
             const stageBadge = document.getElementById('modalStageBadge');
-            if (status && stageBadge) {
-                stageBadge.innerText = `Stage ${status.stage}${status.status === 'mastered' ? ' (Mastered)' : ''}`;
-                stageBadge.classList.remove('hidden');
-                if (status.status === 'mastered') {
-                    stageBadge.classList.remove('bg-blue-100', 'text-blue-600');
-                    stageBadge.classList.add('bg-green-100', 'text-green-600');
-                } else {
-                    stageBadge.classList.remove('bg-green-100', 'text-green-600');
-                    stageBadge.classList.add('bg-blue-100', 'text-blue-600');
+            
+            // IMPORTANT: Move badge to safe zone (modal-content) BEFORE anything else clears outputContainer
+            // This prevents it from being wiped out by subsequent analyzeVerbs calls
+            const modalContent = modal.querySelector('.modal-content');
+            if (stageBadge && modalContent && stageBadge.parentElement !== modalContent) {
+                 modalContent.appendChild(stageBadge);
+            }
+            
+            if (status) {
+                if (stageBadge) {
+                    stageBadge.innerText = `Stage ${status.stage}${status.status === 'mastered' ? ' (Mastered)' : ''}`;
+                    // stageBadge.classList.remove('hidden'); // Do not unhide immediately to prevent showing during load
+                    
+                    // Reset classes first
+                    stageBadge.classList.remove('bg-blue-100', 'text-blue-600', 'bg-green-100', 'text-green-600');
+                    
+                    if (status.status === 'mastered') {
+                        stageBadge.classList.add('bg-green-100', 'text-green-600');
+                    } else {
+                        stageBadge.classList.add('bg-blue-100', 'text-blue-600');
+                    }
                 }
-            } else if (stageBadge) {
-                stageBadge.classList.add('hidden');
+            } else {
+                if (stageBadge) stageBadge.classList.add('hidden');
             }
 
             // Handle Review Mode class for UI hiding
@@ -5242,6 +5268,14 @@
                 }
             } catch (e) {}
             
+            // Move stageBadge back to safe storage before clearing outputContainer
+            const stageBadge = document.getElementById('modalStageBadge');
+            const modalContent = modal.querySelector('.modal-content');
+            if (stageBadge && modalContent) {
+                modalContent.appendChild(stageBadge);
+                stageBadge.classList.add('hidden'); // Hide it while inactive
+            }
+
             // Wait for modal fade-out transition before resetting internal state
             // This prevents "flashing" of content as modes change
             setTimeout(() => {
@@ -5269,6 +5303,9 @@
             }, 300);
         }
 
+        // Global flag to prevent double submission
+        let isSpellingCheckProcessing = false;
+
         async function checkSpelling(input) {
             const container = document.getElementById('spellingContainer');
             const feedback = document.getElementById('spellingFeedback');
@@ -5276,9 +5313,25 @@
             
             if (!container || !feedback || !inputEl) return;
             
+            // Ensure spellingWord is available and valid
+            if (!spellingWord) {
+                 console.error("checkSpelling: spellingWord is undefined!");
+                 return;
+            }
+
+            // Debounce / Lock
+            if (isSpellingCheckProcessing) {
+                console.log("[checkSpelling] Processing already in progress, ignoring input.");
+                return;
+            }
+
             const isCorrect = input.trim().toLowerCase() === spellingWord.toLowerCase();
             
             if (isCorrect) {
+                // Lock immediately
+                isSpellingCheckProcessing = true;
+                inputEl.disabled = true; // Disable input to prevent further edits/enter keys
+
                 // Success feedback
                 container.classList.add('success-pulse');
                 feedback.innerText = 'CORRECT! WELL DONE.';
@@ -5287,9 +5340,72 @@
                 
                 // Record success to backend (auto-advances stage)
                 try {
-                    await recordReview('remembered');
+                    console.log(`[checkSpelling] Correct! Updating stage for: ${spellingWord}`);
                     
-                    // Don't close immediately if we are in review mode (recordReview will handle switching)
+                    // DIRECT UPDATE via Ebbinghaus logic to ensure stage progresses
+                    // We bypass the generic recordReview wrapper to be safe
+                    if (window.Ebbinghaus && window.Ebbinghaus.recordReview) {
+                        const result = await window.Ebbinghaus.recordReview(spellingWord, 'remembered');
+                        console.log("[checkSpelling] Ebbinghaus update result:", result);
+
+                        // Update global learningStatus immediately
+                        if (result && result.new_stage !== undefined) {
+                             const wordLower = spellingWord.toLowerCase();
+                             if (!learningStatus[wordLower]) learningStatus[wordLower] = {};
+                             learningStatus[wordLower].stage = result.new_stage;
+                             learningStatus[wordLower].next_review = result.next_review;
+                             learningStatus[wordLower].status = result.new_stage >= 9 ? 'mastered' : 'learning'; // Assuming 9 stages
+                        }
+
+                        // Remove from reviewVerbsList so "Start Reviewing" picks the next word
+                        if (typeof reviewVerbsList !== 'undefined' && Array.isArray(reviewVerbsList)) {
+                             const idx = reviewVerbsList.findIndex(v => v['单词'] === spellingWord);
+                             if (idx > -1) {
+                                 reviewVerbsList.splice(idx, 1);
+                                 console.log(`[checkSpelling] Removed ${spellingWord} from review list. Remaining: ${reviewVerbsList.length}`);
+                             }
+                        }
+
+                        // If skipped (due to double click logic in backend), we still proceed to close modal
+                        // because visually the user already got it right.
+                    } else {
+                        // Fallback if Ebbinghaus object missing (should not happen in dist)
+                        await recordReview('remembered');
+                        
+                        // Also try to update list in fallback
+                        if (typeof reviewVerbsList !== 'undefined' && Array.isArray(reviewVerbsList)) {
+                             const idx = reviewVerbsList.findIndex(v => v['单词'] === spellingWord);
+                             if (idx > -1) reviewVerbsList.splice(idx, 1);
+                        }
+                    }
+                    
+                    // Show success feedback briefly then proceed
+                    setTimeout(async () => {
+                         // Reset lock for next word
+                         isSpellingCheckProcessing = false;
+                         if (inputEl) inputEl.disabled = false;
+
+                         // Check if we are in "Review" mode (the dedicated review page)
+                         if (typeof isReviewMode !== 'undefined' && isReviewMode === true) {
+                             // CRITICAL FIX: Explicitly handle the "Start Reviewing" modal flow
+                             // Check if we have more words in the local review list first
+                             if (typeof reviewVerbsList !== 'undefined' && reviewVerbsList.length > 0) {
+                                 // Load next word immediately without closing modal
+                                 console.log(`[checkSpelling] Loading next word: ${reviewVerbsList[0]['单词']}`);
+                                 openVerb(reviewVerbsList[0]['单词'], true);
+                             } else {
+                                 // No more words in list, check if we can fetch more or finish
+                                 console.log("[checkSpelling] Review list empty. Session complete.");
+                                 closeModal();
+                                 if (typeof renderReviewSummary === 'function') renderReviewSummary();
+                                 else if (typeof renderGrid === 'function') renderGrid();
+                             }
+                         } else {
+                             // Normal mode (just checking a word), just close modal
+                             closeModal(); 
+                         }
+                    }, 800); // Wait for animation
+                    
                 } catch (e) {
                     console.error('Failed to record review:', e);
                 }
@@ -5572,7 +5688,8 @@
                                                 <i class="fas fa-image"></i>
                                             </div>`;
                                         } else {
-                                            innerHtml = `<img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">`;
+                                            // FORCE RELOAD: No lazy loading for dynamic updates
+                                            innerHtml = `<img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" onerror="showFrostedPlaceholder(this)">`;
                                         }
 
                                         const newImgHtml = `
@@ -5595,17 +5712,22 @@
                                             </div>
                                             <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>`;
                                         } else {
-                                            const img = imgContainer.querySelector('img');
-                                            if (img) {
-                                                img.src = imageUrl;
-                                                imgContainer.style.display = '';
-                                                img.onerror = () => showFrostedPlaceholder(img);
-                                            } else {
-                                                // Replace placeholder with img if provider changed from none
-                                                imgContainer.innerHTML = `
-                                                <img src="${imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${originalWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
-                                                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>`;
-                                            }
+                                            // ROBUST UPDATE: Completely replace content to force browser render
+                                            imgContainer.innerHTML = '';
+                                            
+                                            const newImg = new Image();
+                                            newImg.src = imageUrl;
+                                            newImg.className = "w-full h-full object-cover transition-transform duration-500 group-hover:scale-110";
+                                            newImg.alt = originalWord;
+                                            // Important: Remove loading="lazy" to force immediate load even if hidden behind modal
+                                            newImg.onerror = function() { showFrostedPlaceholder(this); };
+                                            
+                                            const overlay = document.createElement('div');
+                                            overlay.className = "absolute inset-0 bg-gradient-to-t from-black/20 to-transparent";
+                                            
+                                            imgContainer.appendChild(newImg);
+                                            imgContainer.appendChild(overlay);
+                                            imgContainer.style.display = '';
                                         }
                                     }
 
@@ -5907,7 +6029,7 @@
                         
                         // Always create content wrapper (common to both branches)
                         contentWrapper = document.createElement('div');
-                        contentWrapper.className = "flex-1 overflow-y-auto px-4 py-4 hide-scrollbar overscroll-contain";
+                        contentWrapper.className = "flex-1 overflow-y-auto px-4 py-4 hide-scrollbar overscroll-contain pb-8"; // Added extra padding bottom for badge
                         
                         // Clean up remaining headers in tempDiv to prevent artifacts like empty <h1>
                         const leftoverHeaders = tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -5963,6 +6085,32 @@
                     // 5. Vertical Flip Logic Initialization
                     if (cards.length > 0) {
                         currentCardIndex = 0;
+
+                        // Ensure stage badge is moved to bottom-right of the active card context
+                        // We will append the badge to the outputContainer itself, positioned absolutely
+                        // so it overlays whatever card is active.
+                        const stageBadge = document.getElementById('modalStageBadge');
+                        if (stageBadge) {
+                            // Move it to outputContainer to ensure it's on top of cards
+                            outputContainer.appendChild(stageBadge);
+                            
+                            // Re-apply styling logic from openVerb to ensure correct colors
+                            // Reset classes first but keep layout classes
+                            stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300";
+                            
+                            const status = learningStatus[spellingWord.toLowerCase()];
+                            if (status) {
+                                stageBadge.innerText = `Stage ${status.stage}${status.status === 'mastered' ? ' (Mastered)' : ''}`;
+                                if (status.status === 'mastered') {
+                                    stageBadge.classList.add('bg-green-100', 'text-green-600');
+                                } else {
+                                    stageBadge.classList.add('bg-blue-100', 'text-blue-600');
+                                }
+                                stageBadge.classList.remove('hidden');
+                            } else {
+                                stageBadge.classList.add('hidden');
+                            }
+                        }
                         
                         // Touch handling for mobile flip (1:1 tracking)
                         let touchStartY = 0;

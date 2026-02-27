@@ -30,6 +30,25 @@ const Ebbinghaus = {
         if (progress) {
             stage = progress.stage;
             reviewCount = progress.review_count;
+
+            // Debounce Check: If the word is NOT due yet (next_review > now),
+            // and we are trying to advance it ('remembered'), do NOT advance.
+            // This prevents accidental double-clicks or refresh-spam from skipping stages.
+            // Exception: If stage is 0 (learning phase), we might be doing initial learning.
+            // Exception: If result is 'forgotten', we always allow reset.
+            if (result === 'remembered' && stage > 0 && progress.next_review) {
+                const nextReviewDate = new Date(progress.next_review);
+                // Allow a small buffer (e.g., 1 minute) or strict check
+                if (nextReviewDate > now) {
+                    console.warn(`[Ebbinghaus] Skipped update for '${verb}': Not due until ${progress.next_review}`);
+                    return {
+                        status: 'skipped',
+                        message: 'Word not due for review yet',
+                        current_stage: stage,
+                        next_review: progress.next_review
+                    };
+                }
+            }
         }
         
         let newStage = 0;

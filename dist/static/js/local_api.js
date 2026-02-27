@@ -1167,9 +1167,8 @@ const LocalAPI = {
                 return `https://image.pollinations.ai/prompt/${prompt}?model=${settings.pollinations_model || 'flux'}&nologo=true&seed=${seed}`;
             }
         } else {
-            // Use 'identicon' style which is algorithmically generated and more reliable than 'icons'
-            // which depends on a finite set of icons that may fail for some seeds.
-            return `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(verb)}`;
+            // Use 'icons' style to match backend and frontend consistency
+            return `https://api.dicebear.com/9.x/icons/svg?seed=${encodeURIComponent(verb)}`;
         }
     }
 };
