@@ -1393,7 +1393,7 @@
                                     <i class="fas fa-flag-checkered text-indigo-400 text-[10px]"></i>
                                     <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Daily Progress</span>
                                 </div>
-                                <span id="daily-goal-text" class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100/30 uppercase tracking-tight">0/40 New | 0 Due</span>
+                                <span id="daily-goal-text" class="text-[10px] font-black uppercase tracking-tight text-gray-400">0/40 New | 0 Due</span>
                             </div>
                             <div class="w-full bg-gray-200/40 h-2.5 rounded-full overflow-hidden neumorphic-inset p-0.5">
                                 <div id="daily-goal-progress" class="bg-gradient-to-r from-indigo-400 via-blue-500 to-cyan-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.2)]" style="width: 0%"></div>
@@ -2604,6 +2604,25 @@
 
         async function autoCheckin() {
             const today = new Date().toISOString().split('T')[0];
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            
+            // Calculate Today's Progress locally (Sync with Header Today)
+            // User request: "New" count should match the "Today" header count
+            let todayCount = 0;
+            let dueCount = 0;
+            const now = new Date();
+
+            Object.values(learningStatus).forEach(status => {
+                // Today Count (Any review today)
+                if (status.last_review && new Date(status.last_review) >= todayStart) {
+                    todayCount++;
+                }
+                // Due Count
+                if (status.status === 'learning' && new Date(status.next_review) <= now) {
+                    dueCount++;
+                }
+            });
             
             // If already checked in today, no need to re-check
             if (checkinHistory.includes(today)) {
@@ -2623,15 +2642,9 @@
             const DAILY_NEW_GOAL = 40;
 
             try {
-                // Fetch stats from backend
-                const res = await fetch('/api/stats/daily_goal', {
-                    signal: pageAbortController.signal
-                });
-                if (!res.ok) throw new Error('Failed to fetch daily stats');
-                const data = await res.json();
-                
-                const newWordsToday = data.new_words_today || 0;
-                const dueWordsRemaining = data.due_words_remaining || 0;
+                // Use local calculation instead of backend API to ensure consistency with Header Today count
+                const newWordsToday = todayCount;
+                const dueWordsRemaining = dueCount;
 
                 // Update UI Progress
                 const progressEl = document.getElementById('daily-goal-progress');
@@ -7051,18 +7064,50 @@
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
-                modal.querySelector('div').classList.remove('scale-95');
-                modal.querySelector('div').classList.add('scale-100');
+                const content = modal.querySelector('.modal-content') || modal.querySelector('div');
+                if (content) {
+                    content.classList.remove('scale-95');
+                    content.classList.add('scale-100');
+                }
             }, 10);
 
-            document.getElementById('confirmResetBtn').onclick = async () => {
+            const confirmBtn = document.getElementById('confirmResetBtn');
+            // Remove old listeners to prevent stacking
+            const newBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+            
+            newBtn.onclick = async () => {
                 try {
-                    await recordReview('forgotten');
+                    // Update DB status to 'learning' and reset stage
+                    await db.updateProgress(verb, 1, new Date(), new Date(), 'learning', 0);
+                    
+                    // Update memory
+                    learningStatus[verb] = {
+                        stage: 1,
+                        last_review: new Date().toISOString(),
+                        next_review: new Date().toISOString(),
+                        status: 'learning',
+                        review_count: 0
+                    };
+
                     closeResetModal();
                     closeModal();
-                    // Optional: Refresh current view if needed
-                    if (currentPage === 'review') renderReviewPage();
-                    else if (currentPage === 'mastery') renderMasteryPage();
+                    
+                    // Refresh lists
+                    if (currentPage === 'review') {
+                        await loadDueVerbs(); // Reload due verbs
+                        renderReviewPage();
+                    } else if (currentPage === 'mastery') {
+                        renderMasteryPage();
+                    }
+                    
+                    // Show success toast
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg z-[3000] animate-fade-in';
+                    toast.innerText = 'Reset to Stage 1';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+
                 } catch (e) {
                     console.error("Failed to reset word", e);
                 }
