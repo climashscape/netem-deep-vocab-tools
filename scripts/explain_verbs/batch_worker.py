@@ -4,6 +4,7 @@ import json
 import sqlite3
 import time
 import threading
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
 
@@ -184,7 +185,7 @@ def process_single_verb(item: Dict[str, Any], client: Any, settings: Any, count_
         print(f"[{idx}/{total}] FAILED: {verb} (Unexpected error: {e})")
         return False
 
-def process_all_verbs(max_workers: int = 5):
+def process_all_verbs(max_workers: int = 5, force: bool = False, limit: int = 0):
     # 1. Load verbs
     if not os.path.exists(VERBS_JSON_PATH):
         print(f"Error: {VERBS_JSON_PATH} not found.")
@@ -202,11 +203,19 @@ def process_all_verbs(max_workers: int = 5):
     print(f"Found {total_verbs} verbs in total.")
 
     # 2. Get explained verbs
-    explained_verbs = get_explained_verbs()
-    print(f"{len(explained_verbs)} verbs already have explanations.")
+    if force:
+        print("Force mode enabled. Ignoring existing cache.")
+        to_process = verbs_list
+    else:
+        explained_verbs = get_explained_verbs()
+        print(f"{len(explained_verbs)} verbs already have explanations.")
+        # 3. Filter verbs
+        to_process = [item for item in verbs_list if item['单词'].strip().lower() not in explained_verbs]
+    
+    if limit > 0:
+        to_process = to_process[:limit]
+        print(f"Limiting to first {limit} verbs.")
 
-    # 3. Filter verbs
-    to_process = [item for item in verbs_list if item['单词'].strip().lower() not in explained_verbs]
     print(f"{len(to_process)} verbs need processing.")
 
     if not to_process:
@@ -241,5 +250,11 @@ def process_all_verbs(max_workers: int = 5):
     print(f"Average time per verb: {duration/max(1, count_info['success']):.2f} seconds.")
 
 if __name__ == "__main__":
-    # You can increase max_workers if your API tier allows more concurrency
-    process_all_verbs(max_workers=10)
+    parser = argparse.ArgumentParser(description="Batch process verb explanations.")
+    parser.add_argument("--workers", type=int, default=5, help="Number of concurrent workers")
+    parser.add_argument("--force", action="store_true", help="Force regenerate existing explanations")
+    parser.add_argument("--limit", type=int, default=0, help="Limit number of verbs to process")
+    
+    args = parser.parse_args()
+    
+    process_all_verbs(max_workers=args.workers, force=args.force, limit=args.limit)

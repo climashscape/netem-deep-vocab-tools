@@ -1,6 +1,6 @@
 {
-    "name": "NETEM Deep Vocab Tools",
-    "short_name": "NETEMVocab",
+    "name": "NETEM",
+    "short_name": "NETEM",
     "description": "Deep vocabulary learning tools for NETEM (Postgraduate Entrance Exam English).",
     "start_url": "index.html",
     "display": "standalone",

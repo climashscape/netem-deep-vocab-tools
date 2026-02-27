@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#e0e5ec">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>NETEM Deep Vocab Tools</title>
+    <title>NETEM</title>
     <!-- PWA Manifest -->
     <link rel="manifest" href="static/manifest.json">
     <!-- Tailwind CSS (Local) -->
@@ -5656,6 +5656,23 @@
                                 
                                 // Final check to remove any trailing asterisks left over
                                 cleanContent = cleanContent.replace(/\*+$/, '');
+
+                                // User Request: Hide original word if it starts the essence summary
+                                if (verb) {
+                                    try {
+                                        const escapedVerb = verb.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        // Improved Regex: Handles HTML tags (like bold/spans) wrapping the word
+                                        // Matches: Start -> Optional HTML tags -> Quotes? -> Word (Boundary) -> Quotes? -> Optional HTML tags -> Separators
+                                        const regex = new RegExp(`^(\\s*<[^>]+>\\s*)*["'“‘]?\\s*\\b${escapedVerb}\\b\\s*["'”’]?(\\s*<[^>]+>\\s*)*[:：,.-]?\\s*`, 'i');
+                                        cleanContent = cleanContent.replace(regex, '');
+                                        
+                                        // Secondary cleanup: If the removal left a dangling "is" or "means" at start, capitalize it?
+                                        // For now, just ensure we trim again.
+                                        cleanContent = cleanContent.trim();
+                                    } catch (e) {
+                                        console.warn('Regex replacement failed', e);
+                                    }
+                                }
 
                                 let essenceHtml = '';
                                 if (isReviewMode) {
