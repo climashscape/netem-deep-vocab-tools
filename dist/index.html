@@ -2546,22 +2546,37 @@
             if (!calendar) return;
 
             // Uses global checkinHistory (array of dates)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            // Ensure today is strictly local YYYY-MM-DD
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
             
             // Calculate streak (consecutive days ending today or yesterday)
             let streak = 0;
-            let tempDate = new Date(today);
+            // Check backwards from today
+            let checkDate = new Date(now);
             
-            // If not checked in today, start checking from yesterday
-            if (!checkinHistory.includes(tempDate.toISOString().split('T')[0])) {
-                tempDate.setDate(tempDate.getDate() - 1);
-            }
-            
-            while (checkinHistory.includes(tempDate.toISOString().split('T')[0])) {
+            // First check if checked in today
+            const todayChecked = checkinHistory.includes(todayStr);
+            if (todayChecked) {
                 streak++;
-                tempDate.setDate(tempDate.getDate() - 1);
+                checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+                // If not today, check yesterday
+                checkDate.setDate(checkDate.getDate() - 1);
+                // If yesterday not checked, streak is 0 (or keep checking backwards if logic allows gaps? No, streak implies consecutive)
+                // Actually, if today is not checked, streak starts from yesterday ONLY if yesterday is checked.
             }
+
+            while (true) {
+                const dStr = checkDate.toLocaleDateString('en-CA');
+                if (checkinHistory.includes(dStr)) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+
             if (streakBadge) {
                 streakBadge.innerHTML = `
                     <i class="fas fa-fire-alt text-[10px]"></i>
@@ -2574,9 +2589,9 @@
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             
             for (let i = 6; i >= 0; i--) {
-                const date = new Date(today);
+                const date = new Date(now);
                 date.setDate(date.getDate() - i);
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = date.toLocaleDateString('en-CA');
                 const isChecked = checkinHistory.includes(dateStr);
                 const isToday = i === 0;
                 const dayName = days[date.getDay()];
@@ -2598,45 +2613,17 @@
             calendar.innerHTML = html;
         }
 
-        async function manualCheckin(dateStr) {
-            const isChecked = checkinHistory.includes(dateStr);
-            try {
-                if (isChecked) {
-                    await fetch(`/api/checkins/${dateStr}`, { method: 'DELETE' });
-                    checkinHistory = checkinHistory.filter(d => d !== dateStr);
-                } else {
-                    await fetch('/api/checkins', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr })
-                    });
-                    if (!checkinHistory.includes(dateStr)) checkinHistory.push(dateStr);
-                }
-                updateCheckinCalendar();
-                autoCheckin();
-                
-                // Visual feedback
-                const notification = document.createElement('div');
-                notification.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-black shadow-lg z-[2000] animate-bounce';
-                notification.innerText = !isChecked ? 'Daily Check-in Successful! 🚀' : 'Check-in Cancelled! 🗑️';
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 2000);
-            } catch (e) {
-                console.error("Manual check-in failed:", e);
-                showMessage('Error', 'Failed to sync check-in status', 'error');
-            }
-        }
-
         async function autoCheckin() {
-            const today = new Date().toISOString().split('T')[0];
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+            // Use local date for today to match calendar logic
+            const now = new Date();
+            const today = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             
             // Calculate Today's Progress locally (Sync with Header Today)
             // User request: "New" count should match the "Today" header count
             let todayCount = 0;
             let dueCount = 0;
-            const now = new Date();
+            const nowTime = new Date();
 
             Object.values(learningStatus).forEach(status => {
                 // Today Count (Any review today)
@@ -2644,26 +2631,11 @@
                     todayCount++;
                 }
                 // Due Count
-                if (status.status === 'learning' && new Date(status.next_review) <= now) {
+                if (status.status === 'learning' && new Date(status.next_review) <= nowTime) {
                     dueCount++;
                 }
             });
             
-            // If already checked in today, no need to re-check
-            if (checkinHistory.includes(today)) {
-                // Still update UI stats if present
-                const progressEl = document.getElementById('daily-goal-progress');
-                if (progressEl) {
-                    progressEl.style.width = '100%';
-                    const statsText = document.getElementById('daily-goal-text');
-                    if (statsText) {
-                        statsText.innerText = `Goal Achieved! 🚀`;
-                        statsText.className = 'text-[10px] font-black uppercase tracking-tight text-green-500';
-                    }
-                }
-                return;
-            }
-
             const DAILY_NEW_GOAL = 40;
 
             try {
@@ -2683,24 +2655,44 @@
                         statsText.className = `text-[10px] font-black uppercase tracking-tight ${dueWordsRemaining === 0 && newWordsToday >= DAILY_NEW_GOAL ? 'text-green-500' : 'text-gray-400'}`;
                     }
                 }
+                
+                // If already checked in today, update UI to reflect "Goal Achieved" and exit
+                if (checkinHistory.includes(today)) {
+                     if (progressEl) {
+                        progressEl.style.width = '100%';
+                        const statsText = document.getElementById('daily-goal-text');
+                        if (statsText) {
+                            statsText.innerText = `Goal Achieved! 🚀`;
+                            statsText.className = 'text-[10px] font-black uppercase tracking-tight text-green-500';
+                        }
+                    }
+                    return;
+                }
 
                 // Check if criteria met: 40+ new words AND 0 due reviews
                 if (newWordsToday >= DAILY_NEW_GOAL && dueWordsRemaining === 0) {
-                    await fetch('/api/checkins', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: today }),
-                        signal: pageAbortController.signal
-                    });
-                    if (!checkinHistory.includes(today)) checkinHistory.push(today);
-                    updateCheckinCalendar();
-                    
-                    // Show achievement notification
-                    const notification = document.createElement('div');
-                    notification.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl text-xs font-black shadow-xl z-[2000] animate-bounce border-2 border-white/20 backdrop-blur-md';
-                    notification.innerHTML = '<div class="flex items-center gap-2"><i class="fas fa-trophy text-yellow-300"></i> Daily Goal Achieved! Check-in Recorded! 🚀</div>';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 4000);
+                    // Only post if not already checked in
+                    if (!checkinHistory.includes(today)) {
+                        // Optimistic Update: Update UI immediately before fetch
+                        // This ensures instant feedback even if network is slow
+                        checkinHistory.push(today);
+                        updateCheckinCalendar();
+
+                        try {
+                            await fetch('/api/checkins', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ date: today }),
+                                signal: pageAbortController.signal
+                            });
+                        } catch(e) {
+                            // Revert on failure (optional, but good for consistency)
+                            console.error("Check-in sync failed", e);
+                            checkinHistory = checkinHistory.filter(d => d !== today);
+                            updateCheckinCalendar();
+                            // Optional: Show error toast
+                        }
+                    }
                 }
             } catch (e) {
                 if (e.name === 'AbortError') return;
@@ -5379,6 +5371,9 @@
                              }
                         }
 
+                        // Sync global counters and nav badge immediately
+                        if (typeof updateCounts === 'function') updateCounts();
+
                         // If skipped (due to double click logic in backend), we still proceed to close modal
                         // because visually the user already got it right.
                     } else {
@@ -7503,13 +7498,6 @@
                     } else if (currentPage === 'mastery') {
                         renderMasteryPage();
                     }
-                    
-                    // Show success toast
-                    const toast = document.createElement('div');
-                    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg z-[3000] animate-fade-in';
-                    toast.innerText = 'Reset to Stage 1';
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 2000);
 
                 } catch (e) {
                     console.error("Failed to reset word", e);
@@ -7716,25 +7704,62 @@
                     };
                 } else {
                     // Web/Browser logic (Works for PC and Mobile Web)
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                    const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                    const mimeType = isJson ? 'application/json' : 'application/zip';
                     
-                    // CRITICAL FIX FOR MOBILE: 
-                    // 1. Must be attached to body
-                    // 2. target="_blank" helps some mobile browsers handle the blob download better
-                    document.body.appendChild(a);
+                    // Prefer Web Share API on mobile to open system sheet / file manager
+                    let completed = false;
+                    if (navigator && typeof navigator.share === 'function' && typeof window.File === 'function') {
+                        try {
+                            const file = new File([blob], filename, { type: mimeType });
+                            if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                                await navigator.share({
+                                    files: [file],
+                                    title: 'NETEM Backup',
+                                    text: 'NETEM Deep Vocab Tools Backup'
+                                });
+                                completed = true;
+                            }
+                        } catch (err) {
+                            // Fall through to next strategy
+                        }
+                    }
                     
-                    // Trigger click
-                    a.click();
+                    // Try File System Access API (Android Chrome)
+                    if (!completed && window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({
+                                suggestedName: filename,
+                                types: [
+                                    {
+                                        description: 'NETEM Backup',
+                                        accept: { [mimeType]: [isJson ? '.json' : '.zip'] }
+                                    }
+                                ]
+                            });
+                            const writable = await handle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            completed = true;
+                        } catch (err) {
+                            // Fall through to anchor download
+                        }
+                    }
                     
-                    // Clean up with slight delay to ensure mobile browser registers the click
-                    setTimeout(() => {
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                    }, 100);
+                    // Fallback: anchor download
+                    if (!completed) {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                        }, 200);
+                    }
                 }
                 
                 if (btn) {
