@@ -2427,6 +2427,7 @@
                     const sB = learningStatus[b['单词'].toLowerCase()];
                     return sB.stage - sA.stage;
                 });
+                learnedVerbs.reverse();
 
                 if (learnedVerbs.length === 0) {
                     grid.innerHTML = `
