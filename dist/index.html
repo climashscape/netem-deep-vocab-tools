@@ -2613,6 +2613,30 @@
             calendar.innerHTML = html;
         }
 
+        // --- New Words Tracking (for Daily Goal) ---
+        function getTodayKey() {
+            const d = new Date();
+            return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        }
+        function getTodayNewWords() {
+            try {
+                const key = `new_words:${getTodayKey()}`;
+                const raw = localStorage.getItem(key);
+                const arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? new Set(arr) : new Set();
+            } catch (_) { return new Set(); }
+        }
+        function saveTodayNewWords(set) {
+            const key = `new_words:${getTodayKey()}`;
+            localStorage.setItem(key, JSON.stringify(Array.from(set)));
+        }
+        function addNewWordForToday(verb) {
+            if (!verb) return;
+            const set = getTodayNewWords();
+            set.add(verb.toLowerCase());
+            saveTodayNewWords(set);
+        }
+
         async function autoCheckin() {
             // Use local date for today to match calendar logic
             const now = new Date();
@@ -2621,7 +2645,7 @@
             
             // Calculate Today's Progress locally (Sync with Header Today)
             // User request: "New" count should match the "Today" header count
-            let todayCount = 0;
+            let todayCount = 0; // legacy (no longer used for "New")
             let dueCount = 0;
             const nowTime = new Date();
 
@@ -2639,8 +2663,8 @@
             const DAILY_NEW_GOAL = 40;
 
             try {
-                // Use local calculation instead of backend API to ensure consistency with Header Today count
-                const newWordsToday = todayCount;
+                // New definition: Only words that entered stage > 0 for the first time today
+                const newWordsToday = getTodayNewWords().size;
                 const dueWordsRemaining = dueCount;
 
                 // Update UI Progress
@@ -2674,7 +2698,6 @@
                     // Only post if not already checked in
                     if (!checkinHistory.includes(today)) {
                         // Optimistic Update: Update UI immediately before fetch
-                        // This ensures instant feedback even if network is slow
                         checkinHistory.push(today);
                         updateCheckinCalendar();
 
@@ -4980,11 +5003,10 @@
                 countdownEl.innerText = days;
             }
 
-            // Calculate rounds: (Learned words / Total words)
             const totalWords = allVerbs.length || 5500; // Fallback to 5500 if not loaded
             const learnedWords = Object.keys(learningStatus).filter(k => learningStatus[k].stage > 0).length;
-            // Increased precision to 3 decimal places to show incremental progress
-            const rounds = (learnedWords / totalWords).toFixed(3);
+            const roundIndex = parseInt(localStorage.getItem('round_index') || '0', 10) || 0;
+            const rounds = (roundIndex + (learnedWords / totalWords)).toFixed(3);
             roundsEl.innerText = rounds;
         }
 
@@ -5350,6 +5372,8 @@
                     // DIRECT UPDATE via Ebbinghaus logic to ensure stage progresses
                     // We bypass the generic recordReview wrapper to be safe
                     if (window.Ebbinghaus && window.Ebbinghaus.recordReview) {
+                        const wordLowerPrev = spellingWord.toLowerCase();
+                        const prevStage = (learningStatus[wordLowerPrev] && typeof learningStatus[wordLowerPrev].stage === 'number') ? learningStatus[wordLowerPrev].stage : 0;
                         const result = await window.Ebbinghaus.recordReview(spellingWord, 'remembered');
                         console.log("[checkSpelling] Ebbinghaus update result:", result);
 
@@ -5360,6 +5384,11 @@
                              learningStatus[wordLower].stage = result.new_stage;
                              learningStatus[wordLower].next_review = result.next_review;
                              learningStatus[wordLower].status = result.new_stage >= 9 ? 'mastered' : 'learning'; // Assuming 9 stages
+                        }
+
+                        // Track "new word today" if this was the first time entering stage > 0
+                        if (result && typeof result.new_stage === 'number' && prevStage === 0 && result.new_stage >= 1) {
+                            addNewWordForToday(spellingWord);
                         }
 
                         // Remove from reviewVerbsList so "Start Reviewing" picks the next word
@@ -6916,6 +6945,28 @@
                             </div>
                             <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
                         </button>
+                        
+                        <button type="button" onclick="startNextRound()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-purple-500 mr-3 shrink-0">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                            <div class="flex-1 text-left">
+                                <span class="text-sm font-bold text-gray-700 block">Start Next Round</span>
+                                <span class="text-[10px] font-medium text-gray-400">Move all to no-stage queue</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                        </button>
+                        
+                        <button type="button" onclick="resetMasteredOnly()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-pink-500 mr-3 shrink-0">
+                                <i class="fas fa-undo"></i>
+                            </div>
+                            <div class="flex-1 text-left">
+                                <span class="text-sm font-bold text-gray-700 block">Reset Mastered Only</span>
+                                <span class="text-[10px] font-medium text-gray-400">Move mastered to no-stage queue</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -7614,6 +7665,50 @@
             }
         }
 
+        async function startNextRound() {
+            showConfirm('Start Next Round', 'Move all words to no-stage queue (delete stages) without starting all reviews at once. Explanations, check-ins, and settings will be kept. Continue?', async () => {
+                try {
+                    if (!window.db && window.initDB) await window.initDB();
+                    await window.db.transaction('rw', window.db.learning_progress, async () => {
+                        await window.db.learning_progress.clear();
+                    });
+                    const idx = parseInt(localStorage.getItem('round_index') || '0', 10) || 0;
+                    localStorage.setItem('round_index', String(idx + 1));
+                    if (typeof loadLearningStatus === 'function') await loadLearningStatus();
+                    if (typeof updateCounts === 'function') updateCounts();
+                    if (typeof updateProfileStats === 'function') updateProfileStats();
+                    showMessage('Success', 'All words moved to no-stage queue.', 'success');
+                } catch (e) {
+                    console.error('Start next round failed', e);
+                    showMessage('Error', 'Failed to start next round', 'error');
+                }
+            });
+        }
+
+        async function resetMasteredOnly() {
+            showConfirm('Reset Mastered Only', 'Move all mastered words to no-stage queue. Other words remain unchanged. Continue?', async () => {
+                try {
+                    if (!window.db && window.initDB) await window.initDB();
+                    const items = await window.db.learning_progress.toArray();
+                    await window.db.transaction('rw', window.db.learning_progress, async () => {
+                        for (const item of items) {
+                            const s = (item.status || '').toLowerCase();
+                            if (s === 'mastered') {
+                                await window.db.learning_progress.delete(item.verb);
+                            }
+                        }
+                    });
+                    if (typeof loadLearningStatus === 'function') await loadLearningStatus();
+                    if (typeof updateCounts === 'function') updateCounts();
+                    if (typeof updateProfileStats === 'function') updateProfileStats();
+                    showMessage('Success', 'Mastered words moved to no-stage queue.', 'success');
+                } catch (e) {
+                    console.error('Reset mastered only failed', e);
+                    showMessage('Error', 'Failed to reset mastered words', 'error');
+                }
+            });
+        }
+
         // Deprecated: old direct call, now redirects to modal
         function clearLearningData() {
             showResetConfirmation();
@@ -8128,6 +8223,11 @@
                     // Update local status
                     const isNewWord = !learningStatus[verb.toLowerCase()] || learningStatus[verb.toLowerCase()].stage === 0;
                     await loadLearningStatus();
+                    
+                    // Track "new word today" BEFORE autoCheckin so UI reflects correct New count
+                    if (result === 'remembered' && isNewWord) {
+                        addNewWordForToday(verb);
+                    }
                     
                     // Trigger daily check-in
                     autoCheckin();

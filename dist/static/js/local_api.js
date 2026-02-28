@@ -545,7 +545,12 @@ const LocalAPI = {
                     await DB.addCheckin(data.date);
                     return { status: "success" };
                 } else {
-                    return await DB.getCheckins();
+                    // Return a normalized array of date strings for UI consumption
+                    const rows = await DB.getCheckins();
+                    if (Array.isArray(rows)) {
+                        return rows.map(r => (typeof r === 'string' ? r : r && r.date)).filter(Boolean);
+                    }
+                    return [];
                 }
 
             case '/api/learn_batch':
