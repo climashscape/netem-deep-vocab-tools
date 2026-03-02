@@ -1646,6 +1646,9 @@
                 <button onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
                     <i class="fas fa-sync-alt"></i>
                 </button>
+                <button id="priorityBtn" onclick="retreatToStage1()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all" style="display: none;" aria-label="重点记忆" title="重点记忆：退回到 Stage 1">
+                    <i class="fas fa-undo"></i>
+                </button>
             </div>
             
             <!-- Content Area (The Stage) -->
@@ -4857,6 +4860,69 @@
                 }
             }
         }
+        
+        async function retreatToStage1() {
+            if (!isReviewMode || !spellingWord) return;
+            try {
+                const result = await window.Ebbinghaus.recordReview(spellingWord, 'forgotten');
+                const key = spellingWord.toLowerCase();
+                const nowIso = new Date().toISOString();
+                const nextReviewIso = result && result.next_review ? result.next_review : nowIso;
+                const prev = learningStatus[key] || {};
+                learningStatus[key] = {
+                    stage: 1,
+                    last_review: nowIso,
+                    next_review: nextReviewIso,
+                    status: 'learning',
+                    review_count: (prev.review_count || 0) + 1
+                };
+                await window.DB.updateProgress(key, 1, nowIso, nextReviewIso, 'learning', (prev.review_count || 0) + 1);
+                const stageBadge = document.getElementById('modalStageBadge');
+                if (stageBadge) {
+                    stageBadge.className = "absolute bottom-5 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300 bg-blue-100 text-blue-600";
+                    stageBadge.innerText = "Stage 1";
+                    stageBadge.classList.remove('hidden');
+                }
+                if (currentPage === 'review') {
+                    renderReviewPage();
+                    const sourceList = reviewVerbsList;
+                    const currentIndex = sourceList.findIndex(v => v['单词'].toLowerCase() === key);
+                    setTimeout(() => {
+                        let nextVerbToReview = null;
+                        const now = new Date();
+                        for (let i = currentIndex + 1; i < sourceList.length; i++) {
+                            const v = sourceList[i];
+                            if (v['单词'].toLowerCase() === key) continue;
+                            const status = learningStatus[v['单词'].toLowerCase()];
+                            if (status && new Date(status.next_review) <= now && status.status !== 'mastered') {
+                                nextVerbToReview = v['单词'];
+                                break;
+                            }
+                        }
+                        if (!nextVerbToReview) {
+                            for (let i = 0; i < currentIndex; i++) {
+                                const v = sourceList[i];
+                                if (v['单词'].toLowerCase() === key) continue;
+                                const status = learningStatus[v['单词'].toLowerCase()];
+                                if (status && new Date(status.next_review) <= now && status.status !== 'mastered') {
+                                    nextVerbToReview = v['单词'];
+                                    break;
+                                }
+                            }
+                        }
+                        if (nextVerbToReview) {
+                            if (window.globalResetPressedState) window.globalResetPressedState();
+                            openVerb(nextVerbToReview, true);
+                            renderReviewPage();
+                        } else {
+                            closeModal();
+                            if (window.globalResetPressedState) window.globalResetPressedState();
+                            renderReviewSummary();
+                        }
+                    }, 800);
+                }
+            } catch (e) {}
+        }
 
         function hideExcludeOverlay(overlay) {
             if (!overlay) return;
@@ -5199,6 +5265,10 @@
                 } else {
                     refreshBtn.style.display = ''; // Reset to default
                 }
+            }
+            const priorityBtn = document.getElementById('priorityBtn');
+            if (priorityBtn) {
+                priorityBtn.style.display = isReviewMode ? '' : 'none';
             }
 
             // Show/Hide Review Controls (the bottom buttons like "Mark as Learned" or "Already Mastered")
@@ -6213,7 +6283,7 @@
                             
                             // Re-apply styling logic from openVerb to ensure correct colors
                             // Reset classes first but keep layout classes
-                            stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300";
+                            stageBadge.className = "absolute bottom-5 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300";
                             
                             const status = learningStatus[spellingWord.toLowerCase()];
                             if (status) {
