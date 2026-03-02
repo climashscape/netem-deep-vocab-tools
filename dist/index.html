@@ -120,8 +120,8 @@
 
         /* Global Pressed State (JS Controlled) */
         .is-pressed {
-            transform: scale(0.96) !important;
-            transition: all 0.1s ease-out !important;
+            transform: scale(0.94) !important;
+            transition: all 0.12s ease-out !important;
         }
 
         /* Specific Component Press Styles */
@@ -152,7 +152,7 @@
         }
 
         .verb-card.is-pressed {
-            transform: scale(0.95) !important;
+            transform: scale(0.92) !important;
             box-shadow: inset 4px 4px 8px rgb(163,177,198,0.5), 
                        inset -4px -4px 8px rgba(255,255,255, 0.8) !important;
         }
@@ -413,6 +413,13 @@
             margin-left: auto;
             margin-right: auto;
         }
+        .verb-card.overlay-active {
+            border-color: transparent; /* Eliminate visible seam when overlay is active */
+        }
+        .overlay-press-card {
+            transform: scale(0.92) !important;
+            transition: transform 0.12s ease-out !important;
+        }
 
         .verb-image-container {
             border-bottom: 1px solid rgba(163,177,198,0.2);
@@ -505,13 +512,16 @@
             border-radius: 24px;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            transform: scale(0.95);
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: none;
         }
         .exclude-overlay.active {
             opacity: 1;
             pointer-events: auto;
-            transform: scale(1);
+            /* keep transform inherited from card for perfect sync */
+        }
+        .exclude-overlay.overlay-press {
+            opacity: 0.96; /* subtle feedback during press to avoid flicker */
         }
         .exclude-confirm-btn {
             background: #e0e5ec;
@@ -4472,8 +4482,8 @@
                     startY = e.clientY;
                 }
                 
-                card.style.transform = 'scale(0.98)';
-                card.style.transition = 'transform 0.6s ease';
+                card.style.transform = 'scale(0.95)';
+                card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
                 
                 longPressTimer = setTimeout(() => {
                     isLongPress = true;
@@ -4481,6 +4491,7 @@
                     
                     showExcludeOverlay(card, verb);
                     card.style.transform = '';
+                    card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
                 }, longPressDuration);
             };
 
@@ -4711,6 +4722,17 @@
                 const masteryBtn = overlay.querySelector('.mastery-confirm-btn');
                 const excludeBtn = overlay.querySelector('.exclude-confirm-btn');
                 
+                // Ensure card rebound is immediate and synchronized with overlay
+                card.classList.remove('is-pressed');
+                card.style.transform = '';
+                card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                card.style.willChange = 'transform';
+                overlay.style.willChange = 'opacity, transform';
+                
+                // Force a reflow to align animation start times
+                void card.offsetWidth;
+                void overlay.offsetWidth;
+                
                 if (currentPage === 'mastery') {
                     // Mastery Page: Only "Reset to Review"
                     if (masteryBtn) masteryBtn.style.display = 'none';
@@ -4730,7 +4752,28 @@
                     excludeBtn.classList.add('text-gray-500');
                     excludeBtn.onclick = (e) => confirmExclude(e, word);
                 }
-                overlay.classList.add('active');
+                
+                // Start overlay and card animations on the same frame for perfect sync
+                requestAnimationFrame(() => {
+                    overlay.classList.add('active');
+                    card.classList.add('overlay-active');
+                    // card transform already cleared; ensure transition is active
+                    card.style.transform = '';
+                });
+
+                // Press feedback on overlay: keep card/overlay in sync during down/up
+                const pressDown = () => {
+                    card.classList.add('overlay-press-card');
+                };
+                const pressUp = () => {
+                    card.classList.remove('overlay-press-card');
+                };
+                // Attach listeners (remove previous to avoid duplicates)
+                overlay.onmousedown = pressDown;
+                overlay.ontouchstart = pressDown;
+                overlay.onmouseup = pressUp;
+                overlay.ontouchend = pressUp;
+                overlay.ontouchcancel = pressUp;
             }
         }
 
@@ -4816,19 +4859,30 @@
         }
 
         function hideExcludeOverlay(overlay) {
-            if (overlay) {
-                overlay.classList.remove('active');
-                
-                // Add scale-out effect to parent card to match dismissal
-                const card = overlay.closest('.verb-card');
-                if (card) {
-                    card.style.transform = 'scale(1)'; // Reset scale first
-                    // Optional: trigger a small bounce or reset
-                    setTimeout(() => {
-                         card.style.transform = '';
-                    }, 200);
-                }
+            if (!overlay) return;
+            const card = overlay.closest('.verb-card');
+            if (card) {
+                card.style.willChange = 'transform';
             }
+            overlay.style.willChange = 'opacity';
+            if (card) {
+                card.classList.add('overlay-press-card');
+            }
+            // Prevent double taps during close and give overlay subtle press feedback
+            overlay.style.pointerEvents = 'none';
+            overlay.classList.add('overlay-press');
+            // Close after press feedback completes to avoid flicker
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                overlay.classList.remove('overlay-press');
+                if (card) {
+                    card.classList.remove('overlay-press-card');
+                    card.style.transform = '';
+                    card.classList.remove('overlay-active');
+                }
+                // Restore pointer events after transition
+                overlay.style.pointerEvents = '';
+            }, 120);
         }
 
         function confirmExclude(event, word) {
@@ -7063,6 +7117,10 @@
                     // CRITICAL: Ensure we don't accidentally blur an active input when touching another part of it
                     return;
                 }
+                // Ignore press state when interacting with exclude overlay to prevent card scaling mismatch
+                if (e.target.closest('.exclude-overlay')) {
+                    return;
+                }
 
                 // Record start position for scroll detection
                 if (e.touches && e.touches[0]) {
@@ -7086,6 +7144,13 @@
                     // Check if the target is ITSELF a modal or modal content wrapper
                     if (target.id === 'verbModal' || target.id === 'learningModal' || target.id === 'settingsModal' || target.id === 'analyticsModal' || target.id === 'importConfirmModal' || target.classList.contains('fixed') || target.classList.contains('modal-content') || target.classList.contains('modal-overlay')) {
                         return;
+                    }
+                    // If target is a verb card with an active overlay, do not add pressed state to avoid seam/scale mismatch
+                    if (target.classList && target.classList.contains('verb-card')) {
+                        const activeOverlay = target.querySelector('.exclude-overlay.active');
+                        if (activeOverlay) {
+                            return;
+                        }
                     }
                     
                     // Also check if target is inside a modal content area but IS the content area itself (not a button inside)
