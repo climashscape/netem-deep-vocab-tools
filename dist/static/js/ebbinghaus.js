@@ -68,6 +68,15 @@ const Ebbinghaus = {
             status, 
             reviewCount + 1
         );
+        try {
+            const firstLearned = (progress && progress.first_learned_at) ? progress.first_learned_at : ((newStage === 1 && reviewCount === 0) ? now.toISOString() : null);
+            if (firstLearned && window.db && window.db.learning_progress) {
+                await window.db.learning_progress.update(normalizedVerb, { first_learned_at: firstLearned });
+            }
+            if (firstLearned && window.learningStatus) {
+                window.learningStatus[normalizedVerb].first_learned_at = firstLearned;
+            }
+        } catch(e) {}
         
         // Update Memory Cache (Global learningStatus) using normalized key
         // This is CRITICAL for immediate UI updates without reload

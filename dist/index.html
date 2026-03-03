@@ -218,6 +218,17 @@
             overflow-y: hidden;
             padding-bottom: 0;
         }
+        .floating-sort-btn {
+            transition: opacity 200ms ease;
+        }
+        .app-content.swipe-left {
+            transform: translateX(-20px);
+            transition: transform 180ms ease-out;
+        }
+        .app-content.swipe-right {
+            transform: translateX(20px);
+            transition: transform 180ms ease-out;
+        }
 
         /* Bottom Navigation */
         .bottom-nav {
@@ -1797,7 +1808,7 @@
     </div>
 
     <!-- Confirm Modal -->
-    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
@@ -1820,7 +1831,7 @@
     </div>
 
     <!-- Generic Message Modal (Success/Error) -->
-    <div id="messageModal" class="fixed inset-0 bg-black/50 z-[80] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeMessageModal()">
+    <div id="messageModal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeMessageModal()">
         <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
@@ -2066,6 +2077,42 @@
         }
         // --- End Pull to Refresh Logic ---
 
+        function initSwipeNavigation() {
+            const container = document.querySelector('.app-content');
+            if (!container) return;
+            let startX = 0;
+            let startY = 0;
+            let active = false;
+            container.addEventListener('touchstart', (e) => {
+                if (!e.touches || e.touches.length !== 1) return;
+                startX = e.touches[0].pageX;
+                startY = e.touches[0].pageY;
+                active = true;
+            }, { passive: true });
+            container.addEventListener('touchend', (e) => {
+                if (!active) return;
+                active = false;
+                if (!e.changedTouches || e.changedTouches.length === 0) return;
+                const dx = e.changedTouches[0].pageX - startX;
+                const dy = e.changedTouches[0].pageY - startY;
+                if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+                const modal = document.getElementById('learningModal');
+                if (modal && modal.classList.contains('active')) return;
+                if (currentPage !== 'review') return;
+                const dirLeft = dx < 0;
+                const appContent = document.querySelector('.app-content');
+                if (appContent) {
+                    appContent.classList.add(dirLeft ? 'swipe-left' : 'swipe-right');
+                    setTimeout(() => appContent.classList.remove('swipe-left', 'swipe-right'), 180);
+                }
+                if (dirLeft) {
+                    if (currentReviewTab === 'session') switchReviewTab('library');
+                } else {
+                    if (currentReviewTab === 'library') switchReviewTab('session');
+                }
+            }, { passive: true });
+        }
+
         const safeUpdate = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
@@ -2103,6 +2150,8 @@
         let currentRenderId = 0;
         // Migration: Check for legacy settings and default to 'auto' if not set
         let analysisMode = localStorage.getItem('analysisMode') || 'auto'; 
+        let currentLibrarySortType = 'first'; // 'countdown' | 'first'
+        let currentLibrarySortOrder = 'desc'; // 'asc' | 'desc'
 
         // Backwards compatibility migration (run once)
         if (!localStorage.getItem('analysisMode')) {
@@ -2247,6 +2296,7 @@
             });
             
             currentPage = pageId;
+            ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             
             // Persist Page State
             try {
@@ -2338,6 +2388,7 @@
             }
             
             renderReviewPage();
+            ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
         }
 
         function renderReviewPage() {
@@ -2434,13 +2485,23 @@
                     return true;
                 });
 
-                // Sort learnedVerbs: by stage descending
-                learnedVerbs.sort((a, b) => {
-                    const sA = learningStatus[a['单词'].toLowerCase()];
-                    const sB = learningStatus[b['单词'].toLowerCase()];
-                    return sB.stage - sA.stage;
-                });
-                learnedVerbs.reverse();
+                if (currentLibrarySortType === 'countdown') {
+                    learnedVerbs.sort((a, b) => {
+                        const sA = learningStatus[a['单词'].toLowerCase()];
+                        const sB = learningStatus[b['单词'].toLowerCase()];
+                        const tA = sA && sA.next_review ? new Date(sA.next_review).getTime() : Number.MAX_VALUE;
+                        const tB = sB && sB.next_review ? new Date(sB.next_review).getTime() : Number.MAX_VALUE;
+                        return (currentLibrarySortOrder === 'asc') ? (tA - tB) : (tB - tA);
+                    });
+                } else {
+                    learnedVerbs.sort((a, b) => {
+                        const sA = learningStatus[a['单词'].toLowerCase()] || {};
+                        const sB = learningStatus[b['单词'].toLowerCase()] || {};
+                        const tA = sA.first_learned_at ? new Date(sA.first_learned_at).getTime() : (sA.last_review ? new Date(sA.last_review).getTime() : 0);
+                        const tB = sB.first_learned_at ? new Date(sB.first_learned_at).getTime() : (sB.last_review ? new Date(sB.last_review).getTime() : 0);
+                        return (currentLibrarySortOrder === 'asc') ? (tA - tB) : (tB - tA);
+                    });
+                }
 
                 if (learnedVerbs.length === 0) {
                     grid.innerHTML = `
@@ -2461,6 +2522,7 @@
                     const card = createVerbCard(v);
                     grid.appendChild(card);
                 });
+                ensureLibrarySortButton(true);
             }
         }
 
@@ -2470,6 +2532,73 @@
                 sessionReviewStats = { count: 0, remembered: 0 };
                 // Open the first word in review mode
                 openVerb(reviewVerbsList[0]['单词'], true);
+            }
+        }
+
+        function ensureLibrarySortButton(show) {
+            let btnCountdown = document.getElementById('librarySortCountdown');
+            let btnFirst = document.getElementById('librarySortFirst');
+            if (!btnCountdown) {
+                btnCountdown = document.createElement('button');
+                btnCountdown.id = 'librarySortCountdown';
+                btnCountdown.className = 'neumorphic-btn w-12 h-12 rounded-full flex items-center justify-center text-blue-500 floating-sort-btn';
+                btnCountdown.style.position = 'fixed';
+                btnCountdown.style.right = '16px';
+                btnCountdown.style.bottom = '80px';
+                btnCountdown.style.zIndex = '60';
+                btnCountdown.style.display = 'none';
+                btnCountdown.title = '按倒计时排序';
+                btnCountdown.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+                btnCountdown.onclick = () => {
+                    if (currentLibrarySortType !== 'countdown') {
+                        currentLibrarySortType = 'countdown';
+                        currentLibrarySortOrder = 'desc';
+                    } else {
+                        currentLibrarySortOrder = currentLibrarySortOrder === 'asc' ? 'desc' : 'asc';
+                    }
+                    renderReviewPage();
+                };
+                document.body.appendChild(btnCountdown);
+            }
+            if (!btnFirst) {
+                btnFirst = document.createElement('button');
+                btnFirst.id = 'librarySortFirst';
+                btnFirst.className = 'neumorphic-btn w-12 h-12 rounded-full flex items-center justify-center text-blue-500 floating-sort-btn';
+                btnFirst.style.position = 'fixed';
+                btnFirst.style.right = '16px';
+                btnFirst.style.bottom = '140px';
+                btnFirst.style.zIndex = '60';
+                btnFirst.style.display = 'none';
+                btnFirst.title = '按首次学习时间排序';
+                btnFirst.innerHTML = '<i class="fas fa-calendar-day"></i>';
+                btnFirst.onclick = () => {
+                    if (currentLibrarySortType !== 'first') {
+                        currentLibrarySortType = 'first';
+                        currentLibrarySortOrder = 'desc';
+                    } else {
+                        currentLibrarySortOrder = currentLibrarySortOrder === 'asc' ? 'desc' : 'asc';
+                    }
+                    renderReviewPage();
+                };
+                document.body.appendChild(btnFirst);
+            }
+            const display = show ? '' : 'none';
+            btnCountdown.style.display = display;
+            btnFirst.style.display = display;
+            if (show) {
+                const learningModal = document.getElementById('learningModal');
+                const isModalActive = learningModal && learningModal.classList.contains('active');
+                if (isModalActive) {
+                    btnCountdown.style.opacity = '0';
+                    btnCountdown.style.pointerEvents = 'none';
+                    btnFirst.style.opacity = '0';
+                    btnFirst.style.pointerEvents = 'none';
+                } else {
+                    btnCountdown.style.opacity = '1';
+                    btnCountdown.style.pointerEvents = '';
+                    btnFirst.style.opacity = '1';
+                    btnFirst.style.pointerEvents = '';
+                }
             }
         }
 
@@ -5292,6 +5421,7 @@
                     controls.classList.add('hidden');
                 }
             }
+            ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             
             // Multiple calls to handle different stages of modal expansion
             adjustModalTitleFontSize();
@@ -5452,6 +5582,9 @@
                 essenceContainer.classList.add('hidden');
                 
                 isClosing = false;
+                
+                // Restore Review Library sort buttons visibility if applicable
+                ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             }, 300);
         }
 
@@ -7059,6 +7192,7 @@
                             </div>
                             <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
                         </button>
+                        <div id="export-status-text" class="px-3 pb-2 text-[10px] font-medium text-gray-400"></div>
                         
                         <button type="button" onclick="importData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
                             <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-green-500 mr-3 shrink-0">
@@ -7851,134 +7985,183 @@
         }
 
         async function exportData() {
-            try {
-                // Show loading
-                const btn = document.querySelector('button[onclick="exportData()"]');
-                const originalText = btn ? btn.innerHTML : '';
-                if (btn) {
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
-                }
-
-                // 1. Get excluded verbs as string
-                const excludedVerbsList = Array.from(excludedVerbs).join(',');
-                
-                // 2. Request ZIP export
-                const res = await fetch(`/api/export?excluded_verbs=${encodeURIComponent(excludedVerbsList)}`);
-                
-                if (!res.ok) throw new Error('Export failed');
-                
-                // 3. Handle Binary Response (Blob)
-                const blob = await res.blob();
-                const isJson = blob.type === 'application/json';
-                const extension = isJson ? 'json' : 'zip';
-                
-                // Detect Capacitor
-                if (window.Capacitor && window.Capacitor.isNative) {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = async () => {
-                        const base64data = reader.result; // This includes "data:application/zip;base64," prefix
-                        // Clean base64 string for Filesystem plugin (it expects pure base64)
-                        const pureBase64 = base64data.split(',')[1];
-                        
-                        const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
-                        
+            showConfirm('Export Backup', 'This will save a backup file to your device. Continue?', async () => {
+                try {
+                    const btn = document.querySelector('button[onclick="exportData()"]');
+                    const originalText = btn ? btn.innerHTML : '';
+                    const statusEl = document.getElementById('export-status-text');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+                    }
+                    if (statusEl) statusEl.innerText = 'Preparing backup...';
+                    
+                    const excludedVerbsList = Array.from(excludedVerbs).join(',');
+                    let blob;
+                    try {
+                        const timeoutMs = 4000;
+                        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs));
+                        const res = await Promise.race([
+                            fetch(`/api/export?excluded_verbs=${encodeURIComponent(excludedVerbsList)}`),
+                            timeout
+                        ]);
+                        if (!res || !res.ok) throw new Error('Export failed');
+                        if (statusEl) statusEl.innerText = 'Preparing file...';
+                        blob = await res.blob();
+                    } catch (netErr) {
+                        if (statusEl) statusEl.innerText = 'Building local backup...';
                         try {
-                            const { Filesystem, Directory } = Capacitor.Plugins;
+                            if (!window.db && window.initDB) await window.initDB();
+                            const explanations = window.db && window.db.explanations ? await window.db.explanations.toArray() : [];
+                            const progress = window.db && window.db.learning_progress ? await window.db.learning_progress.toArray() : [];
+                            const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
+                            const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                            const excluded = Array.from(excludedVerbs || []);
+                            const exportData = { explanations, progress, checkins, settings, excluded };
+                            blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+                        } catch (localErr) {
+                            throw localErr;
+                        }
+                    }
+                    const isJson = blob.type === 'application/json';
+                    const extension = isJson ? 'json' : 'zip';
+                    
+                    if (window.Capacitor && (window.Capacitor.isNative || (window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem))) {
+                        try {
+                            if (statusEl) statusEl.innerText = 'Preparing write...';
                             
-                            // Write file to Documents directory
-                            const result = await Filesystem.writeFile({
-                                path: filename,
-                                data: pureBase64,
-                                directory: Directory.Documents,
-                                recursive: true // Create directory if needed
-                            });
+                            const ab = await blob.arrayBuffer();
+                            const bytes = new Uint8Array(ab);
+                            const totalLength = bytes.byteLength;
                             
-                            // Get the full URI to share
-                            const fileUri = result.uri;
+                            // Chunk size: 1.5MB (must be multiple of 3 for Base64 alignment)
+                            // Smaller chunks are safer for WebView memory limits
+                            const CHUNK_SIZE = 1024 * 1024 * 1.5; 
                             
-                            // Share the file using Capacitor Share plugin
-                            const { Share } = Capacitor.Plugins;
+                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                            const { Filesystem, Share } = window.Capacitor.Plugins;
+                            const platform = window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'native';
                             
-                            // Attempt to share the file directly
+                            // Directory enum is not always exposed in Plugins, define manually
+                            const Directory = {
+                                Documents: 'DOCUMENTS',
+                                Cache: 'CACHE',
+                                Data: 'DATA',
+                                Library: 'LIBRARY',
+                                External: 'EXTERNAL'
+                            };
+                            
+                            // Directory Strategy: Always use Cache for sharing (temporary file)
+                            // We don't want to pollute user's Documents folder unless necessary
+                            let saveDirectory = Directory.Cache;
+                            let savePath = filename;
+                            
+                            // Test write permission with a tiny file first
                             try {
-                                await Share.share({
-                                    title: 'NETEM Backup',
-                                    text: 'NETEM Deep Vocab Tools Backup',
-                                    url: fileUri, 
-                                    dialogTitle: 'Save Backup',
-                                    files: [fileUri] 
+                                await Filesystem.writeFile({
+                                    path: 'test_perm_check.txt',
+                                    data: 'ok',
+                                    directory: saveDirectory,
+                                    encoding: 'utf8'
                                 });
-                            } catch (shareError) {
-                                console.warn("Share failed, trying fallback...", shareError);
-                                // Fallback: Just show an alert with the path
-                                alert(`Backup saved to Documents: ${filename}`);
+                                // Clean up test file
+                                try { await Filesystem.deleteFile({ path: 'test_perm_check.txt', directory: saveDirectory }); } catch(e) {}
+                            } catch (permErr) {
+                                console.warn(`Write permission failed for ${saveDirectory}, switching to Documents...`);
+                                saveDirectory = Directory.Documents;
+                            }
+
+                            // Chunked Write Loop
+                            let offset = 0;
+                            let isFirstChunk = true;
+                            
+                            while (offset < totalLength) {
+                                const progress = Math.round((offset / totalLength) * 100);
+                                if (statusEl) statusEl.innerText = `Generating file... ${progress}%`;
+                                
+                                const end = Math.min(offset + CHUNK_SIZE, totalLength);
+                                const chunkBytes = bytes.subarray(offset, end);
+                                
+                                // Convert chunk to binary string safely
+                                let binary = '';
+                                const chunkLen = chunkBytes.byteLength;
+                                const SUB_CHUNK = 32768; // 32KB sub-chunks for String.fromCharCode
+                                
+                                for (let i = 0; i < chunkLen; i += SUB_CHUNK) {
+                                    binary += String.fromCharCode.apply(null, chunkBytes.subarray(i, Math.min(i + SUB_CHUNK, chunkLen)));
+                                }
+                                
+                                const base64Chunk = btoa(binary);
+                                
+                                if (isFirstChunk) {
+                                    // First chunk: Overwrite file
+                                    await Filesystem.writeFile({ 
+                                        path: savePath, 
+                                        data: base64Chunk, 
+                                        directory: saveDirectory
+                                        // No encoding = binary write from base64
+                                    });
+                                    isFirstChunk = false;
+                                } else {
+                                    // Subsequent chunks: Append
+                                    await Filesystem.appendFile({ 
+                                        path: savePath, 
+                                        data: base64Chunk, 
+                                        directory: saveDirectory
+                                        // No encoding = binary append from base64
+                                    });
+                                }
+                                
+                                offset += CHUNK_SIZE;
+                                
+                                // Yield to UI thread to prevent freezing
+                                await new Promise(r => setTimeout(r, 10));
                             }
                             
-                        } catch (fsError) {
-                            console.error("Capacitor Export Error:", fsError);
-                            // Fallback to Web/Browser logic if native filesystem fails
-                            // This might work if the WebView handles downloads natively
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            setTimeout(() => {
-                                window.URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-                            }, 100);
-                        }
-                    };
-                } else {
-                    // Web/Browser logic (Works for PC and Mobile Web)
-                    const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
-                    const mimeType = isJson ? 'application/json' : 'application/zip';
-                    
-                    // Prefer Web Share API on mobile to open system sheet / file manager
-                    let completed = false;
-                    if (navigator && typeof navigator.share === 'function' && typeof window.File === 'function') {
-                        try {
-                            const file = new File([blob], filename, { type: mimeType });
-                            if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-                                await navigator.share({
-                                    files: [file],
-                                    title: 'NETEM Backup',
-                                    text: 'NETEM Deep Vocab Tools Backup'
+                            if (statusEl) statusEl.innerText = 'Ready to share...';
+                            
+                            let fileUri = null;
+                            try {
+                                const uriRes = await Filesystem.getUri({ path: savePath, directory: saveDirectory });
+                                if (uriRes && uriRes.uri) fileUri = uriRes.uri;
+                            } catch (e) {
+                                console.warn("Failed to get URI", e);
+                            }
+                            
+                            // Store for retry
+                            window.lastExportUri = fileUri;
+                            window.lastExportFilename = filename;
+                            
+                            if (statusEl) statusEl.innerText = 'Opening share sheet...';
+                            
+                            // Share
+                            const openableUri = (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function' && fileUri) ? window.Capacitor.convertFileSrc(fileUri) : fileUri;
+                            try {
+                                await Share.share({ 
+                                    title: 'NETEM Backup', 
+                                    text: 'NETEM Deep Vocab Tools Backup', 
+                                    url: openableUri || fileUri, 
+                                    files: fileUri ? [fileUri] : undefined, 
+                                    dialogTitle: 'Save Backup' 
                                 });
-                                completed = true;
+                                // User requested "don't need save locally way", so show simpler success message
+                                if (statusEl) statusEl.innerText = `Export ready`;
+                            } catch (shareError) {
+                                console.warn("Share failed", shareError);
+                                // Even on failure, minimize "Saved to" wording if possible, but location is useful for debugging/manual retrieval
+                                // Use "File prepared" instead of "Saved to"
+                                const locationHint = (saveDirectory === Directory.Cache) ? `Cache` : `Documents`;
+                                if (statusEl) statusEl.innerHTML = `File prepared (${locationHint}) · <a href="#" onclick="shareLastExport();return false;" class="text-blue-500 underline">Share</a>`;
                             }
                         } catch (err) {
-                            // Fall through to next strategy
+                            console.error("Capacitor export error:", err);
+                            // Fallback to browser download if Capacitor fails completely
+                            if (statusEl) statusEl.innerText = `Native save failed (${err.message || 'Unknown'}). Trying browser download...`;
+                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                            downloadBlob(blob);
                         }
-                    }
-                    
-                    // Try File System Access API (Android Chrome)
-                    if (!completed && window.showSaveFilePicker) {
-                        try {
-                            const handle = await window.showSaveFilePicker({
-                                suggestedName: filename,
-                                types: [
-                                    {
-                                        description: 'NETEM Backup',
-                                        accept: { [mimeType]: [isJson ? '.json' : '.zip'] }
-                                    }
-                                ]
-                            });
-                            const writable = await handle.createWritable();
-                            await writable.write(blob);
-                            await writable.close();
-                            completed = true;
-                        } catch (err) {
-                            // Fall through to anchor download
-                        }
-                    }
-                    
-                    // Fallback: anchor download
-                    if (!completed) {
+                    } else {
+                        const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.style.display = 'none';
@@ -7989,29 +8172,31 @@
                         setTimeout(() => {
                             window.URL.revokeObjectURL(url);
                             document.body.removeChild(a);
-                        }, 200);
+                        }, 100);
+                        // No modal: download initiated
+                        const statusEl = document.getElementById('export-status-text');
+                        if (statusEl) statusEl.innerText = `Saved as ${filename}`;
+                    }
+                    
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                } catch (e) {
+                    console.error("Export failed", e);
+                    alert("Export failed: " + e.message);
+                    const btn = document.querySelector('button[onclick="exportData()"]');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `
+                            <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                                <i class="fas fa-file-export text-sm"></i>
+                            </div>
+                            <span class="text-xs font-black uppercase tracking-widest">Export</span>
+                        `;
                     }
                 }
-                
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-            } catch (e) {
-                console.error("Export failed", e);
-                alert("Export failed: " + e.message);
-                // Restore button
-                const btn = document.querySelector('button[onclick="exportData()"]');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = `
-                        <div class="w-10 h-10 rounded-2xl bg-white neumorphic flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all duration-300 shadow-sm">
-                            <i class="fas fa-file-export text-sm"></i>
-                        </div>
-                        <span class="text-xs font-black uppercase tracking-widest">Export</span>
-                    `;
-                }
-            }
+            });
         }
 
         function downloadBlob(blob) {
@@ -8024,6 +8209,30 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }
+        
+        async function shareLastExport() {
+            try {
+                const statusEl = document.getElementById('export-status-text');
+                if (statusEl) statusEl.innerText = 'Opening share...';
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share && window.lastExportUri) {
+                    const openableUri = (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function' && window.lastExportUri) ? window.Capacitor.convertFileSrc(window.lastExportUri) : window.lastExportUri;
+                    await window.Capacitor.Plugins.Share.share({
+                        title: 'NETEM Backup',
+                        text: window.lastExportFilename || 'Backup file',
+                        url: openableUri || window.lastExportUri,
+                        files: window.lastExportUri ? [window.lastExportUri] : undefined,
+                        dialogTitle: 'Open Backup'
+                    });
+                    if (statusEl) statusEl.innerText = 'Export ready';
+                } else {
+                    if (statusEl) statusEl.innerText = 'Share unavailable.';
+                }
+            } catch (e) {
+                const statusEl = document.getElementById('export-status-text');
+                // When share is cancelled or fails, just offer retry, don't mention local files
+                if (statusEl) statusEl.innerHTML = `Share cancelled · <a href="#" onclick="shareLastExport();return false;" class="text-blue-500 underline">Retry</a>`;
+            }
         }
 
         function closeImportConfirmModal(fromPopState = false) {
@@ -8745,6 +8954,7 @@
             observer.observe(document.body, { childList: true, subtree: true });
 
             initPullToRefresh();
+            initSwipeNavigation();
             updateKaoyanCountdown();
             
             // Initialize LocalAPI
