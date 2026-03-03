@@ -3562,7 +3562,13 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `netem_backup_${new Date().toISOString().split('T')[0]}.zip`;
+                    // Use local time for filename instead of UTC
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    a.download = `netem_backup_${dateStr}.zip`;
                     document.body.appendChild(a);
                     
                     // Detect if the user actually triggered the download
