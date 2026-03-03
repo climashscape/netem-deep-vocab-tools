@@ -58,6 +58,19 @@ const Ebbinghaus = {
 
         const status = newStage < EBBINGHAUS_STAGES.length ? 'learning' : 'mastered';
         
+        // Determine first learned time
+        // If it exists in progress, keep it.
+        // If not, and this is the FIRST successful review (stage 1, count 0), set it to now.
+        // Fallback: If missing but stage > 0 (legacy data), try to use last_review if available.
+        let firstLearned = null;
+        if (progress && progress.first_learned_at) {
+            firstLearned = progress.first_learned_at;
+        } else if (newStage === 1 && reviewCount === 0) {
+            firstLearned = now.toISOString();
+        } else if (progress && progress.last_review) {
+            firstLearned = progress.last_review;
+        }
+
         // Update DB with normalized verb
         // Using put() is safer than update() as it creates if not exists
         await window.DB.updateProgress(
@@ -66,17 +79,9 @@ const Ebbinghaus = {
             now.toISOString(), 
             nextReview.toISOString(), 
             status, 
-            reviewCount + 1
+            reviewCount + 1,
+            firstLearned
         );
-        try {
-            const firstLearned = (progress && progress.first_learned_at) ? progress.first_learned_at : ((newStage === 1 && reviewCount === 0) ? now.toISOString() : null);
-            if (firstLearned && window.db && window.db.learning_progress) {
-                await window.db.learning_progress.update(normalizedVerb, { first_learned_at: firstLearned });
-            }
-            if (firstLearned && window.learningStatus) {
-                window.learningStatus[normalizedVerb].first_learned_at = firstLearned;
-            }
-        } catch(e) {}
         
         // Update Memory Cache (Global learningStatus) using normalized key
         // This is CRITICAL for immediate UI updates without reload
@@ -86,7 +91,8 @@ const Ebbinghaus = {
                 last_review: now.toISOString(),
                 next_review: nextReview.toISOString(),
                 status: status,
-                review_count: reviewCount + 1
+                review_count: reviewCount + 1,
+                first_learned_at: firstLearned
             };
         }
         
@@ -101,6 +107,15 @@ const Ebbinghaus = {
      * Mark a verb as mastered
      */
     async markMastered(verb) {
+        const normalizedVerb = verb.toLowerCase();
+        // Fetch current to preserve first_learned_at
+        const progress = await window.db.learning_progress.get(normalizedVerb);
+        // Fallback for first_learned_at if missing (legacy)
+        let firstLearned = (progress && progress.first_learned_at) ? progress.first_learned_at : null;
+        if (!firstLearned && progress && progress.last_review) {
+            firstLearned = progress.last_review;
+        }
+
         const now = new Date();
         const stage = EBBINGHAUS_STAGES.length; // Stage 9
         const nextReview = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year later
@@ -112,7 +127,8 @@ const Ebbinghaus = {
             now.toISOString(), 
             nextReview.toISOString(), 
             'mastered', 
-            1
+            1,
+            firstLearned
         );
         
         return {

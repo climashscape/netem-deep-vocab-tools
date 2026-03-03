@@ -1243,6 +1243,7 @@
                     <div class="neumorphic-inset flex items-center px-3 py-1.5 h-8">
                         <i class="fas fa-search text-gray-400 mr-2 text-[10px]"></i>
                         <input type="text" id="searchInput" placeholder="Search..." class="bg-transparent outline-none w-full text-gray-600 font-bold text-[11px] placeholder-gray-400/70" oninput="filterVerbs()">
+                        <i id="searchClearBtn" class="fas fa-times-circle text-gray-400 ml-2 text-xs cursor-pointer hover:text-gray-600 hidden" onclick="clearSearch()"></i>
                     </div>
                 </div>
             </div>
@@ -3189,6 +3190,28 @@
                 });
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 learningStatus = await res.json();
+
+                // --- MIGRATION: Backfill first_learned_at for existing words ---
+                // This ensures sorting by "First Learned Time" is stable for old data
+                const updates = [];
+                Object.values(learningStatus).forEach(p => {
+                    // Only migrate if stage > 0 (learned) and missing first_learned_at
+                    if (p.stage > 0 && !p.first_learned_at && p.last_review) {
+                        // Use last_review as proxy for first_learned_at for old data
+                        // This freezes the timestamp so it doesn't change on future reviews
+                        p.first_learned_at = p.last_review;
+                        updates.push(p);
+                    }
+                });
+                
+                if (updates.length > 0) {
+                    console.log(`Migrating ${updates.length} words to include first_learned_at...`);
+                    // Use bulkPut to update efficiently if DB is available
+                    if (window.db && window.db.learning_progress) {
+                        await window.db.learning_progress.bulkPut(updates);
+                    }
+                }
+                // -------------------------------------------------------------
             } catch (e) {
                 // Ignore abort errors which are normal during reloads
                 if (e.name === 'AbortError') return;
@@ -3793,7 +3816,10 @@
                     
                     if (state.searchInput) {
                         const searchInput = document.getElementById('searchInput');
-                        if (searchInput) searchInput.value = state.searchInput;
+                        if (searchInput) {
+                            searchInput.value = state.searchInput;
+                            toggleSearchClearBtn();
+                        }
                     }
 
                     if (state.currentPos) {
@@ -5125,7 +5151,29 @@
             }
         }
 
+        function toggleSearchClearBtn() {
+            const input = document.getElementById('searchInput');
+            const btn = document.getElementById('searchClearBtn');
+            if (input && btn) {
+                if (input.value.length > 0) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            }
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('searchInput');
+            if (input) {
+                input.value = '';
+                toggleSearchClearBtn();
+                filterVerbs();
+            }
+        }
+
         function filterVerbs() {
+            toggleSearchClearBtn();
             updateCounts();
             
             // Refresh current page

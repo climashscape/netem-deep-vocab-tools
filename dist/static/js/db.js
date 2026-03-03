@@ -202,7 +202,7 @@ const DB = {
     /**
      * Update learning progress
      */
-    async updateProgress(verb, stage, lastReview, nextReview, status, reviewCount) {
+    async updateProgress(verb, stage, lastReview, nextReview, status, reviewCount, firstLearnedAt = null) {
         try {
             // Normalize verb to lowercase to prevent duplicates (e.g. "Christian" vs "christian")
             const normalizedVerb = verb.toLowerCase();
@@ -216,14 +216,23 @@ const DB = {
                 } catch(e) { /* ignore if not exists */ }
             }
 
-            await db.learning_progress.put({
+            const data = {
                 verb: normalizedVerb,
                 stage,
                 last_review: lastReview,
                 next_review: nextReview,
                 status,
                 review_count: reviewCount
-            });
+            };
+            
+            // Only add if provided, otherwise we rely on caller to pass it or we might lose it?
+            // Actually, for PUT, we MUST provide all fields we want to keep.
+            // So caller MUST pass firstLearnedAt if it exists.
+            if (firstLearnedAt) {
+                data.first_learned_at = firstLearnedAt;
+            }
+
+            await db.learning_progress.put(data);
         } catch (error) {
             console.error("DB error updating progress:", error);
         }
