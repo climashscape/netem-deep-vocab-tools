@@ -1,132 +1,182 @@
 # 考研词汇词频排序数据与深度背单词工具 (NETEM Deep Vocab Tools)
 
-**版本号：v2.0.0 (Stable)**
+**版本号：v6.6.6 (Static/Offline Edition)**
 
-## 项目状态 (Project Status)
-- ✅ **核心词汇数据**：已集成 5530 个考研大纲词汇及详尽词频统计。
-- ✅ **离线化架构**：已完成从 Python 后端向纯前端 (IndexedDB + Dexie.js) 的迁移，支持 100% 离线运行。
-- ✅ **多端支持**：支持 Web 端、移动端 (PWA/APK) 交互。
-- ✅ **AI 深度解析**：支持通过 LLM 进行动词深度解析及视觉助记生成。
-- ✅ **严格缓存模式**：新增 Strict Cache Mode，无 API Key 时自动回退至离线词库，避免无效调用。
-- ✅ **智能数据同步**：支持从后端获取最新缓存数据，并自动导入遗留数据 (Legacy Import)。
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Web%20%7C%20Android-green.svg)
+![Status](https://img.shields.io/badge/status-Stable-success.svg)
 
-本项目是一个专为考研英语设计的**深度背单词工具**。它不仅提供《全国硕士研究生招生考试英语（一）考试大纲》5530 个词汇的科学词频排序数据，还配套了基于 AI 的动词深度解析、视觉助记及多端交互工具，旨在帮助考生通过科学的统计规律和 AI 辅助记忆，高效攻克考研核心词汇。
+## 1. 项目简介 (Introduction)
 
-## 版本更新 (v2.0.0 Changelog)
-这是第一版开始正式发布的编译后的app。
+**NETEM Deep Vocab Tools** 是一个专为考研英语设计的**深度背单词工具**。它基于《全国硕士研究生招生考试英语（一）考试大纲》要求的 5530 个词汇，结合科学的**词频统计**、**艾宾浩斯记忆曲线**和**AI 深度解析**，帮助考生高效攻克考研核心词汇。
 
-- **Fix**: 改进移动端输入框的触摸事件处理，防止父元素阻止原生聚焦和文本选择
-- **Refactor**: 重构卡片滑动逻辑，使用更精确的触摸跟踪和边界检测
-- **Fix**: 修复设置页面中导入/导出模态框的层级问题
-- **Feat**: 优化分析模式设置的同步逻辑，确保本地和服务器设置一致性
-- **Feat**: 增强学习模式中的自动跳转功能，提升用户体验
+本项目目前已发展为**纯静态、离线化**的架构，支持在 Web 端和 Android 端（通过 Capacitor）运行，无需依赖任何后端服务器，数据完全存储在用户本地。
 
-## 版本更新 (v1.1.1 Changelog)
-- **Fix**: 修复 Android 物理返回键逻辑，现在可以正确关闭各类弹窗 (详情页/设置/排除列表等) 而非直接退出应用。
-- **Fix**: 优化数据导入导出功能，支持 `.json` 格式的本地备份与恢复，解决跨平台兼容性问题。
-- **Fix**: 调整 UI 顶部状态栏间距，适配沉浸式状态栏设计。
-- **Feat**: 改进离线缓存和数据库同步机制，支持从后端获取缓存数据。
-- **Feat**: 优化离线模式下的缓存回退逻辑，依次尝试 IndexedDB、后端 API 和本地 JSON。
-- **Feat**: 添加严格缓存模式 (Strict Cache Mode)，避免在没有 API 密钥时生成 AI 内容。
-- **Feat**: 改进数据库初始化，自动导入遗留数据并处理大小写重复问题。
-- **Feat**: 增强数据导出功能，过滤遗留数据以减少文件大小。
-- **Feat**: 添加动词排除功能，支持用户自定义学习列表。
-- **Fix**: 修复 Service Worker 缓存版本和 Android 构建配置。
+### 核心价值
+*   **科学排序**：基于 200+ 套真题统计的词频数据，优先复习高频词。
+*   **深度解析**：通过 AI (OpenAI/DeepSeek) 生成动词的深度解析、词源、搭配及视觉助记。
+*   **离线优先**：所有学习进度、笔记、设置均存储在本地 (IndexedDB)，随时随地学习。
+*   **极简主义**：无广告、无社交干扰，专注于沉浸式学习体验。
 
-## 核心数据 (Core Data)
+---
 
-### 词频排序
-*   **数据源**：基于 [exam-data/NETEMVocabulary](https://github.com/exam-data/NETEMVocabulary/)，核心数据源于《2024年全国硕士研究生招生考试英语（一）考试大纲词汇表》要求的 5530 个词汇。
-*   **统计范围**：分析了约 200 套试卷（包括四六级、考研英语一/二、专四专八等）。
-*   **处理策略**：采用词形还原（Lemmatization）策略，确保词频统计的准确性。
-*   **高频词汇**：前 **2444** 个单词出现 **40** 次以上（平均每 5 套试卷出现一次），定义为高频词汇。
+## 2. 核心功能 (Features)
 
-### 数据格式
-*   **JSON**: [netem_full_list.json](netem_full_list.json) - 包含序号、词频、单词、释义、POS 等完整信息。
-*   **SQL**: [netem_full_list.sql](netem_full_list.sql) - 方便导入各种数据库。
-*   **SQLite**: `vocabulary.db` - 项目内置的轻量级数据库。
+### 📚 科学词库
+*   **词频统计**：集成 5530 个大纲词汇，按真题出现频率排序。
+*   **词形还原**：采用 Lemmatization 策略，精准统计词汇频率。
+*   **高频筛选**：自动标记高频词（出现 >40 次），重点突破。
 
-## 工具体系 (Tools Ecosystem)
+### 🧠 深度学习模式
+*   **4 阶段学习法**：
+    1.  **初识 (Preview)**：查看基础释义与词频。
+    2.  **解析 (Analysis)**：AI 生成深度解析（词源、语境、助记）。
+    3.  **视觉 (Visual)**：AI 生成视觉助记描述（可对接绘图 AI）。
+    4.  **复习 (Review)**：基于艾宾浩斯曲线的智能复习安排。
+*   **AI 辅助**：
+    *   支持自定义 API Key (OpenAI / DeepSeek / Custom)。
+    *   **Strict Cache Mode**：无 Key 时自动回退至内置离线词库，不消耗 Token。
 
-项目在 `scripts/` 目录下提供了一套完整的词汇处理工具：
+### 💾 离线架构
+*   **本地存储**：使用 IndexedDB (Dexie.js) 存储所有数据，容量大、速度快。
+*   **数据导出/导入**：支持 JSON/ZIP 格式备份学习进度，跨设备同步。
+*   **PWA 支持**：可作为渐进式 Web 应用安装到桌面或手机。
 
-### 1. 动词深度解析系统 (explain_verbs)
-这是一个功能强大的动词学习与管理系统：
-*   **AI 智能解析**：集成 OpenAI 兼容接口，自动生成词汇深度解析、例句和助记。
-*   **Web 界面 (FastAPI)**：提供可视化的词汇管理后台。
-*   **本地 GUI (Gradio)**：精美的复古自然主义风格界面，支持单词解析、批量解析和对比分析。
-*   **图像生成**：集成 Pollinations/Dicebear，为单词生成视觉辅助。
+### 📱 移动端体验
+*   **手势操作**：支持左右滑动切换单词，下拉刷新。
+*   **沉浸式 UI**：Neumorphism（新拟态）设计风格，适配移动端触控。
+*   **Android APK**：提供原生 Android 安装包，性能更佳。
 
-### 2. 拼写变体处理 (spelling-variations)
-*   处理考纲中具有多种拼写形式的单词（如 color/colour），确保数据的统一性。
+---
 
-### 3. 文档生成 (generate-doc)
-*   支持从 SQL 数据库自动生成格式化的 Markdown/JSONL 文档。
+## 3. 快速开始 (Getting Started)
 
-### 4. 释义格式化 (update_def)
-*   统一和标准化词汇释义的显示格式，减轻记忆负担。
+### 方式一：Web 预览 (推荐)
+本项目是纯静态网站，您可以直接在浏览器中运行。
 
-## 快速开始
+1.  **克隆项目**：
+    ```bash
+    git clone https://github.com/your-repo/netem-deep-vocab-tools.git
+    cd netem-deep-vocab-tools
+    ```
+2.  **启动本地服务器**：
+    *   如果您安装了 Python：
+        ```bash
+        python tools/utils/dev_proxy.py
+        ```
+        访问 `http://localhost:8000/` 即可。
+        *(注：`dev_proxy.py` 是一个带代理功能的开发服务器，可解决本地调用 AI API 的跨域问题)*
+    *   或者使用 VS Code 的 **Live Server** 插件打开 `app/index.html`。
 
-### 获取数据
-1. 直接下载根目录下的 `netem_full_list.json` 或 `netem_full_list.sql` 即可使用。
-2. 也可以去 [Release 页面](https://github.com/exam-data/NETEM-Deep-Vocab-Tools/releases) 下载 PDF 版本。
+### 方式二：Android 安装
+您可以自己构建 APK，或者下载 Release 页面的预编译版本（如果有）。
 
-### 1. 运行后端解析工具 (Backend/GUI Mode)
-1.  **安装依赖**：
-    *   在项目根目录下运行：`pip install -r requirements.txt`。
-2.  **配置 AI 密钥**：
-    *   进入 `scripts/explain_verbs/` 目录。
-    *   配置 `config.json` 或 `.env` 文件，填入你的 `OPENAI_API_KEY`。
-3.  **启动工具**：
-    *   运行 Web 版 (FastAPI)：`python app.py`。
-    *   运行 GUI 版 (Gradio)：`python gui.py`。
+1.  **环境准备**：
+    *   Node.js (v18+)
+    *   Android Studio (及 SDK)
+    *   Java JDK 17+
 
-### 2. 运行离线版/移动端 (Offline/Mobile)
-*   **Web 预览**：在根目录下直接通过静态服务器（如 `Live Server` 或 `python -m http.server`）打开 `dist/index.html`。
-*   **Android 构建**：
-    1.  安装依赖：`npm install`
-    2.  同步资源：`npx cap sync`
-    3.  通过 Android Studio 构建：打开 `android/` 目录并生成 APK。
-    *   *详细步骤请参考 [OFFLINE_APK_PLAN.md](OFFLINE_APK_PLAN.md)*。
+2.  **构建步骤**：
+    ```bash
+    # 1. 安装依赖
+    npm install
 
-## 项目结构 (Project Structure)
+    # 2. 同步前端资源到 Android 工程
+    npx cap sync
 
+    # 3. 打开 Android Studio 构建
+    npx cap open android
+    ```
+    在 Android Studio 中点击 `Build > Build APK` 即可。
+
+---
+
+## 4. 开发指南 (Development Guide)
+
+### 📂 项目结构
 ```text
 .
+├── app/                 # [核心] Web 应用源码 (HTML/JS/CSS/Static)
+│   ├── static/          # 静态资源
+│   │   ├── js/          # 核心逻辑 (ebbinghaus.js, db.js, local_api.js 等)
+│   │   ├── lib/         # 第三方库 (Tailwind, FontAwesome, Dexie)
+│   │   └── netem_full_list.json # 核心词库
+│   └── index.html       # 应用入口
 ├── android/             # Android 原生工程 (Capacitor 托管)
-├── dist/                # 纯前端静态资源 (离线版/PWA/APK 核心)
-│   ├── static/          # JS、CSS 及离线词库数据
-│   └── index.html       # 离线版入口
-├── scripts/
-│   ├── explain_verbs/   # 动词 AI 解析系统 (FastAPI + Gradio)
-│   │   ├── static/      # 前端本地化逻辑 (local_api.js, db.js)
-│   │   ├── templates/   # 网页模板
-│   │   └── app.py       # FastAPI 后端入口
-│   ├── spelling-variations/ # 拼写变体处理逻辑 (Node.js)
-│   ├── generate-doc/    # 文档生成工具
-│   ├── generate_json/   # SQL 转 JSON 工具
-│   └── update_def/      # 释义格式化工具
-├── netem_full_list.json # 核心词频 JSON 数据
-├── netem_full_list.sql  # 核心词频 SQL 数据
-├── requirements.txt     # Python 依赖管理
-├── package.json         # 前端及 Capacitor 依赖管理
-├── capacitor.config.json # Capacitor 配置文件
-└── vocabulary.db        # 项目数据库 (SQLite)
+├── tools/               # 开发与维护脚本 (Python/Node.js)
+│   ├── checkers/        # 数据检查工具
+│   ├── utils/           # 实用工具 (dev_proxy, converters)
+│   └── data/            # 原始数据源
+├── docs/                # 项目文档
+│   ├── guidelines/      # 开发规范 (架构、发布、UI/UX 等)
+│   └── ROADMAP.md       # 长期规划
+├── package.json         # 项目依赖配置
+└── capacitor.config.json # Capacitor 配置文件
 ```
 
-## 鸣谢 (Acknowledgements)
+### 📚 文档资源
+详细的开发文档请参考 `docs/` 目录：
+*   [**架构白皮书**](docs/guidelines/ARCHITECTURE.md): 了解离线优先架构设计。
+*   [**开发与贡献指南**](docs/guidelines/CONTRIBUTING_GUIDE.md): 代码风格与 Git 规范。
+*   [**发布流程**](docs/guidelines/RELEASE_WORKFLOW.md): 版本管理与 APK 构建流程。
+*   [**UI/UX 规范**](docs/guidelines/UI_UX_GUIDELINES.md): 新拟态设计风格指南。
+*   [**项目路线图**](docs/ROADMAP.md): 未来功能规划。
+
+### 🔧 常用工具 (Tools)
+所有维护脚本均位于 `tools/` 目录下：
+
+*   **启动开发服务器** (带 API 代理)：
+    ```bash
+    python tools/utils/dev_proxy.py
+    ```
+*   **检查数据重复**：
+    ```bash
+    python tools/checkers/check_duplicates.py
+    ```
+*   **更新前端词库 JS**：
+    ```bash
+    python tools/utils/update_full_list_js.py
+    ```
+    *(当您修改了 `tools/data/` 下的原始数据后，需运行此脚本更新 `app/` 中的 JS 文件)*
+
+### ⚙️ 配置说明
+应用内的设置（如 API Key）均存储在浏览器的 `localStorage` 中。
+*   **API Key**：在应用设置页面输入。
+*   **自定义模型**：支持在设置中配置 `Base URL` 和 `Model Name` (如 DeepSeek, Moonshot 等)。
+
+---
+
+## 5. 常见问题 (FAQ)
+
+**Q: 为什么 AI 解析无法使用？**
+A: 请检查：
+1. 是否在设置中填写了正确的 API Key。
+2. 网络环境是否可以访问 OpenAI/DeepSeek API。
+3. 如果在浏览器本地开发，请使用 `python tools/utils/dev_proxy.py` 启动，以避免 CORS 跨域问题。
+
+**Q: 数据会丢失吗？**
+A: 数据存储在浏览器的 IndexedDB 中。
+*   **安全**：刷新页面不会丢失。
+*   **风险**：清除浏览器缓存或卸载 APP 会导致数据丢失。
+*   **建议**：定期使用“导出备份”功能下载 JSON/ZIP 备份文件。
+
+**Q: 如何更新词库？**
+A: 修改 `tools/data/netem_full_list.json`，然后运行 `python tools/utils/update_full_list_js.py`，最后重新部署或构建 APK。
+
+---
+
+## 6. 鸣谢 (Acknowledgements)
 
 感谢以下项目及个人为本项目提供的数据支持与灵感：
 
-*   **[exam-data/NETEM-Deep-Vocab-Tools](https://github.com/exam-data/NETEMVocabulary/)**：本项目原始词频数据的主要来源。
+*   **[exam-data/NETEMVocabulary](https://github.com/exam-data/NETEMVocabulary/)**：本项目原始词频数据的主要来源。
 *   **[awxiaoxian2020/spelling-variations](https://github.com/awxiaoxian2020/spelling-variations/)**：提供了考纲词汇的拼写变体数据支持。
 *   所有为本项目提供反馈和建议的用户。
 
-## 许可证
+## 7. 许可证 (License)
 
 *   **数据**：基于 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 共享。
 *   **代码**：基于 [MIT License](LICENSE-CODE)。
 
 ---
-*如果想自行生成文档，请参阅[相关说明](https://github.com/exam-data/scripts-docs/blob/main/docs/how-to-generate-docs.md)。*
+*Generated by Trae AI based on v6.6.6 architecture.*

@@ -1,7 +1,7 @@
 {
   "appId": "com.netem.deepvocab",
   "appName": "NETEM",
-  "webDir": "dist",
+  "webDir": "app",
   "plugins": {
     "CapacitorHttp": {
       "enabled": true

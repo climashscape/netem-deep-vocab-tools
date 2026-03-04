@@ -1,22 +1,59 @@
-*.docx
-*.pdf
-*.db
-*.bak
+# OS files
+.DS_Store
+Thumbs.db
 *.log
 *.tmp
-.history
-.env
+*.bak
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
 .venv/
 venv/
 env/
-config.json
-node_modules/
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-__pycache__/
 .pytest_cache/
 .coverage
 .tox/
-netem_backup_2026-03-03.json
+
+# Node / Web
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output
+android/app/build/
+android/.gradle/
+android/app/release/
+android/capacitor.settings.gradle
+android/local.properties
+
+# Environment variables
+.env
+config.json
+
+# Local data (do not commit large binaries or user data if any)
+*.db
+*.sqlite
+
+# Web Build Artifacts
+www/
+dist/
+.parcel-cache/
+.eslintcache
+
+# Android General
+*.apk
+*.aar
+*.ap_
+android/captures/
+
+# Editors & Tools
+.history/
+*.orig
+.ipynb_checkpoints/
+.mypy_cache/

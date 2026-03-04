@@ -1,6 +1,0 @@
-openai
-python-dotenv
-gradio
-fastapi
-uvicorn
-jinja2
