@@ -950,15 +950,36 @@ const LocalAPI = {
                         // Try case-insensitive lookup if still not found
                         if (!legacyContent) {
                             const lowerKey = key.toLowerCase();
-                            const lowerVerbKey = `${lowerKey}:verb`;
                             
-                            // Find case-insensitive match in keys
-                            const allKeys = Object.keys(this.legacyData);
-                            const foundKey = allKeys.find(k => 
-                                k.toLowerCase() === lowerKey || 
-                                k.toLowerCase() === lowerVerbKey
-                            );
-                            if (foundKey) legacyContent = this.legacyData[foundKey];
+                            // Safety Check: If both "Word" and "word" exist in the full list, 
+                            // we should NOT fallback to "word" for "Word" unless absolutely necessary.
+                            // This prevents "March" (month) from showing "march" (walk) content.
+                            let isAmbiguous = false;
+                            
+                            // Only check if keys are different (e.g. "March" vs "march")
+                            if (this.verbsData && key !== lowerKey) {
+                                // Efficient check if verbsData is array
+                                // We check if the exact original key exists in the word list
+                                const hasOriginal = this.verbsData.some(v => (v.word || v['单词']) === key);
+                                // And if the lowercase version also exists
+                                const hasLower = this.verbsData.some(v => (v.word || v['单词']) === lowerKey);
+                                
+                                isAmbiguous = hasOriginal && hasLower;
+                            }
+
+                            if (!isAmbiguous) {
+                                const lowerVerbKey = `${lowerKey}:verb`;
+                                
+                                // Find case-insensitive match in keys
+                                const allKeys = Object.keys(this.legacyData);
+                                const foundKey = allKeys.find(k => 
+                                    k.toLowerCase() === lowerKey || 
+                                    k.toLowerCase() === lowerVerbKey
+                                );
+                                if (foundKey) legacyContent = this.legacyData[foundKey];
+                            } else {
+                                console.warn(`LocalAPI: Ambiguous case for '${key}' vs '${lowerKey}'. Skipping fallback to prevent wrong definition.`);
+                            }
                         }
 
                         if (legacyContent) {

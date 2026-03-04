@@ -343,6 +343,23 @@ const LLM = {
             throw new Error("API Key not configured in settings.");
         }
 
+        // Special handling for case-sensitive inputs like "March" (month) vs "march" (walk)
+        // We instruct the LLM to strictly respect the casing of the user input
+        // and explicitly clarify the intended meaning if it's ambiguous.
+        let finalUserInput = userInput;
+        const userInputLower = userInput.toLowerCase();
+        
+        // If the input has uppercase letters (e.g. "March", "May", "Polish"), 
+        // add a system hint to the user prompt to enforce case sensitivity.
+        if (userInput !== userInputLower) {
+            finalUserInput = `请严格基于单词 "${userInput}" (注意大小写) 进行解析。如果该单词是专有名词（如月份、人名、地名等），请解析其专有含义，不要解析为其小写形式的含义。例如：如果是 "March"，请解析 "三月"，不要解析 "行军" (march)。\n\n单词：${userInput}`;
+        } else {
+            // Even for lowercase, if it's a word that could be a proper noun (like "march"),
+            // we might want to hint to stick to the common noun meaning, but usually lowercase is safe default.
+            // However, to be safe, we can just say "Resolve strictly based on this word".
+            finalUserInput = `单词：${userInput}`;
+        }
+
         let systemPrompt = SYSTEM_PROMPTS.verb;
         if (pos === 'noun') systemPrompt = SYSTEM_PROMPTS.noun;
         else if (pos === 'adj_adv' || pos === 'adj' || pos === 'adv') systemPrompt = SYSTEM_PROMPTS.adj_adv;
@@ -369,7 +386,7 @@ const LLM = {
                     model: model,
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userInput }
+                        { role: 'user', content: finalUserInput }
                     ],
                     temperature: 0.7
                 })
@@ -396,7 +413,7 @@ const LLM = {
                     model: model,
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userInput }
+                        { role: 'user', content: finalUserInput }
                     ],
                     temperature: 0.7
                 })

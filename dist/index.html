@@ -6255,32 +6255,96 @@
                                 const essenceContentWrapper = document.createElement('div');
                                 essenceContentWrapper.innerHTML = tempDiv.innerHTML;
 
+                                // --- Mask all English letters in Text Nodes (User Request) ---
+                                // This prevents revealing the answer in spelling tests
+                                // Style: Blue underscores, one per letter, with spacing
+                                function walkAndMask(node) {
+                                    const childNodes = Array.from(node.childNodes); // Static array to avoid live update issues
+                                    
+                                    childNodes.forEach(child => {
+                                        if (child.nodeType === 3) { // Text node
+                                            const text = child.nodeValue;
+                                            if (/[a-zA-Z]/.test(text)) {
+                                                const fragment = document.createDocumentFragment();
+                                                let lastIndex = 0;
+                                                const regex = /[a-zA-Z]+/g;
+                                                let match;
+                                                
+                                                while ((match = regex.exec(text)) !== null) {
+                                                    // Text before match
+                                                    if (match.index > lastIndex) {
+                                                        // Use font-bold for Chinese/other text to match user request
+                                                        const span = document.createElement('span');
+                                                        span.className = 'font-bold'; 
+                                                        span.textContent = text.substring(lastIndex, match.index);
+                                                        fragment.appendChild(span);
+                                                    }
+                                                    
+                                                    // The match (English word)
+                                                    const word = match[0];
+                                                    const span = document.createElement('span');
+                                                    // Use border-bottom instead of underscore character for consistent thickness
+                                                    // inline-block is required for width/height/border
+                                                    span.className = 'mx-0.5 inline-block'; 
+                                                    // span.style.letterSpacing = '3px'; // No longer needed as we build blocks
+                                                    
+                                                    // Create individual blocks for each letter to maintain spacing look
+                                                    for (let i = 0; i < word.length; i++) {
+                                                        const letterSlot = document.createElement('span');
+                                                        letterSlot.className = 'inline-block mx-[0.5px] align-baseline'; // Use align-baseline to match text
+                                                        letterSlot.style.width = '8px'; // Reduced width for compact look
+                                                        letterSlot.style.height = '12px'; // Height just enough for visual
+                                                        letterSlot.style.borderBottom = '2px solid #2563eb'; // Reduced thickness (was 3px)
+                                                        letterSlot.style.marginBottom = '-1px'; // Push down slightly to align with text descenders
+                                                        span.appendChild(letterSlot);
+                                                    }
+                                                    
+                                                    fragment.appendChild(span);
+                                                    
+                                                    lastIndex = regex.lastIndex;
+                                                }
+                                                
+                                                // Remaining text
+                                                if (lastIndex < text.length) {
+                                                    const span = document.createElement('span');
+                                                    span.className = 'font-bold';
+                                                    span.textContent = text.substring(lastIndex);
+                                                    fragment.appendChild(span);
+                                                }
+                                                
+                                                child.parentNode.replaceChild(fragment, child);
+                                            }
+                                        } else if (child.nodeType === 1) { // Element node
+                                            walkAndMask(child);
+                                        }
+                                    });
+                                }
+                                walkAndMask(essenceContentWrapper);
+                                // ---------------------------------------------------------
+
                                 // Clean up content for essence card (remove P tags, convert strong to themed span)
                                 let cleanContent = essenceContentWrapper.innerHTML
                                     .replace(/<p>/g, '').replace(/<\/p>/g, '')
-                                    .replace(/<strong>/g, '<span class="text-blue-600/90 font-bold">').replace(/<\/strong>/g, '</span>')
+                                    // FORCE REMOVE ALL BOLD TAGS from source first to prevent mixed font weights
+                                    // We want the mask style (blue-600 font-black) to be the ONLY style
+                                    .replace(/<strong>/g, '').replace(/<\/strong>/g, '')
+                                    .replace(/<b>/g, '').replace(/<\/b>/g, '')
                                     .replace(/\*\*/g, '') // Remove remaining markdown bold markers
                                     .trim();
+                                
+                                // Re-wrap in a new div to perform text node walking on cleaned HTML
+                                const cleanWrapper = document.createElement('div');
+                                cleanWrapper.innerHTML = cleanContent;
+                                
+                                walkAndMask(cleanWrapper);
+                                
+                                // Get the final HTML from the processed wrapper
+                                cleanContent = cleanWrapper.innerHTML;
                                 
                                 // Final check to remove any trailing asterisks left over
                                 cleanContent = cleanContent.replace(/\*+$/, '');
 
-                                // User Request: Hide original word if it starts the essence summary
-                                if (verb) {
-                                    try {
-                                        const escapedVerb = verb.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                        // Improved Regex: Handles HTML tags (like bold/spans) wrapping the word
-                                        // Matches: Start -> Optional HTML tags -> Quotes? -> Word (Boundary) -> Quotes? -> Optional HTML tags -> Separators
-                                        const regex = new RegExp(`^(\\s*<[^>]+>\\s*)*["'“‘]?\\s*\\b${escapedVerb}\\b\\s*["'”’]?(\\s*<[^>]+>\\s*)*[:：,.-]?\\s*`, 'i');
-                                        cleanContent = cleanContent.replace(regex, '');
-                                        
-                                        // Secondary cleanup: If the removal left a dangling "is" or "means" at start, capitalize it?
-                                        // For now, just ensure we trim again.
-                                        cleanContent = cleanContent.trim();
-                                    } catch (e) {
-                                        console.warn('Regex replacement failed', e);
-                                    }
-                                }
+                                // Old logic removed: specific verb masking is now covered by global English masking above.
 
                                 let essenceHtml = '';
                                 if (isReviewMode) {
