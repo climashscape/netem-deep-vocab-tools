@@ -882,7 +882,8 @@ const LocalAPI = {
             
             for (const verb of verbList) {
                 try {
-                    const key = verb; 
+                    // Use lowercase key for consistent caching regardless of display case
+                    const key = verb.toLowerCase(); 
                     let cachedData = null;
                 
                 if (!refresh) {
