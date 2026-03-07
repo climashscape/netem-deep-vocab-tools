@@ -91,15 +91,18 @@ const LocalAPI = {
                     const expCount = await window.db.explanations.count();
                     const legacyCount = this.legacyData ? Object.keys(this.legacyData).length : 0;
 
-                    // If not marked as imported, OR DB has fewer records than legacy (indicating partial/failed import)
-                    if (this.legacyData && (!legacyImported || expCount < legacyCount || needsUpdate)) {
+                    // If not marked as imported, OR needs update. 
+                    // We avoid strict count comparison because legacy data might have duplicates or invalid records 
+                    // that are filtered during import, leading to persistent count mismatch.
+                    if (this.legacyData && (!legacyImported || needsUpdate)) {
                         const legacyEntries = Object.entries(this.legacyData);
                         if (legacyEntries.length > 0) {
                             console.log(`LocalAPI: reconciling legacy data (DB: ${expCount}, Legacy: ${legacyCount})...`);
                             
                             // Get all existing keys to perform a "safe insert" (don't overwrite user data)
-                            // This is efficient even for 5000+ keys
-                            const existingKeys = new Set(await window.db.explanations.toCollection().primaryKeys());
+                            // Since the primary key is [mode, query_key], primaryKeys() returns an array of arrays.
+                            // We convert them to a set of strings for fast lookup.
+                            const existingKeys = new Set((await window.db.explanations.toCollection().primaryKeys()).map(pk => `${pk[0]}|${pk[1]}`));
                             
                             const explanationsToAdd = [];
                             const now = new Date().toISOString();
@@ -111,8 +114,8 @@ const LocalAPI = {
                                     key = key.substring(0, key.length - 5);
                                 }
 
-                                // Only add if NOT present in DB
-                                if (!existingKeys.has(key)) {
+                                // Only add if NOT present in DB (check 'single|word')
+                                if (!existingKeys.has(`single|${key}`)) {
                                     let content = null;
                                     let image_url = null;
                                     let image_dicebear = null;
@@ -397,7 +400,8 @@ const LocalAPI = {
                        route.includes('/api/checkins') || 
                        route.includes('/api/learn_batch') || 
                        route.includes('/api/export') ||
-                       route.includes('/api/mastery')) && !isClearAll; // Skip check for clear_all
+                       route.includes('/api/mastery') ||
+                       route.includes('/api/explain')) && !isClearAll; // Skip check for clear_all
 
         if (needsDb) {
             // Force init if window.db is missing but initDB exists

@@ -3562,7 +3562,7 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `netem_backup_${new Date().toISOString().split('T')[0]}.zip`;
+                    a.download = `netem_backup_${new Date().toLocaleDateString('en-CA')}.json`;
                     document.body.appendChild(a);
                     
                     // Detect if the user actually triggered the download
@@ -3601,7 +3601,7 @@
             showConfirm('Restore Data', 'Importing a backup will overwrite all your current progress. Continue?', () => {
                 const input = document.createElement('input');
                 input.type = 'file';
-                input.accept = '.zip';
+                input.accept = '.json';
                 input.onchange = async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
@@ -8135,8 +8135,7 @@
                             throw localErr;
                         }
                     }
-                    const isJson = blob.type === 'application/json';
-                    const extension = isJson ? 'json' : 'zip';
+                    const extension = 'json';
                     
                     if (window.Capacitor && (window.Capacitor.isNative || (window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem))) {
                         try {
@@ -8150,7 +8149,7 @@
                             // Smaller chunks are safer for WebView memory limits
                             const CHUNK_SIZE = 1024 * 1024 * 1.5; 
                             
-                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                            const filename = `netem_backup_${new Date().toLocaleDateString('en-CA')}.${extension}`;
                             const { Filesystem, Share } = window.Capacitor.Plugins;
                             const platform = window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'native';
                             
@@ -8269,11 +8268,11 @@
                             console.error("Capacitor export error:", err);
                             // Fallback to browser download if Capacitor fails completely
                             if (statusEl) statusEl.innerText = `Native save failed (${err.message || 'Unknown'}). Trying browser download...`;
-                            const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                            const filename = `netem_backup_${new Date().toLocaleDateString('en-CA')}.${extension}`;
                             downloadBlob(blob);
                         }
                     } else {
-                        const filename = `netem_backup_${new Date().toISOString().slice(0,10)}.${extension}`;
+                        const filename = `netem_backup_${new Date().toLocaleDateString('en-CA')}.${extension}`;
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.style.display = 'none';
@@ -8316,7 +8315,7 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `netem_backup_${new Date().toISOString().slice(0,10)}.zip`;
+            a.download = `netem_backup_${new Date().toLocaleDateString('en-CA')}.json`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
