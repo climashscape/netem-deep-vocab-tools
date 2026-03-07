@@ -1614,7 +1614,7 @@
             <div class="nav-item" onclick="switchPage('review')">
                 <i class="fas fa-history"></i>
                 <span>Review</span>
-                <span id="nav-review-badge" class="absolute top-0.5 left-1/2 ml-2 bg-red-500 text-white text-[9px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white hidden">0</span>
+                <span id="nav-review-badge" class="absolute top-0.5 left-1/2 ml-2 bg-red-500 text-white text-[8px] font-black px-1 min-w-[14px] h-3.5 rounded-full flex items-center justify-center border border-white hidden">0</span>
             </div>
             <div class="nav-item" onclick="switchPage('mastery')">
                 <i class="fas fa-trophy"></i>
@@ -4077,13 +4077,22 @@
             });
 
             // The header stats (Total/Review/Mastered) reflect the current selection scope
+            const todayNewWords = getTodayNewWords();
+            let scopeNewCount = 0;
+
             matchesCurrentSelection.forEach(v => {
                 scopeStats.total++;
-                const status = learningStatus[(v.word || v['单词']).toLowerCase()];
+                const word = (v.word || v['单词']).toLowerCase();
+                const status = learningStatus[word];
                 if (status) {
                     // Today's progress: Any word reviewed today
                     if (status.last_review && new Date(status.last_review) >= todayStart) {
                         scopeStats.today++;
+                    }
+
+                    // Scope-aware new words today
+                    if (todayNewWords.has(word)) {
+                        scopeNewCount++;
                     }
 
                     // Reviewing: Any word in the Ebbinghaus cycle that is NOT mastered
@@ -4103,7 +4112,7 @@
             safeUpdate('header-count-total', scopeStats.total);
             safeUpdate('header-count-review', scopeStats.reviewing);
             safeUpdate('header-count-mastered', scopeStats.mastered);
-            safeUpdate('header-count-today', scopeStats.today);
+            safeUpdate('header-count-today', `${scopeStats.today}/${scopeNewCount}`);
 
             // Update Header Progress Bar
             // User request: Progress should be (any stage words) / (total words in scope)
