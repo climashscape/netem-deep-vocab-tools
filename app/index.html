@@ -2129,6 +2129,7 @@
         };
 
         let allVerbs = [];
+        let vocabularyMap = new Map(); // Fast lookup for word linking and definitions
         let displayedVerbs = [];
         let learningStatus = {}; // Store Ebbinghaus progress
         let currentCardIndex = 0; // Track current card in modal
@@ -3796,6 +3797,7 @@
                 const data = await res.json();
                 
                 if (data.items) {
+                    vocabularyMap = new Map();
                     allVerbs = data.items.map(item => {
                         // Ensure frequency is valid number, handle both legacy Chinese key and normalized English key
                         const freq = parseInt(item['词频'] || item.frequency || item.freq) || 0;
@@ -3805,6 +3807,10 @@
                         const word = (item.word || item['单词'] || '').trim();
                         item.word = word;
                         item['单词'] = word; // Backfill for legacy access
+                        
+                        // Add to vocabularyMap for fast lookup
+                        if (word) vocabularyMap.set(word.toLowerCase(), item);
+                        
                         return item;
                     }).filter(item => item.word);
                     
@@ -6172,6 +6178,275 @@
                     let cards = [];
                     let firstCardExtracted = false;
 
+                    // --- Word Recognition & Linking ---
+                    // Automatically identify words in the vocabulary and make them clickable
+                    function getCanonicalLink(word) {
+                        if (!word || !vocabularyMap) return [];
+                        const lower = word.toLowerCase();
+                        const candidates = new Set();
+                        
+                        // 1. Exact match
+                        if (vocabularyMap.has(lower)) candidates.add(lower);
+                        
+                        // 2. Common Irregular Verbs (Manual Mapping)
+                        const irregulars = {
+                            'went': 'go', 'gone': 'go', 'saw': 'see', 'seen': 'see', 'did': 'do', 'done': 'do',
+                            'came': 'come', 'got': 'get', 'given': 'give', 'gave': 'give', 'taken': 'take', 'took': 'take',
+                            'made': 'make', 'felt': 'feel', 'told': 'tell', 'kept': 'keep', 'left': 'leave', 'slept': 'sleep',
+                            'thought': 'think', 'bought': 'buy', 'caught': 'catch', 'taught': 'teach', 'brought': 'bring',
+                            'stood': 'stand', 'understood': 'understand', 'sat': 'sit', 'spoke': 'speak', 'spoken': 'speak',
+                            'wrote': 'write', 'written': 'write', 'drove': 'drive', 'driven': 'drive', 'ate': 'eat', 'eaten': 'eat',
+                            'drank': 'drink', 'drunk': 'drink', 'swam': 'swim', 'swum': 'swim', 'ran': 'run', 'read': 'read',
+                            'lost': 'lose', 'found': 'find', 'heard': 'hear', 'meant': 'mean', 'paid': 'pay', 'said': 'say',
+                            'sold': 'sell', 'built': 'build', 'sent': 'send', 'spent': 'spend', 'met': 'meet', 'led': 'lead'
+                        };
+                        if (irregulars[lower] && vocabularyMap.has(irregulars[lower])) {
+                            candidates.add(irregulars[lower]);
+                        }
+
+                        // 3. Common English Suffix Stemming (Heuristics)
+                        const suffixes = [
+                            's', 'es', 'ed', 'ing', 'ly', 'ment', 'ion', 'ions', 'ive', 'al', 'ic', 'ness', 
+                            'able', 'ible', 'ity', 'ous', 'ful', 'less', 'ship', 'er', 'or', 'ist', 'ize', 
+                            'ise', 'en', 'ify', 'th', 'ier', 'iest', 'ied', 'ies'
+                        ];
+                        
+                        for (const suffix of suffixes) {
+                            if (lower.endsWith(suffix) && lower.length > suffix.length + 2) {
+                                let root = lower.substring(0, lower.length - suffix.length);
+                                
+                                // Basic root check
+                                if (vocabularyMap.has(root)) candidates.add(root);
+                                
+                                // Rule: e-deletion (e.g., diving -> dive, baked -> bake)
+                                if (suffix === 'ing' || suffix === 'ed' || suffix === 'er' || suffix === 'able' || suffix === 'ive' || suffix === 'ize') {
+                                    const eRoot = root + 'e';
+                                    if (vocabularyMap.has(eRoot)) candidates.add(eRoot);
+                                }
+                                
+                                // Rule: y-to-i change (e.g., carried -> carry, happily -> happy, beauties -> beauty)
+                                if (suffix === 'ed' || suffix === 'ly' || suffix === 'ies' || suffix === 'ied' || suffix === 'ier' || suffix === 'iest' || suffix === 'iness') {
+                                    if (root.endsWith('i')) {
+                                        const yRoot = root.substring(0, root.length - 1) + 'y';
+                                        if (vocabularyMap.has(yRoot)) candidates.add(yRoot);
+                                    }
+                                }
+
+                                // Rule: double consonant (e.g., running -> run, admitted -> admit)
+                                if (suffix === 'ing' || suffix === 'ed' || suffix === 'er' || suffix === 'est') {
+                                    if (root.length > 3 && root[root.length-1] === root[root.length-2]) {
+                                        const singleConsonantRoot = root.substring(0, root.length - 1);
+                                        if (vocabularyMap.has(singleConsonantRoot)) {
+                                            candidates.add(singleConsonantRoot);
+                                        }
+                                    }
+                                }
+                                
+                                // Rule: es removal (beaches -> beach, boxes -> box)
+                                if (suffix === 'es') {
+                                    // Already checked "root" which is lower - "es"
+                                }
+                            }
+                        }
+
+                        // 4. Prefix Stemming (e.g. attract -> tract, distract -> tract)
+                        const prefixes = ['at', 'con', 'dis', 'ex', 'in', 're', 'sub', 'trans', 'pro', 'de', 'pre', 'per', 'ad', 'ab', 'com', 'inter', 'intra', 'extra'];
+                        
+                        // Recursive/Multi-stage Stemming
+                        // We try to find roots by stripping prefixes, then stripping suffixes from the result, and vice versa.
+                        function findRoots(str) {
+                            const results = new Set();
+                            
+                            // 1. Try Prefix Stripping
+                            for (const prefix of prefixes) {
+                                if (str.startsWith(prefix) && str.length > prefix.length + 3) {
+                                    const root = str.substring(prefix.length);
+                                    if (vocabularyMap.has(root)) results.add(root);
+                                    
+                                    // Try stripping suffix from this prefixed root (e.g., attraction -> at + tract + ion)
+                                    for (const suffix of suffixes) {
+                                        if (root.endsWith(suffix) && root.length > suffix.length + 2) {
+                                            const subRoot = root.substring(0, root.length - suffix.length);
+                                            if (vocabularyMap.has(subRoot)) results.add(subRoot);
+                                            
+                                            // Handle e-deletion and other rules for subRoot
+                                            if (['ing', 'ed', 'er', 'able', 'ive', 'ize'].includes(suffix)) {
+                                                if (vocabularyMap.has(subRoot + 'e')) results.add(subRoot + 'e');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 2. Try Suffix Stripping (already handled in step 3 above, but we need it for combined logic)
+                            // This part ensures we catch things like "distracting" -> "distract" -> "tract"
+                            for (const suffix of suffixes) {
+                                if (str.endsWith(suffix) && str.length > suffix.length + 2) {
+                                    const root = str.substring(0, str.length - suffix.length);
+                                    // If we find a root by stripping suffix, try stripping prefix from IT
+                                    for (const prefix of prefixes) {
+                                        if (root.startsWith(prefix) && root.length > prefix.length + 3) {
+                                            const subRoot = root.substring(prefix.length);
+                                            if (vocabularyMap.has(subRoot)) results.add(subRoot);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            return results;
+                        }
+
+                        const structuralRoots = findRoots(lower);
+                        structuralRoots.forEach(r => candidates.add(r));
+
+                        // 5. Remove General "Word Block" Detection
+                        // This was too aggressive and caused matches like grate -> rate.
+                        // By using structural analysis (prefixes/suffixes) instead of arbitrary substrings,
+                        // we maintain accuracy while still catching roots like 'tract' in 'attraction'.
+                        
+                        // Sort candidates logically:
+                        // 1. Exact matches first
+                        // 2. Longer (more specific) candidates next
+                        // 3. Shorter ones last
+                        const sorted = Array.from(candidates).sort((a, b) => {
+                            if (a === lower) return -1;
+                            if (b === lower) return 1;
+                            return b.length - a.length;
+                        });
+                        
+                        return sorted;
+                    }
+
+                    function showLinkSelector(event, word, candidates) {
+                        event.stopPropagation();
+                        
+                        // If only one candidate, open it directly
+                        if (candidates.length === 1) {
+                            if (window.openVerb) window.openVerb(candidates[0]);
+                            else openVerb(candidates[0]);
+                            return;
+                        }
+
+                        // Remove existing selector if any
+                        const existing = document.getElementById('link-selector-popup');
+                        if (existing) existing.remove();
+
+                        const popup = document.createElement('div');
+                        popup.id = 'link-selector-popup';
+                        popup.className = 'fixed z-[9999] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 py-2 min-w-[180px] max-w-[280px] animate-fade-in-up overflow-hidden';
+                        
+                        // Position logic
+                        const rect = event.target.getBoundingClientRect();
+                        let top = rect.bottom + 8;
+                        let left = rect.left;
+                        
+                        // Keep on screen
+                        if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
+                        if (top + 250 > window.innerHeight) top = rect.top - 150;
+
+                        popup.style.top = `${top}px`;
+                        popup.style.left = `${left}px`;
+
+                        const title = document.createElement('div');
+                        title.className = 'px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100/50 mb-1 flex items-center justify-between';
+                        title.innerHTML = `<span>Jump to...</span><i class="fas fa-link opacity-50"></i>`;
+                        popup.appendChild(title);
+
+                        candidates.forEach(cand => {
+                            const verbObj = vocabularyMap.get(cand);
+                            const definition = verbObj ? (verbObj.definition || verbObj['释义'] || 'No definition') : '';
+                            
+                            const item = document.createElement('button');
+                            item.className = 'w-full text-left px-4 py-3 hover:bg-blue-50/50 transition-all flex flex-col gap-0.5 group border-b border-gray-50 last:border-0';
+                            item.innerHTML = `
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-black text-gray-800 group-hover:text-blue-600 transition-colors">${cand}</span>
+                                    <i class="fas fa-chevron-right text-[10px] text-gray-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>
+                                </div>
+                                <span class="text-[11px] text-gray-500 font-medium truncate opacity-80 group-hover:opacity-100">${definition}</span>
+                            `;
+                            item.onclick = () => {
+                                if (window.openVerb) window.openVerb(cand);
+                                else openVerb(cand);
+                                popup.remove();
+                            };
+                            popup.appendChild(item);
+                        });
+
+                        document.body.appendChild(popup);
+
+                        // Click outside to close
+                        const closePopup = (e) => {
+                            if (!popup.contains(e.target)) {
+                                popup.remove();
+                                document.removeEventListener('mousedown', closePopup);
+                            }
+                        };
+                        setTimeout(() => document.addEventListener('mousedown', closePopup), 10);
+                    }
+
+                    // Global cache for word canonicalization results within a session/render
+                    const linkCache = new Map();
+
+                    function walkAndLink(node, currentVerb) {
+                        const childNodes = Array.from(node.childNodes);
+                        childNodes.forEach(child => {
+                            if (child.nodeType === 3) { // Text node
+                                const text = child.nodeValue;
+                                const regex = /[a-zA-Z']+/g;
+                                let match;
+                                let lastIndex = 0;
+                                const fragment = document.createDocumentFragment();
+                                let hasMatches = false;
+
+                                while ((match = regex.exec(text)) !== null) {
+                                    const word = match[0];
+                                    const wordKey = word.toLowerCase();
+                                    
+                                    // Use cache or calculate
+                                    let candidates;
+                                    if (linkCache.has(wordKey)) {
+                                        candidates = linkCache.get(wordKey);
+                                    } else {
+                                        candidates = getCanonicalLink(word);
+                                        linkCache.set(wordKey, candidates);
+                                    }
+                                    
+                                    // Filter out current verb from candidates
+                                    const validCandidates = candidates.filter(c => c !== currentVerb.toLowerCase());
+                                    
+                                    if (validCandidates.length > 0) {
+                                        hasMatches = true;
+                                        if (match.index > lastIndex) {
+                                            fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                                        }
+
+                                        const span = document.createElement('span');
+                                        span.className = 'text-blue-600 border-b border-blue-400/30 border-dotted cursor-pointer hover:bg-blue-100/50 transition-colors px-0.5 rounded-sm';
+                                        span.textContent = word;
+                                        span.onclick = (e) => {
+                                            showLinkSelector(e, word, validCandidates);
+                                        };
+                                        fragment.appendChild(span);
+                                        lastIndex = regex.lastIndex;
+                                    }
+                                }
+
+                                if (hasMatches) {
+                                    if (lastIndex < text.length) {
+                                        fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+                                    }
+                                    child.parentNode.replaceChild(fragment, child);
+                                }
+                            } else if (child.nodeType === 1) {
+                                const ignoredTags = ['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SCRIPT', 'STYLE'];
+                                if (!ignoredTags.includes(child.tagName)) {
+                                    walkAndLink(child, currentVerb);
+                                }
+                            }
+                        });
+                    }
+
                     // Clear previous cards NOW, just before rendering new ones
                     // This ensures the blur effect stays until the last moment
                     Array.from(outputContainer.children).forEach(child => {
@@ -6328,7 +6603,12 @@
                                         }
                                     });
                                 }
-                                walkAndMask(essenceContentWrapper);
+                                if (isReviewMode) {
+                                    walkAndMask(essenceContentWrapper);
+                                } else {
+                                    // Also apply word linking to essence if not in review mode
+                                    walkAndLink(essenceContentWrapper, spellingWord);
+                                }
                                 // ---------------------------------------------------------
 
                                 // Clean up content for essence card (remove P tags, convert strong to themed span)
@@ -6480,6 +6760,10 @@
                         });
 
                         contentWrapper.innerHTML = tempDiv.innerHTML;
+                        
+                        // Apply word recognition and linking to all detailed content
+                        walkAndLink(contentWrapper, spellingWord);
+                        
                         card.appendChild(contentWrapper);
 
                         // Unify text styles for all content elements
