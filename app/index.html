@@ -1649,7 +1649,7 @@
             </div>
 
             <!-- Modal Header -->
-            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">
+            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec] flex items-center gap-3">
                 <div class="flex flex-col items-start pr-12 min-w-0 w-full">
                     <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-1">Stage 0</div>
                     <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full"></h2>
@@ -2132,6 +2132,7 @@
         let vocabularyMap = new Map(); // Fast lookup for word linking and definitions
         let displayedVerbs = [];
         let learningStatus = {}; // Store Ebbinghaus progress
+        let modalHistoryCount = 0; // Track how many states we pushed for internal navigation
         let currentCardIndex = 0; // Track current card in modal
         
         // Auto Image Generation Queue
@@ -2170,22 +2171,102 @@
             localStorage.setItem('analysisMode', analysisMode);
         }
         
-        // --- Back Button Support for Modals ---
+        // --- Back Button Support for Modals (Pure Hash Router) ---
         let modalStack = [];
+        // Track the depth of hash navigation within the modal
+        let hashNavDepth = 0;
+        
+        // Helper to check/parse hash
+        function parseWordHash(h) {
+            if (h && h.startsWith('#detail=')) {
+                return decodeURIComponent(h.substring(8));
+            }
+            return null;
+        }
+        
         window.addEventListener('popstate', (event) => {
+            // Force reset closing flag just in case
+            isClosing = false;
+
+            const hash = location.hash;
+            let word = parseWordHash(hash);
+            
+            // Fallback: Check event state if hash fails
+            if (!word && event.state && event.state.verb) {
+                word = event.state.verb;
+            }
+
+            // 1. Word Navigation (Hash or State matched)
+            if (word) {
+                // If modal is not active, open it
+                if (!modal.classList.contains('active')) {
+                    modal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                    // We entered from a link or forward navigation, so depth is unknown/reset
+                    // But we can assume at least 1
+                    hashNavDepth = 1;
+                } else {
+                    // If already active, we are navigating back/forward
+                    // We don't know direction easily, but we know we are still in the stack
+                }
+                
+                // If we have overlays (e.g. Settings), close them
+                // Keep popping until we are back to the base layer (or empty if we don't track base)
+                // Since we don't reliably track the base layer in modalStack for word modals (due to history pushes),
+                // we just clear anything that looks like an overlay.
+                // But wait, if we push Word to stack, we can keep it.
+                // Let's assume we want to clear everything EXCEPT the base word modal if it exists.
+                while (modalStack.length > 0) {
+                     const topModal = modalStack[modalStack.length - 1];
+                     // If top modal is NOT the learning modal (which we don't push to stack in this new logic), close it.
+                     // Actually, let's just close everything in modalStack because the Word Modal is managed by URL/State now.
+                     // The Word Modal "is" the page. Overlays are popped on top.
+                     const lastModal = modalStack.pop();
+                     if (lastModal && typeof lastModal.closeFn === 'function') {
+                         lastModal.closeFn(true);
+                     }
+                }
+                
+                // Recover state if available
+                const isReview = event.state ? event.state.isReview : false;
+                
+                // CRITICAL OPTIMIZATION: Check if we are ALREADY displaying this word.
+                // If so, do NOT reload the modal content. This prevents flickering and network requests on back/forward.
+                // We check modalTitle.innerText against the target 'word'.
+                const currentVerb = modalTitle.innerText;
+                if (currentVerb && currentVerb.toLowerCase() === word.toLowerCase()) {
+                    // Already showing this word. Do nothing.
+                    return;
+                }
+
+                // Load the word content
+                openVerb(word, isReview, false, true); // isBack=true prevents pushing new state
+                return;
+            }
+
+            // 2. No Hash (or non-word hash): Close Modal
+            if (modal.classList.contains('active')) {
+                // We backed out of the word detail stack
+                closeModal(true); // true = fromPopState
+                return;
+            }
+            
+            // 3. Handle Other Modals (Standard Stack)
             if (modalStack.length > 0) {
-                const lastModalCloseFn = modalStack.pop();
-                if (typeof lastModalCloseFn === 'function') {
-                    // Call the close function without adding another popstate entry
-                    lastModalCloseFn(true); 
+                const lastModal = modalStack.pop();
+                if (lastModal && typeof lastModal.closeFn === 'function') {
+                    lastModal.closeFn(true); 
                 }
             }
         });
 
-        function pushModalState(closeFn) {
-            modalStack.push(closeFn);
-            history.pushState({ modal: true }, "");
+        function pushModalState(closeFn, state = { modal: true }) {
+            // For non-word modals (Settings, etc.), use standard stack
+            // They don't use Hash routing
+            modalStack.push({ closeFn });
+            history.pushState(state, "");
         }
+        // --- End Back Button Support ---
         // --- End Back Button Support ---
 
         function matchesPos(v, posArray) {
@@ -2518,13 +2599,36 @@
                     return;
                 }
 
+                // Clear grid first
                 grid.innerHTML = '';
-                learnedVerbs.forEach(v => {
-                    // Ensure createVerbCard generates interactive blocks
-                    const card = createVerbCard(v);
-                    grid.appendChild(card);
-                });
-                ensureLibrarySortButton(true);
+                
+                // Optimized Rendering: Use DocumentFragment and requestAnimationFrame
+                const fragment = document.createDocumentFragment();
+                const batchSize = 20; // Render 20 cards per frame
+                let renderedCount = 0;
+                
+                function renderBatch() {
+                    const limit = Math.min(renderedCount + batchSize, learnedVerbs.length);
+                    
+                    for (let i = renderedCount; i < limit; i++) {
+                        const card = createVerbCard(learnedVerbs[i]);
+                        fragment.appendChild(card);
+                    }
+                    
+                    grid.appendChild(fragment); // Append current batch
+                    renderedCount = limit;
+                    
+                    if (renderedCount < learnedVerbs.length) {
+                        // Continue rendering next batch in next frame
+                        requestAnimationFrame(renderBatch);
+                    } else {
+                        // Done rendering
+                        ensureLibrarySortButton(true);
+                    }
+                }
+                
+                // Start rendering loop
+                requestAnimationFrame(renderBatch);
             }
         }
 
@@ -4626,24 +4730,34 @@
 
             const card = document.createElement('div');
             card.id = 'verb-card-' + verb;
-            card.className = 'verb-card group relative flex flex-col items-stretch'; 
+            // Improved Card Interaction: Separate active/press states
+            // Remove 'active:scale-95' from CSS classes to handle scaling manually via JS
+            // This prevents conflict between click scaling and long-press scaling
+            // UI Update: Soften background color (Slate-50) and shadow to reduce eye strain
+            // REMOVE 'border' from card itself to avoid rendering glitch with image.
+            // We use an absolute overlay border instead.
+            card.className = 'group relative flex flex-col bg-[#f8fafc] rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-1 isolate';
             
             // Auto-generate image/explanation if missing
             if (!item.image_url && !item.has_cache) {
                 addToQueue(verb);
             }
             
-            // Long Press Logic for Exclude (Learn page only)
+            // Long Press Logic
             let longPressTimer;
-            let isLongPress = false;
+            let isLongPress = false; // Flag if long press was triggered
+            let isPressing = false;  // Flag if user is currently holding down
             let startX = 0;
             let startY = 0;
-            const longPressDuration = 600;
+            const longPressDuration = 500; // Slightly faster
 
-            const startLongPress = (e) => {
+            const startPress = (e) => {
+                // Ignore if overlay is active
+                if (card.querySelector('.exclude-overlay.active')) return;
                 // User request: Different pages have different card interactions
                 if (currentPage !== 'learn' && currentPage !== 'mastery' && currentPage !== 'review') return;
                 
+                isPressing = true;
                 isLongPress = false;
                 
                 // Track start position
@@ -4655,59 +4769,90 @@
                     startY = e.clientY;
                 }
                 
-                card.style.transform = 'scale(0.95)';
-                card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                // Apply press scale effect immediately
+                card.style.transform = 'scale(0.96)';
+                card.style.transition = 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)';
                 
                 longPressTimer = setTimeout(() => {
+                    if (!isPressing) return;
                     isLongPress = true;
-                    if (window.navigator.vibrate) window.navigator.vibrate(50); // Haptic feedback
                     
+                    // Trigger Haptic feedback
+                    if (window.navigator && window.navigator.vibrate) {
+                        window.navigator.vibrate(50);
+                    }
+                    
+                    // Show Overlay
                     showExcludeOverlay(card, verb);
-                    card.style.transform = '';
-                    card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                    
+                    // Reset scale when overlay appears (it has its own animation)
+                    card.style.transform = 'scale(1)';
+                    
                 }, longPressDuration);
             };
 
-            const cancelLongPress = () => {
+            const cancelPress = (e) => {
+                isPressing = false;
                 clearTimeout(longPressTimer);
-                if (!isLongPress) card.style.transform = '';
-            };
-
-            const handleTouchMove = (e) => {
-                if (!longPressTimer) return;
                 
-                const currentX = e.touches[0].clientX;
-                const currentY = e.touches[0].clientY;
-                
-                // If moved more than 10px, cancel long press
-                if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startY) > 10) {
-                    cancelLongPress();
+                // If it was NOT a long press, and overlay is NOT active, revert scale
+                if (!isLongPress && !card.querySelector('.exclude-overlay.active')) {
+                    card.style.transform = 'scale(1)';
                 }
             };
 
-            card.onmousedown = startLongPress;
-            card.ontouchstart = startLongPress;
-            card.onmouseup = cancelLongPress;
-            card.onmouseleave = cancelLongPress;
-            card.ontouchend = cancelLongPress;
-            card.ontouchcancel = cancelLongPress; // Add touchcancel handler
-            card.ontouchmove = handleTouchMove;
+            const handleMove = (e) => {
+                if (!isPressing) return;
+                
+                let clientX, clientY;
+                if (e.type === 'touchmove') {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
+                // If moved more than 10px, cancel everything (it's a scroll)
+                if (Math.abs(clientX - startX) > 10 || Math.abs(clientY - startY) > 10) {
+                    isPressing = false;
+                    clearTimeout(longPressTimer);
+                    card.style.transform = 'scale(1)';
+                }
+            };
+
+            // Attach Listeners
+            card.addEventListener('mousedown', startPress);
+            card.addEventListener('touchstart', startPress, { passive: true });
+            
+            card.addEventListener('mouseup', cancelPress);
+            card.addEventListener('mouseleave', cancelPress);
+            card.addEventListener('touchend', cancelPress);
+            card.addEventListener('touchcancel', cancelPress);
+            
+            card.addEventListener('mousemove', handleMove);
+            card.addEventListener('touchmove', handleMove, { passive: true });
+            
             card.oncontextmenu = (e) => {
                 if (currentPage === 'learn' || currentPage === 'mastery') e.preventDefault();
             };
 
             card.onclick = (e) => {
                 const overlay = card.querySelector('.exclude-overlay');
+                
+                // If overlay is active, ignore clicks on card body (overlay handles its own clicks)
                 if (overlay && overlay.classList.contains('active')) {
-                    isLongPress = false;
                     return;
                 }
                 
+                // If it was a long press, do NOT open the word
                 if (isLongPress) {
                     isLongPress = false;
                     return;
                 }
+                
                 if (e.target.closest('button') || e.target.closest('.exclude-overlay')) return;
+                
                 let isReview = currentFreq === 'review' || currentPage === 'review';
                 // User request: Library tab in Review page should show study mode (no spelling test)
                 if (currentPage === 'review' && currentReviewTab === 'library') {
@@ -4717,8 +4862,6 @@
                 const verbToOpen = item.word || item['单词'];
                 if (verbToOpen) {
                     openVerb(verbToOpen, isReview);
-                } else {
-                    console.error("Cannot open verb: invalid item data", item);
                 }
             };
             
@@ -4760,8 +4903,12 @@
             }
 
             if (imageProvider === 'none') {
+                // Image container also needs top radius to match card
+                // FIX: Add 'm-[1px]' margin and 'rounded-[14px]' (slightly less than card's 16px) 
+                // to physically separate image from the outer border by 1px of whitespace.
+                // This guarantees the image pixels can NEVER touch the outer edge.
                 imageHtml = `
-                <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
+                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-32 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
                     <div class="frosted-placeholder">
                         <i class="fas fa-image"></i>
                     </div>
@@ -4770,7 +4917,7 @@
                 contentClasses += ' justify-start pt-2';
             } else if (displayImageUrl && itemWord) {
                 imageHtml = `
-                <div class="verb-image-container verb-card-block w-full h-32 overflow-hidden relative shrink-0 transition-all duration-200">
+                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-32 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
                     <img src="${displayImageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
@@ -4825,8 +4972,8 @@
             }
 
             const excludeOverlay = `
-                <div class="exclude-overlay p-4" onclick="hideExcludeOverlay(this)">
-                    <div class="w-full max-w-[150px] space-y-3">
+                <div class="exclude-overlay p-4 rounded-none overflow-hidden z-30" style="border-radius: 0 !important;" onclick="hideExcludeOverlay(this)">
+                    <div class="w-full max-w-[150px] space-y-3 relative z-10">
                         <button class="mastery-confirm-btn text-orange-600">
                             <i class="fas fa-trophy text-sm"></i>
                             <span class="whitespace-nowrap">Mark Mastered</span>
@@ -4855,12 +5002,18 @@
             const displayFreq = item.frequency || item['词频'];
             const displayDef = item.definition || item['释义'] || '';
             const displaySeq = item.sequence || item['序号'];
+            
+            // Add Overlay Border Div:
+            // This div sits on top of all content (z-20) and provides the border.
+            // It perfectly masks any jagged edges from images or content overflow.
+            const borderOverlay = `<div class="absolute inset-0 border border-slate-200/60 rounded-2xl pointer-events-none z-20 transition-colors duration-300 group-hover:border-slate-300/80"></div>`;
 
             card.innerHTML = `
+                ${borderOverlay}
                 ${excludeOverlay}
                 ${ebbinghausBadge}
                 ${imageHtml}
-                <div class="${contentClasses} relative">
+                <div class="${contentClasses} relative z-10">
                     <h3 class="${displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full break-words leading-tight">
                         ${displayWord}
                     </h3>
@@ -5385,12 +5538,47 @@
         const essenceContainer = document.getElementById('essenceContainer');
         // const loader = document.getElementById('loader');
 
-        function openVerb(verb, isReview = false, refresh = false) {
-            if (!modal.classList.contains('active')) {
-                pushModalState(closeModal);
+        // Internal History Stack Removed - We use pure Hash Routing
+        
+        function updateModalBackButton() {
+            // Deprecated - Removed
+        }
+
+        function goBackInternal() {
+            // Deprecated - Removed
+        }
+
+        function openVerb(verb, isReview = false, refresh = false, isBack = false) {
+            // Handle Navigation History
+            if (modal.classList.contains('active')) {
+                const currentVerb = modalTitle.innerText;
+                if (!isBack && currentVerb && currentVerb.toLowerCase() !== verb.toLowerCase()) {
+                    // Push new hash state
+                    // We use pushState to create a new history entry
+                    const newHash = '#detail=' + encodeURIComponent(verb);
+                    
+                    // Only push if hash is different
+                    if (location.hash !== newHash) {
+                        history.pushState({ isReview: isReview }, "", newHash);
+                    }
+                }
+            } else {
+                // Starting fresh modal
+                isClosing = false; // Reset closing flag to ensure clean state
+                modalHistoryCount = 0;
+                
+                // For the FIRST word, we also want to push a state so we have a URL to back from
+                // We must use the correct hash format
+                const newHash = '#detail=' + encodeURIComponent(verb);
+                
+                // CRITICAL: We need to push the state to create the "Detail Page" history entry.
+                // This ensures that when user presses Back, they leave this "Detail Page" entry.
+                history.pushState({ isReview: isReview }, "", newHash);
+                
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
             }
+
             modalTitle.innerText = verb;
             isReviewMode = isReview;
             spellingWord = verb;
@@ -5485,6 +5673,7 @@
                 }
             }
             ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
+            window.openVerb = openVerb;
             
             // Multiple calls to handle different stages of modal expansion
             adjustModalTitleFontSize();
@@ -5576,7 +5765,9 @@
                 refreshBtn.style.display = ''; 
             }
             
-            analyzeVerbs(verb);
+            // For manual trigger, we treat it as a refresh to ensure it generates content
+            // even if previous content was partial or error
+            analyzeVerbs(verb, true);
         }
 
         let isClosing = false;
@@ -5586,10 +5777,10 @@
             isClosing = true;
 
             if (fromPopState !== true) {
-                // If closed manually (not via back button), remove the state from history
-                // const idx = modalStack.indexOf(closeModal);
-                // if (idx > -1) modalStack.splice(idx, 1);
-                history.back();
+                // If closed manually, we need to go back through all internal word states PLUS the modal open state
+                const stepsBack = -1 - modalHistoryCount;
+                modalHistoryCount = 0; // Reset
+                history.go(stepsBack);
             }
 
             // Abort any ongoing analysis request
@@ -6320,12 +6511,14 @@
                     function showLinkSelector(event, word, candidates) {
                         event.stopPropagation();
                         
-                        // If only one candidate, open it directly
+                        // Force show selector even if only one candidate
+                        /*
                         if (candidates.length === 1) {
                             if (window.openVerb) window.openVerb(candidates[0]);
                             else openVerb(candidates[0]);
                             return;
                         }
+                        */
 
                         // Remove existing selector if any
                         const existing = document.getElementById('link-selector-popup');
@@ -6333,55 +6526,149 @@
 
                         const popup = document.createElement('div');
                         popup.id = 'link-selector-popup';
-                        popup.className = 'fixed z-[9999] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 py-2 min-w-[180px] max-w-[280px] animate-fade-in-up overflow-hidden';
+                        // Updated UI to match App's Neumorphic/Glassmorphic style
+                        // - Background: Match global background color #e0e5ec but slightly lighter for popup
+                        // - Shadow: Deep neumorphic shadow
+                        // - Border: Subtle highlight
+                        popup.className = 'fixed z-[9999] bg-[#e6ebf2]/95 backdrop-blur-xl rounded-2xl shadow-[8px_8px_16px_#b8b9be,-8px_-8px_16px_#ffffff] border border-white/40 py-2 min-w-[200px] max-w-[280px] animate-fade-in-up overflow-hidden';
                         
                         // Position logic
                         const rect = event.target.getBoundingClientRect();
+                        
+                        // Push a dummy state to history to intercept back button
+                        // We use a special hash for popup state to distinguish it
+                        // NOTE: We don't want to mess up the 'detail' hash flow too much.
+                        // But we need to intercept.
+                        // Let's use a state object flag.
+                        history.pushState({ popupOpen: true }, "");
+                        
+                        // Handle back button interception for popup
+                        const handlePopupPopState = (e) => {
+                            // If we popped back (popupOpen is gone or different), close popup
+                            // But wait, if user goes back, e.state might be the Previous word state.
+                            // We just need to know that a pop happened.
+                            
+                            // Check if popup is still in DOM
+                            const p = document.getElementById('link-selector-popup');
+                            if (p) {
+                                p.remove();
+                                document.removeEventListener('mousedown', closePopup);
+                                // Stop propagation to prevent modal closing logic?
+                                // Our main popstate listener is also running.
+                                // We need to coordinate.
+                                // Ideally, the main listener sees this state change and decides what to do.
+                                // But main listener sees "No Hash" or "Different Hash".
+                                
+                                // Actually, if we pushed a state, the current URL didn't change (empty 2nd arg).
+                                // Wait, pushState(..., "") keeps current URL.
+                                // So when we back, we go to previous URL (which is the SAME URL).
+                                // So hash didn't change. Main listener sees same hash.
+                                // Main listener logic: "Hash Route Matched: Open/Update Modal".
+                                // If hash is same, it does openVerb(word).
+                                // So backing out of popup just re-renders current word.
+                                // This is actually acceptable behavior! It "refreshes" the view, effectively closing popup.
+                                
+                                // BUT, we need to ensure we don't double-fire or cause issues.
+                                // Let's just rely on the fact that popping this state triggers the main listener.
+                            }
+                            window.removeEventListener('popstate', handlePopupPopState);
+                        };
+                        
+                        window.addEventListener('popstate', handlePopupPopState);
+
+                        // Calculate optimal position
                         let top = rect.bottom + 8;
                         let left = rect.left;
                         
-                        // Keep on screen
-                        if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
-                        if (top + 250 > window.innerHeight) top = rect.top - 150;
+                        // Prevent overflow right
+                        if (left + 280 > window.innerWidth) {
+                            left = window.innerWidth - 290;
+                        }
+                        
+                        // Prevent overflow bottom
+                        const popupHeight = 50 + (candidates.length * 60); // Estimate height
+                        if (top + popupHeight > window.innerHeight) {
+                            // If not enough space below, show above
+                            top = rect.top - popupHeight - 8;
+                        }
 
                         popup.style.top = `${top}px`;
                         popup.style.left = `${left}px`;
 
                         const title = document.createElement('div');
-                        title.className = 'px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100/50 mb-1 flex items-center justify-between';
+                        title.className = 'px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-300/30 mb-1 flex items-center justify-between';
                         title.innerHTML = `<span>Jump to...</span><i class="fas fa-link opacity-50"></i>`;
                         popup.appendChild(title);
 
                         candidates.forEach(cand => {
+                            // Find the definition for this candidate
+                            // First try vocabularyMap (fast lookup)
+                            let definition = '';
                             const verbObj = vocabularyMap.get(cand);
-                            const definition = verbObj ? (verbObj.definition || verbObj['释义'] || 'No definition') : '';
+                            if (verbObj) {
+                                definition = verbObj.definition || verbObj['释义'] || '';
+                            }
                             
-                            const item = document.createElement('button');
-                            item.className = 'w-full text-left px-4 py-3 hover:bg-blue-50/50 transition-all flex flex-col gap-0.5 group border-b border-gray-50 last:border-0';
+                            // Fallback: search in allVerbs array if map missed it
+                            if (!definition) {
+                                const found = allVerbs.find(v => v['单词'] === cand);
+                                if (found) {
+                                    definition = found['释义'] || '';
+                                }
+                            }
+                            
+                            if (!definition) definition = 'No definition available';
+                            
+                            const item = document.createElement('div'); // Changed to div for better styling control
+                            // Updated item style: Neumorphic pressed state on hover
+                            item.className = 'w-full text-left px-4 py-3 cursor-pointer transition-all flex flex-col gap-0.5 group border-b border-gray-300/20 last:border-0 relative hover:bg-white/40 active:bg-gray-200/50 active:shadow-inner';
                             item.innerHTML = `
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm font-black text-gray-800 group-hover:text-blue-600 transition-colors">${cand}</span>
-                                    <i class="fas fa-chevron-right text-[10px] text-gray-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>
+                                <div class="flex items-center justify-between pointer-events-none">
+                                    <span class="text-sm font-black text-gray-700 group-hover:text-blue-600 transition-colors">${cand}</span>
+                                    <i class="fas fa-chevron-right text-[10px] text-gray-400 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>
                                 </div>
-                                <span class="text-[11px] text-gray-500 font-medium truncate opacity-80 group-hover:opacity-100">${definition}</span>
+                                <span class="text-[11px] text-gray-500 font-medium truncate opacity-80 group-hover:opacity-100 pointer-events-none">${definition}</span>
                             `;
-                            item.onclick = () => {
-                                if (window.openVerb) window.openVerb(cand);
-                                else openVerb(cand);
-                                popup.remove();
-                            };
+                            
+                            // Use mousedown instead of click to fire before blur events
+                            item.addEventListener('mousedown', (e) => {
+                                e.stopPropagation(); // Prevent bubbling
+                                
+                                // Manually remove the dummy history state we pushed
+                                // because we are navigating forward now
+                                // Wait, if we navigate forward (openVerb pushes new state), the dummy state remains in history?
+                                // Ideally we want to REPLACE the dummy state with the new word state.
+                                // Or go back first.
+                                
+                                // Let's go back first to clear the "popup open" state
+                                history.back();
+                                
+                                // Small delay to let popstate settle, then open new word
+                                setTimeout(() => {
+                                    if (window.openVerb) window.openVerb(cand);
+                                    else openVerb(cand);
+                                    
+                                    // Popup is removed by handlePopupPopState (triggered by history.back)
+                                    // But just in case
+                                    popup.remove();
+                                }, 50);
+                            });
+                            
                             popup.appendChild(item);
                         });
 
                         document.body.appendChild(popup);
 
-                        // Click outside to close
+                        // Click outside to close - use mousedown to catch it early
                         const closePopup = (e) => {
-                            if (!popup.contains(e.target)) {
-                                popup.remove();
-                                document.removeEventListener('mousedown', closePopup);
+                            if (!popup.contains(e.target) && e.target !== event.target) {
+                                // If clicking outside, we also need to clear the history state
+                                history.back();
+                                // handlePopupPopState will remove the popup
                             }
                         };
+                        
+                        // Delay adding listener slightly to avoid immediate trigger
                         setTimeout(() => document.addEventListener('mousedown', closePopup), 10);
                     }
 
@@ -6842,6 +7129,7 @@
                         let isDragging = false;
                         let activeCard = null;
                         let isScrollGesture = false; // Flag to lock gesture type
+                        let hasFlippedInThisTouch = false; // NEW: Lock to prevent multiple flips in one touch
                         const swipeThreshold = 80; // Distance to trigger flip
 
                         outputContainer.ontouchstart = (e) => {
@@ -6853,6 +7141,7 @@
                             touchStartY = e.touches[0].clientY;
                             isDragging = false;
                             isScrollGesture = false; // Reset gesture flag
+                            hasFlippedInThisTouch = false; // Reset flip lock
                             
                             // Find active card
                             const cards = Array.from(outputContainer.querySelectorAll('.result-card'));
@@ -6881,6 +7170,9 @@
 
                         outputContainer.ontouchmove = (e) => {
                             if (!activeCard) return;
+                            
+                            // If we already flipped in this touch session, ignore further moves
+                            if (hasFlippedInThisTouch) return;
 
                             // IGNORE touch move on inputs to allow native text selection/cursor movement
                             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
@@ -6924,7 +7216,8 @@
                             
                             if (allowDrag) {
                                 // Prevent native pull-to-refresh or scrolling if we are taking over
-                                if (Math.abs(diff) > 5) {
+                                // Increased threshold from 5 to 15 to prevent accidental micro-scrolls triggering drag
+                                if (Math.abs(diff) > 15) {
                                     e.preventDefault(); 
                                     isDragging = true;
                                     
@@ -6939,6 +7232,13 @@
                         outputContainer.ontouchend = (e) => {
                             if (!activeCard) return;
                             
+                            // If we already flipped, just ensure cleanup
+                            if (hasFlippedInThisTouch) {
+                                isDragging = false;
+                                activeCard = null;
+                                return;
+                            }
+                            
                             // Restore smooth transition
                             // Use the same timing as CSS to ensure consistency
                             activeCard.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'; 
@@ -6950,10 +7250,19 @@
                             activeCard.style.transform = '';
                             
                             if (isDragging) {
-                                if (diff < -swipeThreshold) {
+                                // Increased threshold for commit swipe (was swipeThreshold, usually 100)
+                                // We can use a stricter check here or rely on the variable.
+                                // Let's ensure swipeThreshold is large enough.
+                                // Assuming swipeThreshold is defined elsewhere, but we can hardcode a safe value here
+                                // or assume the global variable is set correctly.
+                                const commitThreshold = 120; // Increased from default implied
+                                
+                                if (diff < -commitThreshold) {
                                     switchCard('next');
-                                } else if (diff > swipeThreshold) {
+                                    hasFlippedInThisTouch = true; // Lock
+                                } else if (diff > commitThreshold) {
                                     switchCard('prev');
+                                    hasFlippedInThisTouch = true; // Lock
                                 }
                                 // If threshold not met, clearing transform above automatically handles "spring back"
                             }
@@ -7092,6 +7401,7 @@
             if (verb) {
                 await openRefreshConfirmModal(verb, () => {
                     // Force re-open the word modal to show progress overlay
+                    // IMPORTANT: Pass 'true' for refresh parameter to force bypass cache
                     openVerb(verb, false, true); // Force refresh
                 });
             }
@@ -7101,6 +7411,7 @@
             event.stopPropagation();
             await openRefreshConfirmModal(verb, () => {
                 // Open modal and start refreshing immediately
+                // IMPORTANT: Pass 'true' for refresh parameter to force bypass cache
                 openVerb(verb, false, true); // Force refresh
             });
         }
@@ -8004,9 +8315,7 @@
             const modal = document.getElementById('excludedModal');
             if (modal) {
                 if (fromPopState !== true) {
-                    // Manual close
-                    const idx = modalStack.indexOf(closeExcludedModal);
-                    if (idx > -1) modalStack.splice(idx, 1);
+                    // Let popstate handle the stack pop
                     history.back();
                 }
                 pendingUnexclude.clear(); // Clear pending on cancel/close
@@ -8164,8 +8473,7 @@
         function closeResetModal(fromPopState = false) {
             const modal = document.getElementById('resetModal');
             if (fromPopState !== true) {
-                const idx = modalStack.indexOf(closeResetModal);
-                if (idx > -1) modalStack.splice(idx, 1);
+                // Let popstate handle the stack pop
                 history.back();
             }
             modal.classList.add('opacity-0');
@@ -8642,8 +8950,7 @@
         function closeImportConfirmModal(fromPopState = false) {
             const modal = document.getElementById('importConfirmModal');
             if (fromPopState !== true) {
-                const idx = modalStack.indexOf(closeImportConfirmModal);
-                if (idx > -1) modalStack.splice(idx, 1);
+                // Let popstate handle the stack pop
                 history.back();
             }
             modal.classList.add('opacity-0');
