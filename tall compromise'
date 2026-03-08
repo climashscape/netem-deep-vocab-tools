@@ -1,0 +1,134 @@
+[1mdiff --git a/app/index.html b/app/index.html[m
+[1mindex f59c285..fd44f8a 100644[m
+[1m--- a/app/index.html[m
+[1m+++ b/app/index.html[m
+[36m@@ -1649,7 +1649,7 @@[m
+             </div>[m
+ [m
+             <!-- Modal Header -->[m
+[31m-            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec]">[m
+[32m+[m[32m            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec] flex items-center gap-3">[m
+                 <div class="flex flex-col items-start pr-12 min-w-0 w-full">[m
+                     <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-1">Stage 0</div>[m
+                     <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full"></h2>[m
+[36m@@ -2132,6 +2132,7 @@[m
+         let vocabularyMap = new Map(); // Fast lookup for word linking and definitions[m
+         let displayedVerbs = [];[m
+         let learningStatus = {}; // Store Ebbinghaus progress[m
+[32m+[m[32m        let modalHistoryCount = 0; // Track how many states we pushed for internal navigation[m
+         let currentCardIndex = 0; // Track current card in modal[m
+         [m
+         // Auto Image Generation Queue[m
+[36m@@ -2170,23 +2171,103 @@[m
+             localStorage.setItem('analysisMode', analysisMode);[m
+         }[m
+         [m
+[31m-        // --- Back Button Support for Modals ---[m
+[32m+[m[32m        // --- Back Button Support for Modals (Pure Hash Router) ---[m
+         let modalStack = [];[m
+[32m+[m[32m        // Track the depth of hash navigation within the modal[m
+[32m+[m[32m        let hashNavDepth = 0;[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Helper to check/parse hash[m
+[32m+[m[32m        function parseWordHash(h) {[m
+[32m+[m[32m            if (h && h.startsWith('#detail=')) {[m
+[32m+[m[32m                return decodeURIComponent(h.substring(8));[m
+[32m+[m[32m            }[m
+[32m+[m[32m            return null;[m
+[32m+[m[32m        }[m
+[32m+[m[41m        [m
+         window.addEventListener('popstate', (event) => {[m
+[32m+[m[32m            // Force reset closing flag just in case[m
+[32m+[m[32m            isClosing = false;[m
+[32m+[m
+[32m+[m[32m            const hash = location.hash;[m
+[32m+[m[32m            let word = parseWordHash(hash);[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Fallback: Check event state if hash fails[m
+[32m+[m[32m            if (!word && event.state && event.state.verb) {[m
+[32m+[m[32m                word = event.state.verb;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // 1. Word Navigation (Hash or State matched)[m
+[32m+[m[32m            if (word) {[m
+[32m+[m[32m                // If modal is not active, open it[m
+[32m+[m[32m                if (!modal.classList.contains('active')) {[m
+[32m+[m[32m                    modal.classList.add('active');[m
+[32m+[m[32m                    document.body.style.overflow = 'hidden';[m
+[32m+[m[32m                    // We entered from a link or forward navigation, so depth is unknown/reset[m
+[32m+[m[32m                    // But we can assume at least 1[m
+[32m+[m[32m                    hashNavDepth = 1;[m
+[32m+[m[32m                } else {[m
+[32m+[m[32m                    // If already active, we are navigating back/forward[m
+[32m+[m[32m                    // We don't know direction easily, but we know we are still in the stack[m
+[32m+[m[32m                }[m
+[32m+[m[41m                [m
+[32m+[m[32m                // If we have overlays (e.g. Settings), close them[m
+[32m+[m[32m                // Keep popping until we are back to the base layer (or empty if we don't track base)[m
+[32m+[m[32m                // Since we don't reliably track the base layer in modalStack for word modals (due to history pushes),[m
+[32m+[m[32m                // we just clear anything that looks like an overlay.[m
+[32m+[m[32m                // But wait, if we push Word to stack, we can keep it.[m
+[32m+[m[32m                // Let's assume we want to clear everything EXCEPT the base word modal if it exists.[m
+[32m+[m[32m                while (modalStack.length > 0) {[m
+[32m+[m[32m                     const topModal = modalStack[modalStack.length - 1];[m
+[32m+[m[32m                     // If top modal is NOT the learning modal (which we don't push to stack in this new logic), close it.[m
+[32m+[m[32m                     // Actually, let's just close everything in modalStack because the Word Modal is managed by URL/State now.[m
+[32m+[m[32m                     // The Word Modal "is" the page. Overlays are popped on top.[m
+[32m+[m[32m                     const lastModal = modalStack.pop();[m
+[32m+[m[32m                     if (lastModal && typeof lastModal.closeFn === 'function') {[m
+[32m+[m[32m                         lastModal.closeFn(true);[m
+[32m+[m[32m                     }[m
+[32m+[m[32m                }[m
+[32m+[m[41m                [m
+[32m+[m[32m                // Recover state if available[m
+[32m+[m[32m                const isReview = event.state ? event.state.isReview : false;[m
+[32m+[m[41m                [m
+[32m+[m[32m                // CRITICAL OPTIMIZATION: Check if we are ALREADY displaying this word.[m
+[32m+[m[32m                // If so, do NOT reload the modal content. This prevents flickering and network requests on back/forward.[m
+[32m+[m[32m                // We check modalTitle.innerText against the target 'word'.[m
+[32m+[m[32m                const currentVerb = modalTitle.innerText;[m
+[32m+[m[32m                if (currentVerb && currentVerb.toLowerCase() === word.toLowerCase()) {[m
+[32m+[m[32m                    // Already showing this word. Do nothing.[m
+[32m+[m[32m                    return;[m
+[32m+[m[32m                }[m
+[32m+[m
+[32m+[m[32m                // Load the word content[m
+[32m+[m[32m                openVerb(word, isReview, false, true); // isBack=true prevents pushing new state[m
+[32m+[m[32m                return;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // 2. No Hash (or non-word hash): Close Modal[m
+[32m+[m[32m            if (modal.classList.contains('active')) {[m
+[32m+[m[32m                // We backed out of the word detail stack[m
+[32m+[m[32m                closeModal(true); // true = fromPopState[m
+[32m+[m[32m                return;[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            // 3. Handle Other Modals (Standard Stack)[m
+             if (modalStack.length > 0) {[m
+[31m-                const lastModalCloseFn = modalStack.pop();[m
+[31m-                if (typeof lastModalCloseFn === 'function') {[m
+[31m-                    // Call the close function without adding another popstate entry[m
+[31m-                    lastModalCloseFn(true); [m
+[32m+[m[32m                const lastModal = modalStack.pop();[m
+[32m+[m[32m                if (lastModal && typeof lastModal.closeFn === 'function') {[m
+[32m+[m[32m                    lastModal.closeFn(true);[m[41m [m
+                 }[m
+             }[m
+         });[m
+ [m
+[31m-        function pushModalState(closeFn) {[m
+[31m-            modalStack.push(closeFn);[m
+[31m-            history.pushState({ modal: true }, "");[m
+[32m+[m[32m        function pushModalState(closeFn, state = { modal: true }) {[m
+[32m+[m[32m            // For non-word modals (Settings, etc.), use standard stack[m
+[32m+[m[32m            // They don't use Hash routing[m
+[32m+[m[32m            modalStack.push({ closeFn });[m
+[32m+[m[32m            history.pushState(state, "");[m
+         }[m
+         // --- End Back Button Support ---[m
+[32m+[m[32m        // --- End Back Button Support ---[m
+ [m
+         function matchesPos(v, posArray) {[m
+             if (posArray.includes('all')) return true;[m
+[

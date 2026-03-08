@@ -14,6 +14,8 @@
     <script src="static/lib/tailwind.min.js"></script>
     <!-- Marked for Markdown rendering (Local) -->
     <script src="static/lib/marked.min.js"></script>
+    <!-- Compromise NLP for Lemmatization (Local) -->
+    <script src="static/lib/compromise.js"></script>
     <!-- Font Awesome (Local) -->
     <link rel="stylesheet" href="static/lib/font-awesome/css/all.min.css">
     
@@ -1353,10 +1355,12 @@
                       
                       <div class="flex items-center justify-between min-h-[36px] mb-0.5">
                           <h2 class="text-xl font-bold text-gray-700">Mastery</h2>
-                          <button onclick="openExcludedModal()" class="neumorphic-btn w-9 h-9 flex items-center justify-center text-red-400 relative">
-                              <i class="fas fa-trash-alt text-xs"></i>
-                              <span id="excludedBadgeCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-[#e0e5ec] hidden">0</span>
-                          </button>
+                          <!-- Tab Toggle -->
+                          <div class="flex p-1 bg-gray-200/50 rounded-xl neumorphic-inset">
+                              <button onclick="switchMasteryTab('core')" id="btn-mastery-core" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Core</button>
+                              <button onclick="switchMasteryTab('notebook')" id="btn-mastery-notebook" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all text-gray-500">Notebook</button>
+                              <button onclick="switchMasteryTab('excluded')" id="btn-mastery-excluded" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all text-gray-500">Excluded</button>
+                          </div>
                       </div>
                       <div id="mastery-stats-placeholder"></div>
                   </div>
@@ -1627,7 +1631,7 @@
         </nav>
 
     <!-- Modal for Learning -->
-    <div id="learningModal" class="modal-overlay">
+    <div id="learningModal" class="modal-overlay" onclick="closeModal()">
         <div class="modal-content relative flex flex-col bg-[#e0e5ec] rounded-[20px] shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
@@ -2143,6 +2147,7 @@
         let currentFreq = ['all'];
         let currentPage = null;
         let currentReviewTab = 'session'; // 'session' or 'library'
+        let currentMasteryTab = 'core'; // 'core' or 'notebook'
         let reviewVerbsList = []; // Track verbs shown on the review page
         let sessionReviewStats = { count: 0, remembered: 0 };
         let isReviewMode = false;
@@ -2187,6 +2192,13 @@
         window.addEventListener('popstate', (event) => {
             // Force reset closing flag just in case
             isClosing = false;
+
+            // FIX: Check if we are handling a popup close (e.g. Link Selector)
+            // If the popup is open, this back action is intended to close it.
+            // We should let the popup's own handler manage it and NOT disturb the main modal.
+            if (document.getElementById('link-selector-popup')) {
+                return;
+            }
 
             const hash = location.hash;
             let word = parseWordHash(hash);
@@ -2474,7 +2486,16 @@
             ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
         }
 
+        // Global render cancellation handle
+        let reviewRenderFrameId = null;
+
         function renderReviewPage() {
+            // Cancel any ongoing rendering from previous calls
+            if (reviewRenderFrameId) {
+                cancelAnimationFrame(reviewRenderFrameId);
+                reviewRenderFrameId = null;
+            }
+
             const grid = document.getElementById('reviewGrid');
             if (!grid) return;
             
@@ -2620,15 +2641,16 @@
                     
                     if (renderedCount < learnedVerbs.length) {
                         // Continue rendering next batch in next frame
-                        requestAnimationFrame(renderBatch);
+                        reviewRenderFrameId = requestAnimationFrame(renderBatch);
                     } else {
                         // Done rendering
+                        reviewRenderFrameId = null;
                         ensureLibrarySortButton(true);
                     }
                 }
                 
                 // Start rendering loop
-                requestAnimationFrame(renderBatch);
+                reviewRenderFrameId = requestAnimationFrame(renderBatch);
             }
         }
 
@@ -2737,10 +2759,142 @@
             sessionReviewStats = { count: 0, remembered: 0 };
         }
 
-        function renderMasteryPage() {
+        async function removeExtraVocab(word) {
+            if (confirm(`Remove "${word}" from Notebook?`)) {
+                await window.DB.removeExtraVocab(word);
+                renderMasteryPage();
+            }
+        }
+        
+        // Excluded Verbs Logic (Legacy support or merge into notebook?)
+        // The previous step merged "Excluded" INTO the notebook tab, but the user explicitly asked for "Excluded Verbs" to be merged into Mastery page
+        // AND THEN asked for "OOV Learning".
+        // It seems I might have overwritten the "Excluded" display with "OOV" display in the previous step.
+        // If the user wants BOTH "Excluded" and "OOV Notebook" in Mastery page, we need THREE tabs or combine them.
+        // Let's check the previous request: "现在excluded verbs合并进mastery页面" -> I did that.
+        // Then: "完成词库外单词学习功能" -> I replaced the "Excluded" logic with "OOV" logic in the same "Notebook" tab.
+        // This might be a mistake if they want to keep "Excluded".
+        // Let's add a THIRD tab: "Excluded".
+        
+        function switchMasteryTab(tab) {
+            currentMasteryTab = tab;
+            
+            // Update UI buttons
+            const btnCore = document.getElementById('btn-mastery-core');
+            const btnNotebook = document.getElementById('btn-mastery-notebook');
+            const btnExcluded = document.getElementById('btn-mastery-excluded');
+            
+            // Reset all
+            [btnCore, btnNotebook, btnExcluded].forEach(btn => {
+                if(btn) {
+                    btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600', 'text-red-500', 'text-purple-600');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            if (tab === 'core') {
+                btnCore.classList.remove('text-gray-500');
+                btnCore.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+            } else if (tab === 'notebook') {
+                btnNotebook.classList.remove('text-gray-500');
+                btnNotebook.classList.add('bg-white', 'shadow-sm', 'text-purple-600');
+            } else if (tab === 'excluded') {
+                btnExcluded.classList.remove('text-gray-500');
+                btnExcluded.classList.add('bg-white', 'shadow-sm', 'text-red-500');
+            }
+            
+            renderMasteryPage();
+        }
+
+        async function renderMasteryPage() {
             const grid = document.getElementById('masteryGrid');
             if (!grid) return;
             
+            grid.innerHTML = ''; // Clear first
+            
+            if (currentMasteryTab === 'notebook') {
+                // NOTEBOOK MODE: Show OOV words from extra-vocabulary
+                const extraVocab = window.DB && window.DB.getExtraVocab ? await window.DB.getExtraVocab() : [];
+                
+                // Sort by creation time (newest first)
+                extraVocab.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                if (extraVocab.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-20 text-center animate-fade-in">
+                            <div class="w-16 h-16 flex items-center justify-center text-purple-100 mx-auto mb-6 neumorphic rounded-full">
+                                <i class="fas fa-book-open text-2xl text-purple-400"></i>
+                            </div>
+                            <h3 class="text-xl font-black text-gray-700 mb-2">Notebook Empty</h3>
+                            <p class="text-gray-400 font-bold text-xs mb-8">Tap unlinked words in explanations to add them here.</p>
+                        </div>`;
+                    return;
+                }
+                
+                extraVocab.forEach(item => {
+                    // Create a proper verb card for OOV items
+                    // We need to mimic the structure expected by createVerbCard or create a similar one
+                    
+                    const card = document.createElement('div');
+                    // Use standard verb-card styling but with purple tint for Notebook
+                    card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-purple-50/10 border border-purple-100/50 hover:bg-purple-50/30';
+                    
+                    // Display word
+                    card.innerHTML = `
+                        <h3 class="text-lg font-black text-gray-700 mb-1 group-hover:text-purple-600 transition-colors truncate w-full text-center">${item.word}</h3>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notebook</span>
+                        
+                        <!-- Delete Button -->
+                        <button onclick="event.stopPropagation(); removeExtraVocab('${item.word}')" class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 z-10">
+                            <i class="fas fa-trash-alt text-xs"></i>
+                        </button>
+                    `;
+                    
+                    // Click to open detail view (reusing the standard openVerb)
+                    // Since openVerb handles OOV logic now (hiding stage etc), this should work fine.
+                    // It will trigger AI generation if content is missing.
+                    card.onclick = () => {
+                         if (window.openVerb) window.openVerb(item.word);
+                         else openVerb(item.word);
+                    };
+                    
+                    grid.appendChild(card);
+                });
+                return;
+            }
+
+            if (currentMasteryTab === 'excluded') {
+                 // EXCLUDED MODE
+                 const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
+                 
+                 if (excluded.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-20 text-center animate-fade-in">
+                            <div class="w-16 h-16 flex items-center justify-center text-gray-300 mx-auto mb-6 neumorphic rounded-full">
+                                <i class="fas fa-ban text-2xl"></i>
+                            </div>
+                            <h3 class="text-xl font-black text-gray-700 mb-2">No Excluded Words</h3>
+                            <p class="text-gray-400 font-bold text-xs mb-8">Words you exclude will appear here.</p>
+                        </div>`;
+                    return;
+                }
+                
+                excluded.forEach(word => {
+                    const card = document.createElement('div');
+                    card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-red-50/10 border border-red-100/50';
+                    card.innerHTML = `
+                        <h3 class="text-lg font-black text-gray-700 mb-1 group-hover:text-red-500 transition-colors truncate w-full text-center">${word}</h3>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Excluded</span>
+                        <button onclick="event.stopPropagation(); restoreExcludedVerb('${word}')" class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center text-green-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <i class="fas fa-undo text-xs"></i>
+                        </button>
+                    `;
+                    grid.appendChild(card);
+                });
+                return;
+            }
+
+            // CORE MODE (Default)
             const query = document.getElementById('searchInput')?.value || '';
             
             // User request: "Learn页面的 Total Review Mastered 应该和当前选择的单词库范围相吻合，review和masterey页面同样"
@@ -2781,12 +2935,26 @@
                 return;
             }
             
-            grid.innerHTML = '';
             masteredVerbs.forEach(v => {
                 // Ensure createVerbCard generates interactive blocks
                 const card = createVerbCard(v);
                 grid.appendChild(card);
             });
+        }
+        
+        function restoreExcludedVerb(verb) {
+            const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
+            const index = excluded.indexOf(verb);
+            if (index > -1) {
+                excluded.splice(index, 1);
+                localStorage.setItem('excludedVerbs', JSON.stringify(excluded));
+                // Update global set
+                excludedVerbs = new Set(excluded);
+                // Refresh view
+                renderMasteryPage();
+                // Also refresh other views to show the word again
+                updateCounts();
+            }
         }
 
         function updateCheckinCalendar() {
@@ -5584,6 +5752,16 @@
             spellingWord = verb;
             const status = learningStatus[verb.toLowerCase()];
 
+            // Check if this is an OOV/Notebook word
+            let isOOV = false;
+            // We can check if it exists in allVerbs (Core) or if it's in extra_vocabulary
+            // But checking DB is async.
+            // Fast check: Is it in vocabularyMap?
+            // If not in vocabularyMap, it's likely OOV.
+            if (!vocabularyMap.has(verb.toLowerCase())) {
+                isOOV = true;
+            }
+
             // Show Ebbinghaus Stage immediately
             // Ensure stageBadge is always available in the DOM first
             // We want to move this badge to the bottom-right of the modal content
@@ -5597,10 +5775,13 @@
                  modalContent.appendChild(stageBadge);
             }
             
-            if (status) {
+            // HIDE STAGE FOR OOV WORDS
+            if (isOOV) {
+                if (stageBadge) stageBadge.classList.add('hidden');
+            } else if (status) {
                 if (stageBadge) {
                     stageBadge.innerText = `Stage ${status.stage}${status.status === 'mastered' ? ' (Mastered)' : ''}`;
-                    // stageBadge.classList.remove('hidden'); // Do not unhide immediately to prevent showing during load
+                    stageBadge.classList.remove('hidden');
                     
                     // Reset classes first
                     stageBadge.classList.remove('bg-blue-100', 'text-blue-600', 'bg-green-100', 'text-green-600');
@@ -6379,7 +6560,48 @@
                         // 1. Exact match
                         if (vocabularyMap.has(lower)) candidates.add(lower);
                         
-                        // 2. Common Irregular Verbs (Manual Mapping)
+                        // 2. Compromise NLP Lemmatization (Powerful NLP Library)
+                        if (window.nlp) {
+                            try {
+                                const doc = nlp(lower);
+                                
+                                // Compute root form (handles conjugations, plurals, etc.)
+                                doc.compute('root');
+                                
+                                // Strategy A: General Root
+                                const root = doc.text('root');
+                                if (root && vocabularyMap.has(root)) candidates.add(root);
+                                
+                                // Strategy B: Verb Specifics (infinitive)
+                                // Only if the word is detected as a verb or looks like one
+                                if (doc.has('#Verb')) {
+                                    const infinitive = doc.verbs().toInfinitive().text();
+                                    if (infinitive && vocabularyMap.has(infinitive)) candidates.add(infinitive);
+                                }
+                                
+                                // Strategy C: Noun Specifics (singular)
+                                // Only if the word is detected as a noun or looks like one
+                                if (doc.has('#Noun')) {
+                                    const singular = doc.nouns().toSingular().text();
+                                    if (singular && vocabularyMap.has(singular)) candidates.add(singular);
+                                }
+                                
+                                // Strategy D: Adjective/Adverb Specifics
+                                if (doc.has('#Adjective') || doc.has('#Adverb')) {
+                                     // "happily" -> "happy", "harder" -> "hard"
+                                     const json = doc.json({ terms: true });
+                                     if (json && json[0] && json[0].terms && json[0].terms[0]) {
+                                        const term = json[0].terms[0];
+                                        if (term.root && vocabularyMap.has(term.root)) candidates.add(term.root);
+                                     }
+                                }
+                                
+                            } catch (e) {
+                                console.warn('Compromise NLP error:', e);
+                            }
+                        }
+
+                        // 3. Common Irregular Verbs (Manual Mapping - Legacy/Backup)
                         const irregulars = {
                             'went': 'go', 'gone': 'go', 'saw': 'see', 'seen': 'see', 'did': 'do', 'done': 'do',
                             'came': 'come', 'got': 'get', 'given': 'give', 'gave': 'give', 'taken': 'take', 'took': 'take',
@@ -6399,7 +6621,8 @@
                         const suffixes = [
                             's', 'es', 'ed', 'ing', 'ly', 'ment', 'ion', 'ions', 'ive', 'al', 'ic', 'ness', 
                             'able', 'ible', 'ity', 'ous', 'ful', 'less', 'ship', 'er', 'or', 'ist', 'ize', 
-                            'ise', 'en', 'ify', 'th', 'ier', 'iest', 'ied', 'ies'
+                            'ise', 'en', 'ify', 'th', 'ier', 'iest', 'ied', 'ies',
+                            'ation', 'cation', 'ition', 'tic', 'ical', 'ance', 'ence', 'ant', 'ent', 'ary', 'ory'
                         ];
                         
                         for (const suffix of suffixes) {
@@ -6409,14 +6632,14 @@
                                 // Basic root check
                                 if (vocabularyMap.has(root)) candidates.add(root);
                                 
-                                // Rule: e-deletion (e.g., diving -> dive, baked -> bake)
-                                if (suffix === 'ing' || suffix === 'ed' || suffix === 'er' || suffix === 'able' || suffix === 'ive' || suffix === 'ize') {
+                                // Rule: e-deletion (e.g., diving -> dive, baked -> bake, creation -> create)
+                                if (['ing', 'ed', 'er', 'able', 'ive', 'ize', 'ion', 'ation', 'ition'].includes(suffix)) {
                                     const eRoot = root + 'e';
                                     if (vocabularyMap.has(eRoot)) candidates.add(eRoot);
                                 }
                                 
-                                // Rule: y-to-i change (e.g., carried -> carry, happily -> happy, beauties -> beauty)
-                                if (suffix === 'ed' || suffix === 'ly' || suffix === 'ies' || suffix === 'ied' || suffix === 'ier' || suffix === 'iest' || suffix === 'iness') {
+                                // Rule: y-to-i change (e.g., carried -> carry, happily -> happy, beauties -> beauty, application -> apply)
+                                if (['ed', 'ly', 'ies', 'ied', 'ier', 'iest', 'iness', 'cation', 'ication'].includes(suffix)) {
                                     if (root.endsWith('i')) {
                                         const yRoot = root.substring(0, root.length - 1) + 'y';
                                         if (vocabularyMap.has(yRoot)) candidates.add(yRoot);
@@ -6600,13 +6823,33 @@
                         title.innerHTML = `<span>Jump to...</span><i class="fas fa-link opacity-50"></i>`;
                         popup.appendChild(title);
 
-                        candidates.forEach(cand => {
+                        // If no candidates found, show "Add to Notebook" option for the clicked word itself
+                        // This handles OOV (Out-of-Vocabulary) words
+                        if (candidates.length === 0 && word.length > 1) {
+                            // Try to lemmatize the OOV word using Compromise NLP first
+                            let oovCandidate = word.toLowerCase();
+                            if (window.nlp) {
+                                try {
+                                    const doc = nlp(oovCandidate);
+                                    doc.compute('root');
+                                    const root = doc.text('root');
+                                    if (root) oovCandidate = root;
+                                } catch (e) {
+                                    console.warn('Compromise NLP OOV root error:', e);
+                                }
+                            }
+                            candidates.push(oovCandidate); 
+                        }
+
+                        candidates.forEach(async cand => {
                             // Find the definition for this candidate
                             // First try vocabularyMap (fast lookup)
                             let definition = '';
+                            let isCore = false;
                             const verbObj = vocabularyMap.get(cand);
                             if (verbObj) {
                                 definition = verbObj.definition || verbObj['释义'] || '';
+                                isCore = true;
                             }
                             
                             // Fallback: search in allVerbs array if map missed it
@@ -6614,42 +6857,129 @@
                                 const found = allVerbs.find(v => v['单词'] === cand);
                                 if (found) {
                                     definition = found['释义'] || '';
+                                    isCore = true;
                                 }
                             }
                             
-                            if (!definition) definition = 'No definition available';
+                            // Check if it's already in Notebook
+                            let isCollected = false;
+                            if (window.DB && window.DB.isExtraVocab) {
+                                isCollected = await window.DB.isExtraVocab(cand);
+                            }
+                            
+                            if (!definition && !isCore) {
+                                // For OOV words, we might not have a definition yet.
+                                // We can show "Search online" or placeholder.
+                                definition = 'Tap to search & collect';
+                            }
                             
                             const item = document.createElement('div'); // Changed to div for better styling control
                             // Updated item style: Neumorphic pressed state on hover
                             item.className = 'w-full text-left px-4 py-3 cursor-pointer transition-all flex flex-col gap-0.5 group border-b border-gray-300/20 last:border-0 relative hover:bg-white/40 active:bg-gray-200/50 active:shadow-inner';
+                            
+                            let iconHtml = '';
+                            if (isCore) {
+                                iconHtml = `<i class="fas fa-chevron-right text-[10px] text-gray-400 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>`;
+                            } else {
+                                // OOV Item
+                                iconHtml = isCollected 
+                                    ? `<i class="fas fa-bookmark text-purple-500 text-xs"></i>`
+                                    : `<i class="far fa-bookmark text-gray-400 group-hover:text-purple-500 transition-colors text-xs"></i>`;
+                            }
+
                             item.innerHTML = `
                                 <div class="flex items-center justify-between pointer-events-none">
-                                    <span class="text-sm font-black text-gray-700 group-hover:text-blue-600 transition-colors">${cand}</span>
-                                    <i class="fas fa-chevron-right text-[10px] text-gray-400 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>
+                                    <span class="text-sm font-black ${isCore ? 'text-gray-700 group-hover:text-blue-600' : 'text-purple-700 group-hover:text-purple-600'} transition-colors">${cand}</span>
+                                    ${iconHtml}
                                 </div>
                                 <span class="text-[11px] text-gray-500 font-medium truncate opacity-80 group-hover:opacity-100 pointer-events-none">${definition}</span>
                             `;
                             
                             // Use mousedown instead of click to fire before blur events
-                            item.addEventListener('mousedown', (e) => {
+                            item.addEventListener('mousedown', async (e) => {
                                 e.stopPropagation(); // Prevent bubbling
                                 
                                 // Manually remove the dummy history state we pushed
-                                // because we are navigating forward now
-                                // Wait, if we navigate forward (openVerb pushes new state), the dummy state remains in history?
-                                // Ideally we want to REPLACE the dummy state with the new word state.
-                                // Or go back first.
-                                
-                                // Let's go back first to clear the "popup open" state
                                 history.back();
                                 
-                                // Small delay to let popstate settle, then open new word
-                                setTimeout(() => {
-                                    if (window.openVerb) window.openVerb(cand);
-                                    else openVerb(cand);
+                                setTimeout(async () => {
+                                    if (isCore) {
+                                        // Standard Core Word Navigation
+                                        if (window.openVerb) window.openVerb(cand);
+                                        else openVerb(cand);
+                                    } else {
+                                        // OOV Word Handling
+                                        if (isCollected) {
+                                            // Already collected: Maybe show simple toast or definition?
+                                            // For now, let's toggle remove? Or just show definition.
+                                            // Let's allow remove for now.
+                                            if (confirm(`Remove "${cand}" from Notebook?`)) {
+                                                await window.DB.removeExtraVocab(cand);
+                                                // Refresh view if on Mastery page
+                                                if (currentPage === 'mastery' && currentMasteryTab === 'notebook') {
+                                                    renderMasteryPage();
+                                                }
+                                            }
+                                        } else {
+                                            // Not collected: Add to Notebook
+                                            // 1. Fetch definition (using simple LLM or fallback)
+                                            // For simplicity, we just save it. User can see it in Notebook.
+                                            // Better: Show a toast "Added to Notebook"
+                                            
+                                            // 2. Generate definition using AI (if available)
+                                            let definitionToSave = "Added from text";
+                                            if (window.LLM && window.LLM.explainVerb) {
+                                                // Show loading state
+                                                const loadingBtn = document.createElement('div');
+                                                loadingBtn.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/70 text-white px-4 py-2 rounded-xl text-xs font-bold animate-fade-in z-[100]';
+                                                loadingBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Defining "${cand}"...`;
+                                                document.body.appendChild(loadingBtn);
+                                                
+                                                try {
+                                                    // Use LLM to get a brief definition
+                                                    // Since explainVerb returns full markdown, we might want a simpler one or parse it.
+                                                    // For now, let's just save the word and let the Notebook view handle the detailed fetch on demand?
+                                                    // Or fetch a simple definition now.
+                                                    // Actually, user expects "AI Card Generation".
+                                                    // But generating a full card takes time.
+                                                    // Let's just save the word first, and maybe trigger generation in background?
+                                                    // Or better: Let's stick to the "Lightweight Collection" rule from the docs.
+                                                    // "Lightweight Collection: Only supports adding to a wordbook for lookup".
+                                                    // So we just save the word (lemmatized).
+                                                    // But we can try to get a quick definition from local dictionary if possible?
+                                                    // We already checked vocabularyMap and allVerbs.
+                                                    
+                                                    // If we want AI generation, we should probably do it when they open the card in Notebook.
+                                                    // For now, we save the LEMMATIZED form (which we did above).
+                                                    
+                                                } catch (e) {
+                                                    console.warn("Auto-define failed", e);
+                                                } finally {
+                                                    loadingBtn.remove();
+                                                }
+                                            }
+
+                                            await window.DB.addExtraVocab(cand, definitionToSave);
+                                            
+                                            // Show feedback
+                                            const btn = document.createElement('div');
+                                            btn.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/70 text-white px-4 py-2 rounded-xl text-xs font-bold animate-fade-in z-[100]';
+                                            btn.innerText = `Saved "${cand}"`;
+                                            document.body.appendChild(btn);
+                                            setTimeout(() => btn.remove(), 1500);
+                                            
+                                            // Refresh view if on Mastery page
+                                            if (currentPage === 'mastery' && currentMasteryTab === 'notebook') {
+                                                renderMasteryPage();
+                                            }
+                                            
+                                            // IMMEDIATELY OPEN THE WORD DETAIL MODAL
+                                            // This allows the user to see the AI generation in action or the definition
+                                            if (window.openVerb) window.openVerb(cand);
+                                            else openVerb(cand);
+                                        }
+                                    }
                                     
-                                    // Popup is removed by handlePopupPopState (triggered by history.back)
-                                    // But just in case
                                     popup.remove();
                                 }, 50);
                             });
@@ -6701,15 +7031,19 @@
                                     
                                     // Filter out current verb from candidates
                                     const validCandidates = candidates.filter(c => c !== currentVerb.toLowerCase());
+                                    const isCurrent = word.toLowerCase() === currentVerb.toLowerCase();
+                                    const mapsToCurrent = candidates.includes(currentVerb.toLowerCase());
                                     
-                                    if (validCandidates.length > 0) {
+                                    // Allow clicking if we have candidates OR if it's a potential OOV word 
+                                    // (not current verb, length > 1, and doesn't map to current verb)
+                                    if (validCandidates.length > 0 || (!isCurrent && word.length > 1 && !mapsToCurrent)) {
                                         hasMatches = true;
                                         if (match.index > lastIndex) {
                                             fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
                                         }
 
                                         const span = document.createElement('span');
-                                        span.className = 'text-blue-600 border-b border-blue-400/30 border-dotted cursor-pointer hover:bg-blue-100/50 transition-colors px-0.5 rounded-sm';
+                                        span.className = 'cursor-pointer hover:bg-blue-100/50 transition-colors px-0.5 rounded-sm border-b border-transparent hover:border-blue-400/30 hover:border-dotted';
                                         span.textContent = word;
                                         span.onclick = (e) => {
                                             showLinkSelector(e, word, validCandidates);

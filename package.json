@@ -7,7 +7,8 @@
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@capacitor/filesystem": "^8.1.2",
-    "@capacitor/share": "^8.0.1"
+    "@capacitor/share": "^8.0.1",
+    "compromise": "^14.15.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5"

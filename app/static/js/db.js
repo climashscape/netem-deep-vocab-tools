@@ -43,27 +43,15 @@ function initDB() {
             // NOTE: When upgrading version, Dexie does NOT support changing primary key.
             // You must delete the old table and recreate it, or upgrade carefully.
             // Here we are incrementing version to force upgrade.
-            db.version(6).stores({
+            db.version(7).stores({
                 explanations: '[mode+query_key], mode, query_key, created_at',
                 learning_progress: 'verb, stage, last_review, next_review, status',
                 checkins: 'date',
                 learn_batch: 'verb',
-                verbs: 'word, frequency, pos, original_word' // Added verbs table for faster lookup, word is lowercase
+                verbs: 'word, frequency, pos, original_word', // Added verbs table for faster lookup, word is lowercase
+                extra_vocabulary: 'word, definition, created_at' // NEW: OOV / Notebook words
             }).upgrade(tx => {
-                // If we need to migrate data, do it here.
-                // For now, since we are just ensuring schema consistency, no complex migration needed.
-                // But if 'verbs' table PK changed from auto-increment to 'word', Dexie might complain.
-                // To be safe, we can clear the table if it's causing issues, but upgrade() runs AFTER schema application attempt?
-                // Actually upgrade() runs on old data before schema applied? No.
-                // Dexie documentation says: "You cannot change primary key of an existing object store."
-                // So if version 5 had a different PK for any of these, we are in trouble.
-                // Version 5 defined: verbs: 'word, frequency...' which means PK is 'word'.
-                // If previous version (implicit) had different schema, we might need to delete.
-                
-                // FORCE DELETE if we detect incompatible schema is not possible directly here easily without crashing first.
-                // The best way to handle "Not yet support for changing primary key" is to increment version
-                // and define null for the old table to delete it, then re-define it?
-                // Or just clear the DB in init if we detect version mismatch?
+                // Migration logic if needed
             });
 
             // Handle DB errors globally
@@ -89,12 +77,13 @@ function initDB() {
                     // Re-init (recursive, but should pass now as DB is gone)
                     // We need to return a new promise or reset
                     db = new Dexie("NetemVocabDB");
-                    db.version(6).stores({
+                    db.version(7).stores({
                         explanations: '[mode+query_key], mode, query_key, created_at',
                         learning_progress: 'verb, stage, last_review, next_review, status',
                         checkins: 'date',
                         learn_batch: 'verb',
-                        verbs: 'word, frequency, pos, original_word'
+                        verbs: 'word, frequency, pos, original_word',
+                        extra_vocabulary: 'word, definition, created_at'
                     });
                     await db.open();
                 } else {
@@ -292,6 +281,34 @@ const DB = {
 
     async clearBatch() {
         await db.learn_batch.clear();
+    },
+
+    /**
+     * Extra Vocabulary (OOV) operations
+     */
+    async getExtraVocab() {
+        if (!db.extra_vocabulary) return [];
+        return await db.extra_vocabulary.toArray();
+    },
+
+    async addExtraVocab(word, definition) {
+        if (!db.extra_vocabulary) return;
+        await db.extra_vocabulary.put({
+            word: word.toLowerCase(),
+            definition: definition,
+            created_at: new Date().toISOString()
+        });
+    },
+
+    async removeExtraVocab(word) {
+        if (!db.extra_vocabulary) return;
+        await db.extra_vocabulary.delete(word.toLowerCase());
+    },
+
+    async isExtraVocab(word) {
+        if (!db.extra_vocabulary) return false;
+        const result = await db.extra_vocabulary.get(word.toLowerCase());
+        return !!result;
     }
 };
 
