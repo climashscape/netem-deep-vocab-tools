@@ -302,7 +302,19 @@ const DB = {
 
     async removeExtraVocab(word) {
         if (!db.extra_vocabulary) return;
-        await db.extra_vocabulary.delete(word.toLowerCase());
+        const normalizedWord = word.toLowerCase();
+        
+        // Use a transaction to ensure both are deleted or neither
+        await db.transaction('rw', [db.extra_vocabulary, db.explanations], async () => {
+            // 1. Remove from Notebook
+            await db.extra_vocabulary.delete(normalizedWord);
+            
+            // 2. Remove AI explanations/cache for this OOV word
+            // Note: OOV words use 'api' mode in explanations table
+            if (db.explanations) {
+                await db.explanations.where({ mode: 'api', query_key: normalizedWord }).delete();
+            }
+        });
     },
 
     async isExtraVocab(word) {

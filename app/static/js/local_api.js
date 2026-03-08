@@ -604,6 +604,7 @@ const LocalAPI = {
                 const allExplanations = await window.db.explanations.toArray();
                 const allProgress = await window.db.learning_progress.toArray();
                 const allCheckins = await window.db.checkins.toArray();
+                const allExtraVocab = window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
                 
                 // Ensure legacy data is loaded for filtering
                 if (!this.legacyData) {
@@ -661,6 +662,7 @@ const LocalAPI = {
                     explanations: filteredExplanations,
                     progress: allProgress,
                     checkins: allCheckins,
+                    extra_vocabulary: allExtraVocab,
                     settings: JSON.parse(localStorage.getItem('app_settings') || '{}'),
                     excluded: JSON.parse(localStorage.getItem('excludedVerbs') || '[]')
                 };
@@ -793,6 +795,9 @@ const LocalAPI = {
                     await window.db.explanations.clear();
                     await window.db.checkins.clear();
                     await window.db.learn_batch.clear();
+                    if (window.db.extra_vocabulary) {
+                        await window.db.extra_vocabulary.clear();
+                    }
                     if (window.db.verbs) {
                         await window.db.verbs.clear();
                     }
@@ -824,6 +829,11 @@ const LocalAPI = {
                     // 3. Restore Checkins
                     if (importData.checkins && Array.isArray(importData.checkins)) {
                         await window.db.checkins.bulkPut(importData.checkins);
+                    }
+
+                    // 3.5 Restore Extra Vocabulary (OOV/Notebook)
+                    if (importData.extra_vocabulary && Array.isArray(importData.extra_vocabulary) && window.db.extra_vocabulary) {
+                        await window.db.extra_vocabulary.bulkPut(importData.extra_vocabulary);
                     }
 
                     // 4. Restore Settings

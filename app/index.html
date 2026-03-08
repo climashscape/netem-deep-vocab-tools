@@ -122,11 +122,25 @@
 
         /* Global Pressed State (JS Controlled) */
         .is-pressed {
-            transform: scale(0.94) !important;
-            transition: all 0.12s ease-out !important;
+            transform: scale(0.96) !important;
+            opacity: 0.9 !important;
         }
 
         /* Specific Component Press Styles */
+        .neumorphic-btn, 
+        .neumorphic-btn-sm, 
+        .neumorphic-toggle-btn,
+        .nav-item,
+        .verb-card,
+        .learning-insight-card,
+        .verb-card-block,
+        .action-card-btn,
+        .chip-btn,
+        button {
+            /* JS Controlled Animation - No CSS transition for transform to prevent stuck states */
+            transition: box-shadow 0.1s ease, opacity 0.1s ease;
+        }
+
         .neumorphic-btn.is-pressed, 
         .neumorphic-btn-sm.is-pressed,
         .neumorphic-toggle-btn.is-pressed {
@@ -154,7 +168,7 @@
         }
 
         .verb-card.is-pressed {
-            transform: scale(0.92) !important;
+            /* transform: scale(0.96) !important;  DISABLED: User request to remove lift/scale effect */
             box-shadow: inset 4px 4px 8px rgb(163,177,198,0.5), 
                        inset -4px -4px 8px rgba(255,255,255, 0.8) !important;
         }
@@ -208,6 +222,7 @@
             width: 100%;
             position: relative;
             box-sizing: border-box;
+            contain: layout size; /* Optimization: contain layout and size calculations */
         }
 
         .app-content {
@@ -215,6 +230,10 @@
             overflow-y: auto;
             padding-bottom: 80px; /* Space for bottom nav only, safe area handled by body */
             -webkit-overflow-scrolling: touch;
+            /* Performance: Hint the browser about scrolling behavior */
+            scroll-behavior: smooth;
+            overscroll-behavior-y: contain;
+            will-change: scroll-position;
         }
         .app-content.no-scroll {
             overflow-y: hidden;
@@ -413,7 +432,9 @@
             box-shadow: 6px 6px 12px rgb(163,177,198,0.5), 
                        -6px -6px 12px rgba(255,255,255, 0.8);
             border-radius: 24px; /* More rounded */
-            transition: all 0.2s ease-out; /* Faster for JS control */
+            transform: scale(1);
+            transition: box-shadow 0.15s ease, opacity 0.15s ease; /* No transform transition */
+            cursor: pointer;
             cursor: pointer;
             display: flex;
             flex-direction: column;
@@ -425,13 +446,17 @@
             max-width: 160px; /* User request: reduce card size further from 200px to 160px */
             margin-left: auto;
             margin-right: auto;
+            
+            /* Performance optimizations */
+            will-change: transform, opacity;
+            content-visibility: auto;
+            contain-intrinsic-size: 160px 240px;
         }
         .verb-card.overlay-active {
             border-color: transparent; /* Eliminate visible seam when overlay is active */
         }
         .overlay-press-card {
-            transform: scale(0.92) !important;
-            transition: transform 0.12s ease-out !important;
+            transform: scale(0.96) !important;
         }
 
         .verb-image-container {
@@ -524,12 +549,14 @@
             z-index: 20;
             border-radius: 24px;
             opacity: 0;
+            visibility: hidden;
             pointer-events: none;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
             transform: none;
         }
         .exclude-overlay.active {
             opacity: 1;
+            visibility: visible;
             pointer-events: auto;
             /* keep transform inherited from card for perfect sync */
         }
@@ -1090,6 +1117,9 @@
             margin: 0 auto;
             left: 0;
             right: 0;
+            /* Performance: Reduce blur intensity for smoother scrolling on mobile */
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
         }
         
         /* Adjust search input for compact header */
@@ -1357,9 +1387,8 @@
                           <h2 class="text-xl font-bold text-gray-700">Mastery</h2>
                           <!-- Tab Toggle -->
                           <div class="flex p-1 bg-gray-200/50 rounded-xl neumorphic-inset">
-                              <button onclick="switchMasteryTab('core')" id="btn-mastery-core" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Core</button>
-                              <button onclick="switchMasteryTab('notebook')" id="btn-mastery-notebook" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all text-gray-500">Notebook</button>
-                              <button onclick="switchMasteryTab('excluded')" id="btn-mastery-excluded" class="neumorphic-toggle-btn px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all text-gray-500">Excluded</button>
+                              <button onclick="switchMasteryTab('core')" id="btn-mastery-core" class="neumorphic-toggle-btn px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all bg-white shadow-sm text-blue-600">Core</button>
+                              <button onclick="switchMasteryTab('notebook')" id="btn-mastery-notebook" class="neumorphic-toggle-btn px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all text-gray-500">Notebook</button>
                           </div>
                       </div>
                       <div id="mastery-stats-placeholder"></div>
@@ -1654,7 +1683,7 @@
 
             <!-- Modal Header -->
             <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec] flex items-center gap-3">
-                <div class="flex flex-col items-start pr-12 min-w-0 w-full">
+                <div class="flex flex-col items-start pr-12 min-w-0 flex-1">
                     <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-1">Stage 0</div>
                     <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full"></h2>
                 </div>
@@ -2017,43 +2046,53 @@
             
             if (!pullElement || !scrollContainer) return;
 
-            scrollContainer.addEventListener('touchstart', (e) => {
-                if (scrollContainer.scrollTop === 0 && currentPage === 'learn') {
-                    touchStartPos = e.touches[0].pageY;
-                } else {
-                    touchStartPos = 0;
-                }
-            }, { passive: true });
-
-            scrollContainer.addEventListener('touchmove', (e) => {
+            const onTouchMove = (e) => {
                 if (touchStartPos > 0 && !isRefreshing) {
                     const currentTouch = e.touches[0].pageY;
                     pullDistance = Math.max(0, currentTouch - touchStartPos);
                     
                     if (pullDistance > 0) {
-                        if (e.cancelable) e.preventDefault(); // Stop native scroll
+                        // Use a small threshold before preventing default to allow for slight sideways jitter
+                        if (pullDistance > 5 && e.cancelable) {
+                            e.preventDefault(); // Stop native scroll
+                        }
+                        
                         pullElement.classList.add('pulling');
                         pullElement.style.height = `${Math.min(pullDistance * 0.5, pullThreshold + 20)}px`;
                         
                         pullElement.style.color = '#3b82f6'; // blue-500
-                    if (pullDistance * 0.5 >= pullThreshold) {
-                        pullElement.classList.add('ready');
-                        refreshText.innerText = 'Release to refresh';
-                    } else {
-                        pullElement.classList.remove('ready');
-                        refreshText.innerText = 'Pull down to refresh';
+                        if (pullDistance * 0.5 >= pullThreshold) {
+                            pullElement.classList.add('ready');
+                            refreshText.innerText = 'Release to refresh';
+                        } else {
+                            pullElement.classList.remove('ready');
+                            refreshText.innerText = 'Pull down to refresh';
+                        }
                     }
                 }
-            }
-        }, { passive: false });
+            };
 
-        scrollContainer.addEventListener('touchend', () => {
-            if (pullDistance * 0.5 >= pullThreshold && !isRefreshing) {
-                performRefresh(pullElement, refreshText);
-            } else {
-                resetPull(pullElement, refreshText);
-            }
-        });
+            const onTouchEnd = () => {
+                scrollContainer.removeEventListener('touchmove', onTouchMove);
+                scrollContainer.removeEventListener('touchend', onTouchEnd);
+                
+                if (pullDistance * 0.5 >= pullThreshold && !isRefreshing) {
+                    performRefresh(pullElement, refreshText);
+                } else {
+                    resetPull(pullElement, refreshText);
+                }
+            };
+
+            scrollContainer.addEventListener('touchstart', (e) => {
+                if (scrollContainer.scrollTop <= 0 && currentPage === 'learn') {
+                    touchStartPos = e.touches[0].pageY;
+                    // Only attach movement listeners when we're at the top to keep normal scrolling fast
+                    scrollContainer.addEventListener('touchmove', onTouchMove, { passive: false });
+                    scrollContainer.addEventListener('touchend', onTouchEnd, { passive: true });
+                } else {
+                    touchStartPos = 0;
+                }
+            }, { passive: true });
         }
 
         function performRefresh(pullElement, refreshText) {
@@ -2133,6 +2172,7 @@
         };
 
         let allVerbs = [];
+        let extraVerbs = []; // OOV / Notebook words
         let vocabularyMap = new Map(); // Fast lookup for word linking and definitions
         let displayedVerbs = [];
         let learningStatus = {}; // Store Ebbinghaus progress
@@ -2190,9 +2230,6 @@
         }
         
         window.addEventListener('popstate', (event) => {
-            // Force reset closing flag just in case
-            isClosing = false;
-
             // FIX: Check if we are handling a popup close (e.g. Link Selector)
             // If the popup is open, this back action is intended to close it.
             // We should let the popup's own handler manage it and NOT disturb the main modal.
@@ -2203,10 +2240,20 @@
             const hash = location.hash;
             let word = parseWordHash(hash);
             
+            // Sync modalHistoryCount from state if available
+            if (event.state && typeof event.state.depth === 'number') {
+                modalHistoryCount = event.state.depth;
+            } else if (!hash || hash === '#') {
+                modalHistoryCount = 0;
+            }
+            
             // Fallback: Check event state if hash fails
             if (!word && event.state && event.state.verb) {
                 word = event.state.verb;
             }
+
+            // If we are currently closing (processing history.go), ignore popstate
+            if (isClosing) return;
 
             // 1. Word Navigation (Hash or State matched)
             if (word) {
@@ -2247,7 +2294,7 @@
                 // We check modalTitle.innerText against the target 'word'.
                 const currentVerb = modalTitle.innerText;
                 if (currentVerb && currentVerb.toLowerCase() === word.toLowerCase()) {
-                    // Already showing this word. Do nothing.
+                    // Already showing this word. Still sync back button.
                     return;
                 }
 
@@ -2334,7 +2381,16 @@
             // User request: Clear search content when switching pages so search is scoped to each page
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
+                const hadSearchKeyword = searchInput.value.trim().length > 0;
                 searchInput.value = '';
+                toggleSearchClearBtn();
+                if (hadSearchKeyword) {
+                    if (filterDebounceTimer) {
+                        clearTimeout(filterDebounceTimer);
+                        filterDebounceTimer = null;
+                    }
+                    filterVerbs();
+                }
             }
 
             // Update UI State
@@ -2391,6 +2447,13 @@
             });
             
             currentPage = pageId;
+            
+            // Cancel any ongoing review rendering if we switch away
+            if (reviewRenderFrameId) {
+                cancelAnimationFrame(reviewRenderFrameId);
+                reviewRenderFrameId = null;
+            }
+            
             ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             
             // Persist Page State
@@ -2488,6 +2551,7 @@
 
         // Global render cancellation handle
         let reviewRenderFrameId = null;
+        let masteryRenderFrameId = null;
 
         function renderReviewPage() {
             // Cancel any ongoing rendering from previous calls
@@ -2645,7 +2709,10 @@
                     } else {
                         // Done rendering
                         reviewRenderFrameId = null;
-                        ensureLibrarySortButton(true);
+                        // Final check before showing buttons: are we still on the Review Library page?
+                        if (currentPage === 'review' && currentReviewTab === 'library') {
+                            ensureLibrarySortButton(true);
+                        }
                     }
                 }
                 
@@ -2760,10 +2827,17 @@
         }
 
         async function removeExtraVocab(word) {
-            if (confirm(`Remove "${word}" from Notebook?`)) {
+            showConfirm('Remove from Notebook', `Are you sure you want to remove "${word}" from your Notebook?`, async () => {
                 await window.DB.removeExtraVocab(word);
+                
+                // Refresh extraVerbs cache
+                if (window.DB && window.DB.getExtraVocab) {
+                    extraVerbs = await window.DB.getExtraVocab();
+                }
+                
                 renderMasteryPage();
-            }
+                showMessage('Success', `"${word}" removed from Notebook`, 'success');
+            });
         }
         
         // Excluded Verbs Logic (Legacy support or merge into notebook?)
@@ -2782,31 +2856,29 @@
             // Update UI buttons
             const btnCore = document.getElementById('btn-mastery-core');
             const btnNotebook = document.getElementById('btn-mastery-notebook');
-            const btnExcluded = document.getElementById('btn-mastery-excluded');
             
-            // Reset all
-            [btnCore, btnNotebook, btnExcluded].forEach(btn => {
-                if(btn) {
-                    btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600', 'text-red-500', 'text-purple-600');
-                    btn.classList.add('text-gray-500');
-                }
-            });
-
             if (tab === 'core') {
-                btnCore.classList.remove('text-gray-500');
                 btnCore.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-            } else if (tab === 'notebook') {
+                btnCore.classList.remove('text-gray-500');
+                btnNotebook.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                btnNotebook.classList.add('text-gray-500');
+            } else {
+                btnNotebook.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
                 btnNotebook.classList.remove('text-gray-500');
-                btnNotebook.classList.add('bg-white', 'shadow-sm', 'text-purple-600');
-            } else if (tab === 'excluded') {
-                btnExcluded.classList.remove('text-gray-500');
-                btnExcluded.classList.add('bg-white', 'shadow-sm', 'text-red-500');
+                btnCore.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                btnCore.classList.add('text-gray-500');
             }
             
             renderMasteryPage();
         }
 
         async function renderMasteryPage() {
+            // Cancel any ongoing rendering
+            if (masteryRenderFrameId) {
+                cancelAnimationFrame(masteryRenderFrameId);
+                masteryRenderFrameId = null;
+            }
+
             const grid = document.getElementById('masteryGrid');
             if (!grid) return;
             
@@ -2814,8 +2886,14 @@
             
             if (currentMasteryTab === 'notebook') {
                 // NOTEBOOK MODE: Show OOV words from extra-vocabulary
-                const extraVocab = window.DB && window.DB.getExtraVocab ? await window.DB.getExtraVocab() : [];
+                const query = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
+                let extraVocab = window.DB && window.DB.getExtraVocab ? await window.DB.getExtraVocab() : [];
                 
+                // Search Filter
+                if (query) {
+                    extraVocab = extraVocab.filter(item => item.word.toLowerCase().includes(query));
+                }
+
                 // Sort by creation time (newest first)
                 extraVocab.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 
@@ -2825,107 +2903,69 @@
                             <div class="w-16 h-16 flex items-center justify-center text-purple-100 mx-auto mb-6 neumorphic rounded-full">
                                 <i class="fas fa-book-open text-2xl text-purple-400"></i>
                             </div>
-                            <h3 class="text-xl font-black text-gray-700 mb-2">Notebook Empty</h3>
-                            <p class="text-gray-400 font-bold text-xs mb-8">Tap unlinked words in explanations to add them here.</p>
+                            <h3 class="text-xl font-black text-gray-700 mb-2">${query ? 'No Matches Found' : 'Notebook Empty'}</h3>
+                            <p class="text-gray-400 font-bold text-xs mb-8">${query ? 'Try a different search term.' : 'Tap unlinked words in explanations to add them here.'}</p>
                         </div>`;
                     return;
                 }
                 
-                extraVocab.forEach(item => {
-                    // Create a proper verb card for OOV items
-                    // We need to mimic the structure expected by createVerbCard or create a similar one
-                    
-                    const card = document.createElement('div');
-                    // Use standard verb-card styling but with purple tint for Notebook
-                    card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-purple-50/10 border border-purple-100/50 hover:bg-purple-50/30';
-                    
-                    // Display word
-                    card.innerHTML = `
-                        <h3 class="text-lg font-black text-gray-700 mb-1 group-hover:text-purple-600 transition-colors truncate w-full text-center">${item.word}</h3>
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notebook</span>
-                        
-                        <!-- Delete Button -->
-                        <button onclick="event.stopPropagation(); removeExtraVocab('${item.word}')" class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 z-10">
-                            <i class="fas fa-trash-alt text-xs"></i>
-                        </button>
-                    `;
-                    
-                    // Click to open detail view (reusing the standard openVerb)
-                    // Since openVerb handles OOV logic now (hiding stage etc), this should work fine.
-                    // It will trigger AI generation if content is missing.
-                    card.onclick = () => {
-                         if (window.openVerb) window.openVerb(item.word);
-                         else openVerb(item.word);
-                    };
-                    
-                    grid.appendChild(card);
-                });
-                return;
-            }
+                // Optimized Rendering for Notebook
+                const fragment = document.createDocumentFragment();
+                const batchSize = 20;
+                let renderedCount = 0;
 
-            if (currentMasteryTab === 'excluded') {
-                 // EXCLUDED MODE
-                 const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
-                 
-                 if (excluded.length === 0) {
-                    grid.innerHTML = `
-                        <div class="col-span-full py-20 text-center animate-fade-in">
-                            <div class="w-16 h-16 flex items-center justify-center text-gray-300 mx-auto mb-6 neumorphic rounded-full">
-                                <i class="fas fa-ban text-2xl"></i>
-                            </div>
-                            <h3 class="text-xl font-black text-gray-700 mb-2">No Excluded Words</h3>
-                            <p class="text-gray-400 font-bold text-xs mb-8">Words you exclude will appear here.</p>
-                        </div>`;
-                    return;
+                function renderNotebookBatch() {
+                    const limit = Math.min(renderedCount + batchSize, extraVocab.length);
+                    for (let i = renderedCount; i < limit; i++) {
+                        const item = extraVocab[i];
+                        const card = document.createElement('div');
+                        card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-purple-50/10 border border-purple-100/50 hover:bg-purple-50/30';
+                        card.innerHTML = `
+                            <h3 class="text-lg font-black text-gray-700 mb-1 group-hover:text-purple-600 transition-colors truncate w-full text-center">${item.word}</h3>
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notebook</span>
+                            <button onclick="event.stopPropagation(); removeExtraVocab('${item.word}')" class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 z-10">
+                                <i class="fas fa-trash-alt text-xs"></i>
+                            </button>
+                        `;
+                        card.onclick = () => {
+                             if (window.openVerb) window.openVerb(item.word);
+                             else openVerb(item.word);
+                        };
+                        fragment.appendChild(card);
+                    }
+                    grid.appendChild(fragment);
+                    renderedCount = limit;
+                    if (renderedCount < extraVocab.length) {
+                        masteryRenderFrameId = requestAnimationFrame(renderNotebookBatch);
+                    } else {
+                        masteryRenderFrameId = null;
+                    }
                 }
-                
-                excluded.forEach(word => {
-                    const card = document.createElement('div');
-                    card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-red-50/10 border border-red-100/50';
-                    card.innerHTML = `
-                        <h3 class="text-lg font-black text-gray-700 mb-1 group-hover:text-red-500 transition-colors truncate w-full text-center">${word}</h3>
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Excluded</span>
-                        <button onclick="event.stopPropagation(); restoreExcludedVerb('${word}')" class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center text-green-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <i class="fas fa-undo text-xs"></i>
-                        </button>
-                    `;
-                    grid.appendChild(card);
-                });
+                masteryRenderFrameId = requestAnimationFrame(renderNotebookBatch);
                 return;
             }
 
             // CORE MODE (Default)
             const query = document.getElementById('searchInput')?.value || '';
             
-            // User request: "Learn页面的 Total Review Mastered 应该和当前选择的单词库范围相吻合，review和masterey页面同样"
-            // We apply the same POS filter logic here
             const masteredVerbs = allVerbs.filter(v => {
                 const word = (v.word || v['单词']).toLowerCase();
                 const status = learningStatus[word];
-                if (!status || status.status !== 'mastered') return false;
+                const isExcluded = excludedVerbs.has(word);
+                const isMastered = status && status.status === 'mastered';
 
-                // Excluded Logic
-                if (excludedVerbs.has(word)) return false;
-                
-                // POS Filter logic
+                if (!isMastered && !isExcluded) return false;
                 if (!matchesPos(v, currentPos)) return false;
-
-                // Frequency Filter logic (Sync with header stats)
                 if (!matchesFreq(v, currentFreq)) return false;
-
-                // Search Filter
                 if (query && !word.includes(query)) return false;
-
                 return true;
             });
 
-            // Update stats while we're at it (sync stats based on current view)
             updateCounts();
             
             if (masteredVerbs.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full py-20 text-center animate-fade-in">
-                        <!-- Action Button: Analytics -->
                         <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
                             <i class="fas fa-seedling text-2xl"></i>
                         </div>
@@ -2935,26 +2975,26 @@
                 return;
             }
             
-            masteredVerbs.forEach(v => {
-                // Ensure createVerbCard generates interactive blocks
-                const card = createVerbCard(v);
-                grid.appendChild(card);
-            });
-        }
-        
-        function restoreExcludedVerb(verb) {
-            const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
-            const index = excluded.indexOf(verb);
-            if (index > -1) {
-                excluded.splice(index, 1);
-                localStorage.setItem('excludedVerbs', JSON.stringify(excluded));
-                // Update global set
-                excludedVerbs = new Set(excluded);
-                // Refresh view
-                renderMasteryPage();
-                // Also refresh other views to show the word again
-                updateCounts();
+            // Optimized Rendering for Core
+            const fragment = document.createDocumentFragment();
+            const batchSize = 20;
+            let renderedCount = 0;
+
+            function renderCoreBatch() {
+                const limit = Math.min(renderedCount + batchSize, masteredVerbs.length);
+                for (let i = renderedCount; i < limit; i++) {
+                    const card = createVerbCard(masteredVerbs[i]);
+                    fragment.appendChild(card);
+                }
+                grid.appendChild(fragment);
+                renderedCount = limit;
+                if (renderedCount < masteredVerbs.length) {
+                    masteryRenderFrameId = requestAnimationFrame(renderCoreBatch);
+                } else {
+                    masteryRenderFrameId = null;
+                }
             }
+            masteryRenderFrameId = requestAnimationFrame(renderCoreBatch);
         }
 
         function updateCheckinCalendar() {
@@ -4006,6 +4046,9 @@
                 });
             }
             
+            // Initialize infinite scroll
+            initInfiniteScroll();
+            
             // Mark body as ready to show the restored page
             document.body.classList.add('ready');
 
@@ -4067,6 +4110,16 @@
                 const res = await fetch(`/api/verbs?limit=6000&offset=0&_t=${Date.now()}`);  
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
+
+                // Fetch extra vocabulary (OOV)
+                if (window.DB && window.DB.getExtraVocab) {
+                    try {
+                        extraVerbs = await window.DB.getExtraVocab();
+                    } catch (e) {
+                        console.error("Failed to load extra vocabulary:", e);
+                        extraVerbs = [];
+                    }
+                }
                 
                 if (data.items) {
                     vocabularyMap = new Map();
@@ -4753,9 +4806,9 @@
             const query = document.getElementById('searchInput').value.trim().toLowerCase();
             const isSearching = query.length > 0;
             
-            displayedVerbs = allVerbs.filter(v => {
+            // Search through both core and OOV verbs
+            const coreMatches = allVerbs.filter(v => {
                 const verbKey = (v.word || v['单词']).toLowerCase();
-                const status = learningStatus[verbKey];
                 const matchesSearch = verbKey.includes(query);
                 
                 // Exclude verbs that the user has manually excluded
@@ -4768,7 +4821,6 @@
 
                 let isFreqMatched = false;
                 if (currentFreq.includes('all')) {
-                    // For 'all' frequency, we want to allow everything initially
                     isFreqMatched = true;
                 } else {
                     isFreqMatched = matchesFreq(v, currentFreq);
@@ -4776,22 +4828,34 @@
                 
                 if (!isFreqMatched) return false;
 
-                // User request: Learn page default view (no search) should ONLY show Unlearned words.
-                // But Search should find EVERYTHING (Unlearned, Learning, Mastered).
-                
+                // Learn page default view logic
                 const isReviewOrMastered = currentFreq.includes('review') || currentFreq.includes('mastered');
-                
-                // Only apply strict status filtering if:
-                // 1. We are on Learn page
-                // 2. We are NOT searching
-                // 3. We are NOT explicitly asking for Review/Mastered words
                 if (currentPage === 'learn' && !isSearching && !isReviewOrMastered) {
-                    // If the word has any status (Learning or Mastered), hide it from the default batch
-                    if (status) return false;
+                    if (learningStatus[verbKey]) return false;
                 }
                 
                 return true;
             });
+
+            // If searching, also include OOV matches
+            let oovMatches = [];
+            if (isSearching) {
+                oovMatches = extraVerbs.filter(v => {
+                    const word = (v.word || '').toLowerCase();
+                    return word.includes(query);
+                }).map(v => ({
+                    '单词': v.word,
+                    'word': v.word,
+                    '释义': v.definition,
+                    'definition': v.definition,
+                    '词频': 0, // OOV doesn't have core frequency
+                    'frequency': 0,
+                    'isOOV': true,
+                    'group': 'oov'
+                }));
+            }
+
+            displayedVerbs = [...coreMatches, ...oovMatches];
 
             // User request: For Learn page (when NOT in review/mastered filter), handle persistence and random selection
             const isReviewOrMastered = currentFreq.includes('review') || currentFreq.includes('mastered');
@@ -4896,6 +4960,9 @@
                  return div;
             }
 
+            // Identify OOV/Notebook words
+            const isOOV = item.isOOV || !vocabularyMap.has(verb.toLowerCase());
+
             const card = document.createElement('div');
             card.id = 'verb-card-' + verb;
             // Improved Card Interaction: Separate active/press states
@@ -4904,31 +4971,31 @@
             // UI Update: Soften background color (Slate-50) and shadow to reduce eye strain
             // REMOVE 'border' from card itself to avoid rendering glitch with image.
             // We use an absolute overlay border instead.
-            card.className = 'group relative flex flex-col bg-[#f8fafc] rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-1 isolate';
+            // REMOVED: hover:-translate-y-1 (User request to disable lift effect)
+            card.className = 'verb-card group relative flex flex-col bg-[#f8fafc] rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] isolate';
             
             // Auto-generate image/explanation if missing
             if (!item.image_url && !item.has_cache) {
                 addToQueue(verb);
             }
             
-            // Long Press Logic
+            // Long Press Logic (Visuals handled by global listeners)
             let longPressTimer;
-            let isLongPress = false; // Flag if long press was triggered
-            let isPressing = false;  // Flag if user is currently holding down
+            let isLongPress = false;
+            let isPressing = false;
             let startX = 0;
             let startY = 0;
-            const longPressDuration = 500; // Slightly faster
 
             const startPress = (e) => {
                 // Ignore if overlay is active
                 if (card.querySelector('.exclude-overlay.active')) return;
-                // User request: Different pages have different card interactions
                 if (currentPage !== 'learn' && currentPage !== 'mastery' && currentPage !== 'review') return;
-                
+                if (isOOV) return;
+
                 isPressing = true;
                 isLongPress = false;
                 
-                // Track start position
+                // Record start position for move detection
                 if (e.type === 'touchstart') {
                     startX = e.touches[0].clientX;
                     startY = e.touches[0].clientY;
@@ -4936,39 +5003,28 @@
                     startX = e.clientX;
                     startY = e.clientY;
                 }
-                
-                // Apply press scale effect immediately
-                card.style.transform = 'scale(0.96)';
-                card.style.transition = 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)';
-                
+
                 longPressTimer = setTimeout(() => {
                     if (!isPressing) return;
                     isLongPress = true;
                     
-                    // Trigger Haptic feedback
                     if (window.navigator && window.navigator.vibrate) {
                         window.navigator.vibrate(50);
                     }
                     
-                    // Show Overlay
                     showExcludeOverlay(card, verb);
-                    
-                    // Reset scale when overlay appears (it has its own animation)
-                    card.style.transform = 'scale(1)';
-                    
-                }, longPressDuration);
+                }, 500);
             };
 
             const cancelPress = (e) => {
                 isPressing = false;
-                clearTimeout(longPressTimer);
-                
-                // If it was NOT a long press, and overlay is NOT active, revert scale
-                if (!isLongPress && !card.querySelector('.exclude-overlay.active')) {
-                    card.style.transform = 'scale(1)';
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
                 }
             };
-
+            
+            // Add move handler to cancel long press on scroll
             const handleMove = (e) => {
                 if (!isPressing) return;
                 
@@ -4981,15 +5037,13 @@
                     clientY = e.clientY;
                 }
                 
-                // If moved more than 10px, cancel everything (it's a scroll)
+                // If moved more than 10px, cancel long press (it's a scroll)
                 if (Math.abs(clientX - startX) > 10 || Math.abs(clientY - startY) > 10) {
-                    isPressing = false;
-                    clearTimeout(longPressTimer);
-                    card.style.transform = 'scale(1)';
+                    cancelPress(e);
                 }
             };
 
-            // Attach Listeners
+            // Local listeners ONLY for the long-press timer logic
             card.addEventListener('mousedown', startPress);
             card.addEventListener('touchstart', startPress, { passive: true });
             
@@ -4998,6 +5052,7 @@
             card.addEventListener('touchend', cancelPress);
             card.addEventListener('touchcancel', cancelPress);
             
+            // NEW: Listen for move to prevent accidental long press during scroll
             card.addEventListener('mousemove', handleMove);
             card.addEventListener('touchmove', handleMove, { passive: true });
             
@@ -5008,7 +5063,15 @@
             card.onclick = (e) => {
                 const overlay = card.querySelector('.exclude-overlay');
                 
-                // If overlay is active, ignore clicks on card body (overlay handles its own clicks)
+                // Safety: Reset visuals on click
+                if (window.globalResetPressedState) window.globalResetPressedState();
+                
+                // NEW: Prevent opening detail if we just closed an overlay
+                if (window.getLastOverlayCloseTime && (Date.now() - window.getLastOverlayCloseTime() < 300)) {
+                    return;
+                }
+                
+                // If overlay is active, ignore clicks on card body
                 if (overlay && overlay.classList.contains('active')) {
                     return;
                 }
@@ -5022,7 +5085,6 @@
                 if (e.target.closest('button') || e.target.closest('.exclude-overlay')) return;
                 
                 let isReview = currentFreq === 'review' || currentPage === 'review';
-                // User request: Library tab in Review page should show study mode (no spelling test)
                 if (currentPage === 'review' && currentReviewTab === 'library') {
                     isReview = false;
                 }
@@ -5139,8 +5201,9 @@
                 `;
             }
 
-            const excludeOverlay = `
-                <div class="exclude-overlay p-4 rounded-none overflow-hidden z-30" style="border-radius: 0 !important;" onclick="hideExcludeOverlay(this)">
+            // Long Press Overlay (Skip for OOV)
+            const excludeOverlay = isOOV ? '' : `
+                <div class="exclude-overlay p-4 rounded-none overflow-hidden z-30" style="border-radius: 0 !important;">
                     <div class="w-full max-w-[150px] space-y-3 relative z-10">
                         <button class="mastery-confirm-btn text-orange-600">
                             <i class="fas fa-trophy text-sm"></i>
@@ -5171,6 +5234,18 @@
             const displayDef = item.definition || item['释义'] || '';
             const displaySeq = item.sequence || item['序号'];
             
+            // OOV Badge for items from Notebook
+            let oovBadge = '';
+            if (item.isOOV) {
+                oovBadge = `
+                    <div class="absolute top-2 right-2 z-10 pointer-events-none">
+                        <div class="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-purple-500 text-white shadow-sm flex items-center gap-1">
+                            <i class="fas fa-bookmark text-[8px]"></i><span>Notebook</span>
+                        </div>
+                    </div>
+                `;
+            }
+
             // Add Overlay Border Div:
             // This div sits on top of all content (z-20) and provides the border.
             // It perfectly masks any jagged edges from images or content overflow.
@@ -5180,21 +5255,22 @@
                 ${borderOverlay}
                 ${excludeOverlay}
                 ${ebbinghausBadge}
+                ${oovBadge}
                 ${imageHtml}
                 <div class="${contentClasses} relative z-10">
-                    <h3 class="${displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full break-words leading-tight">
+                    <h3 class="${displayWord.length > 20 ? 'text-xs' : displayWord.length > 16 ? 'text-sm' : displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap leading-none px-1">
                         ${displayWord}
                     </h3>
                     <div class="flex items-center justify-center gap-1.5 mb-1">
-                        <span class="text-[10px] px-2 py-0.5 rounded-lg ${getProbabilityColor(displayFreq)} font-black uppercase tracking-wider border border-white/20 shadow-sm">
-                            ${calculateExamProbability(displayFreq)}% Freq
+                        <span class="text-[10px] px-2 py-0.5 rounded-lg ${item.isOOV ? 'bg-purple-100 text-purple-600' : getProbabilityColor(displayFreq)} font-black uppercase tracking-wider border border-white/20 shadow-sm">
+                            ${item.isOOV ? 'OOV' : calculateExamProbability(displayFreq) + '% Freq'}
                         </span>
                     </div>
                     
                     <div class="w-full flex items-center justify-between mt-auto pt-0.5">
-                        <div class="w-6 flex justify-start">${contextIcon}</div>
+                        <div class="w-6 flex justify-start">${item.isOOV ? '<i class="fas fa-book-open text-purple-400 opacity-40 text-xs"></i>' : contextIcon}</div>
                         <p class="text-xs leading-relaxed text-gray-500 text-center font-medium truncate px-1 flex-1" title="${displayDef}">${displayDef}</p>
-                        <div class="w-6 flex justify-end text-gray-300 text-[10px] font-black tracking-tighter pointer-events-none">#${displaySeq}</div>
+                        <div class="w-6 flex justify-end text-gray-300 text-[10px] font-black tracking-tighter pointer-events-none">${displaySeq ? '#' + displaySeq : ''}</div>
                     </div>
                 </div>
                 ${refreshBtn}
@@ -5216,16 +5292,8 @@
                 const masteryBtn = overlay.querySelector('.mastery-confirm-btn');
                 const excludeBtn = overlay.querySelector('.exclude-confirm-btn');
                 
-                // Ensure card rebound is immediate and synchronized with overlay
-                card.classList.remove('is-pressed');
-                card.style.transform = '';
-                card.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                card.style.willChange = 'transform';
-                overlay.style.willChange = 'opacity, transform';
-                
-                // Force a reflow to align animation start times
-                void card.offsetWidth;
-                void overlay.offsetWidth;
+                // Clear any manual transitions that might interfere
+                card.style.transition = '';
                 
                 if (currentPage === 'mastery') {
                     // Mastery Page: Only "Reset to Review"
@@ -5247,27 +5315,73 @@
                     excludeBtn.onclick = (e) => confirmExclude(e, word);
                 }
                 
-                // Start overlay and card animations on the same frame for perfect sync
-                requestAnimationFrame(() => {
-                    overlay.classList.add('active');
-                    card.classList.add('overlay-active');
-                    // card transform already cleared; ensure transition is active
-                    card.style.transform = '';
-                });
+                // Force layout reflow before starting animations
+                void overlay.offsetWidth;
+                
+                // Show overlay and clear pressed state in the same frame
+                // CRITICAL: Ensure pointer events are enabled (resetting inline style from hide logic)
+                overlay.style.pointerEvents = '';
+                overlay.classList.add('active');
+                card.classList.add('overlay-active');
+                card.classList.remove('is-pressed');
+                card.style.transform = '';
 
-                // Press feedback on overlay: keep card/overlay in sync during down/up
-                const pressDown = () => {
+                // Add press feedback behavior to overlay
+                let overlayStartX = 0;
+                let overlayStartY = 0;
+
+                const pressDown = (e) => {
+                    e.stopPropagation();
                     card.classList.add('overlay-press-card');
+                    if (e.touches && e.touches[0]) {
+                        overlayStartX = e.touches[0].clientX;
+                        overlayStartY = e.touches[0].clientY;
+                    } else {
+                        overlayStartX = e.clientX;
+                        overlayStartY = e.clientY;
+                    }
                 };
-                const pressUp = () => {
+                const pressUp = (e) => {
+                    // Do NOT stop propagation here to allow window capture listeners to run
                     card.classList.remove('overlay-press-card');
+                    
+                    // If it was a quick tap on the overlay, hide it UNLESS it was on a button
+                    if ((e.type === 'touchend' || e.type === 'mouseup')) {
+                         const endX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+                         const endY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+                         
+                         // If we have start positions, check for movement. If not (e.g. click escaped pressDown), assume tap.
+                         const diffX = overlayStartX ? Math.abs(endX - overlayStartX) : 0;
+                         const diffY = overlayStartY ? Math.abs(endY - overlayStartY) : 0;
+                         
+                         if (diffX < 10 && diffY < 10) {
+                             // Check if the tap was NOT on a button or its children
+                             if (!e.target.closest('button')) {
+                                 hideExcludeOverlay(overlay);
+                             }
+                         }
+                    }
+                    // Reset overlay start positions for next time
+                    overlayStartX = 0;
+                    overlayStartY = 0;
+                    
+                    // Final safety cleanup
+                    if (window.globalResetPressedState) window.globalResetPressedState();
                 };
-                // Attach listeners (remove previous to avoid duplicates)
+                
                 overlay.onmousedown = pressDown;
                 overlay.ontouchstart = pressDown;
                 overlay.onmouseup = pressUp;
                 overlay.ontouchend = pressUp;
                 overlay.ontouchcancel = pressUp;
+
+                // Standard click fallback: Handle clicks that might escape the touch handlers
+                overlay.onclick = (e) => {
+                    e.stopPropagation();
+                    if (!e.target.closest('button')) {
+                        hideExcludeOverlay(overlay);
+                    }
+                };
             }
         }
 
@@ -5335,14 +5449,22 @@
                     if (res.ok) {
                         // Update local status
                         const result = await res.json();
-                        learningStatus[word.toLowerCase()] = {
+                        const key = word.toLowerCase();
+                        learningStatus[key] = {
                             status: 'learning',
                             stage: 0,
                             next_review: result.next_review
                         };
                         
+                        // Also un-exclude if it was excluded
+                        if (excludedVerbs.has(key)) {
+                            excludedVerbs.delete(key);
+                            localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
+                        }
+                        
                         setTimeout(() => {
                             renderMasteryPage(); // Refresh the grid
+                            updateCounts(); // Sync header stats
                         }, 300);
                     }
                 } catch (e) {
@@ -5418,28 +5540,31 @@
         function hideExcludeOverlay(overlay) {
             if (!overlay) return;
             const card = overlay.closest('.verb-card');
-            if (card) {
-                card.style.willChange = 'transform';
-            }
-            overlay.style.willChange = 'opacity';
-            if (card) {
-                card.classList.add('overlay-press-card');
-            }
-            // Prevent double taps during close and give overlay subtle press feedback
+            
+            // Prevent double interactions
+            if (!overlay.classList.contains('active')) return;
+            
             overlay.style.pointerEvents = 'none';
-            overlay.classList.add('overlay-press');
-            // Close after press feedback completes to avoid flicker
+            
+            // Clear all possible press states
+            overlay.classList.remove('active');
+            if (card) {
+                card.classList.remove('overlay-active');
+                card.classList.remove('overlay-press-card');
+                card.classList.remove('is-pressed');
+                card.style.transform = '';
+            }
+            
+            // Ensure overlay is reset after transition
             setTimeout(() => {
-                overlay.classList.remove('active');
-                overlay.classList.remove('overlay-press');
-                if (card) {
-                    card.classList.remove('overlay-press-card');
-                    card.style.transform = '';
-                    card.classList.remove('overlay-active');
+                if (!overlay.classList.contains('active')) {
+                    overlay.style.pointerEvents = 'none';
                 }
-                // Restore pointer events after transition
-                overlay.style.pointerEvents = '';
-            }, 120);
+            }, 300);
+            
+            // Global cleanup
+            if (window.globalResetPressedState) window.globalResetPressedState();
+            if (window.setLastOverlayCloseTime) window.setLastOverlayCloseTime(Date.now());
         }
 
         function confirmExclude(event, word) {
@@ -5482,9 +5607,25 @@
         }
 
         function loadMoreVerbs() {
-            if (offset < displayedVerbs.length) {
+            if (offset < displayedVerbs.length && !isLoading) {
                 renderGrid(false);
             }
+        }
+
+        // Auto-load more verbs on scroll (Infinite Scroll)
+        function initInfiniteScroll() {
+            const scrollContainer = document.querySelector('.app-content');
+            if (!scrollContainer) return;
+
+            scrollContainer.addEventListener('scroll', () => {
+                if (currentPage !== 'learn') return;
+                
+                const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+                // If within 200px of bottom, load more
+                if (scrollTop + clientHeight >= scrollHeight - 200) {
+                    loadMoreVerbs();
+                }
+            }, { passive: true });
         }
 
         function toggleSearchClearBtn() {
@@ -5508,20 +5649,25 @@
             }
         }
 
+        let filterDebounceTimer = null;
         function filterVerbs() {
             toggleSearchClearBtn();
-            updateCounts();
             
-            // Refresh current page
-            if (currentPage === 'learn') {
-                applyFilters();
-            } else if (currentPage === 'review') {
-                renderReviewPage();
-            } else if (currentPage === 'mastery') {
-                renderMasteryPage();
-            }
-            
-            updateProfileStats(); // Sync profile stats immediately
+            if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+            filterDebounceTimer = setTimeout(() => {
+                updateCounts();
+                
+                // Refresh current page
+                if (currentPage === 'learn') {
+                    applyFilters();
+                } else if (currentPage === 'review') {
+                    renderReviewPage();
+                } else if (currentPage === 'mastery') {
+                    renderMasteryPage();
+                }
+                
+                updateProfileStats(); // Sync profile stats immediately
+            }, 250); // 250ms debounce
         }
 
         // Excluded Words Logic
@@ -5708,14 +5854,6 @@
 
         // Internal History Stack Removed - We use pure Hash Routing
         
-        function updateModalBackButton() {
-            // Deprecated - Removed
-        }
-
-        function goBackInternal() {
-            // Deprecated - Removed
-        }
-
         function openVerb(verb, isReview = false, refresh = false, isBack = false) {
             // Handle Navigation History
             if (modal.classList.contains('active')) {
@@ -5727,13 +5865,14 @@
                     
                     // Only push if hash is different
                     if (location.hash !== newHash) {
-                        history.pushState({ isReview: isReview }, "", newHash);
+                        modalHistoryCount++; // Increment before push
+                        history.pushState({ isReview: isReview, depth: modalHistoryCount }, "", newHash);
                     }
                 }
             } else {
                 // Starting fresh modal
                 isClosing = false; // Reset closing flag to ensure clean state
-                modalHistoryCount = 0;
+                modalHistoryCount = 1; // Start at 1 for the base word
                 
                 // For the FIRST word, we also want to push a state so we have a URL to back from
                 // We must use the correct hash format
@@ -5741,7 +5880,7 @@
                 
                 // CRITICAL: We need to push the state to create the "Detail Page" history entry.
                 // This ensures that when user presses Back, they leave this "Detail Page" entry.
-                history.pushState({ isReview: isReview }, "", newHash);
+                history.pushState({ isReview: isReview, depth: modalHistoryCount }, "", newHash);
                 
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
@@ -5807,8 +5946,9 @@
                 
                 // User request: In Review Library, we don't need "MARK AS LEARNED" because it's already learned.
                 // We only show "MARK AS LEARNED" if the word is truly new (stage 0) AND we are NOT on the Review page.
+                // IMPORTANT: We never show "MARK AS LEARNED" for OOV words.
                 const isNewWord = !status || status.stage === 0;
-                if (isNewWord && currentPage !== 'review') {
+                if (isNewWord && currentPage !== 'review' && !isOOV) {
                     document.getElementById('studyModeControls')?.classList.remove('hidden');
                 } else {
                     document.getElementById('studyModeControls')?.classList.add('hidden');
@@ -5847,7 +5987,7 @@
                 const isMasteryPage = currentPage === 'mastery';
                 const isReviewLibrary = currentPage === 'review' && currentReviewTab === 'library';
                 
-                if (!isMasteryPage && !isReviewLibrary && (isDue || isReviewMode || (!status && currentPage === 'learn') || (currentPage === 'review' && currentReviewTab === 'session'))) {
+                if (!isMasteryPage && !isReviewLibrary && !isOOV && (isDue || isReviewMode || (!status && currentPage === 'learn') || (currentPage === 'review' && currentReviewTab === 'session'))) {
                     controls.classList.remove('hidden');
                 } else {
                     controls.classList.add('hidden');
@@ -5959,7 +6099,7 @@
 
             if (fromPopState !== true) {
                 // If closed manually, we need to go back through all internal word states PLUS the modal open state
-                const stepsBack = -1 - modalHistoryCount;
+                const stepsBack = -modalHistoryCount;
                 modalHistoryCount = 0; // Reset
                 history.go(stepsBack);
             }
@@ -6869,8 +7009,11 @@
                             
                             if (!definition && !isCore) {
                                 // For OOV words, we might not have a definition yet.
-                                // We can show "Search online" or placeholder.
-                                definition = 'Tap to search & collect';
+                                if (isCollected) {
+                                    definition = 'In Notebook · Tap to view details';
+                                } else {
+                                    definition = 'Tap to search & collect';
+                                }
                             }
                             
                             const item = document.createElement('div'); // Changed to div for better styling control
@@ -6910,16 +7053,11 @@
                                     } else {
                                         // OOV Word Handling
                                         if (isCollected) {
-                                            // Already collected: Maybe show simple toast or definition?
-                                            // For now, let's toggle remove? Or just show definition.
-                                            // Let's allow remove for now.
-                                            if (confirm(`Remove "${cand}" from Notebook?`)) {
-                                                await window.DB.removeExtraVocab(cand);
-                                                // Refresh view if on Mastery page
-                                                if (currentPage === 'mastery' && currentMasteryTab === 'notebook') {
-                                                    renderMasteryPage();
-                                                }
-                                            }
+                                            // Already collected: Ask before opening (user request: "选择是否继续")
+                                            showConfirm('Already in Notebook', `"${cand}" is already in your Notebook. View AI deep analysis?`, () => {
+                                                if (window.openVerb) window.openVerb(cand);
+                                                else openVerb(cand);
+                                            });
                                         } else {
                                             // Not collected: Add to Notebook
                                             // 1. Fetch definition (using simple LLM or fallback)
@@ -6961,20 +7099,18 @@
 
                                             await window.DB.addExtraVocab(cand, definitionToSave);
                                             
-                                            // Show feedback
-                                            const btn = document.createElement('div');
-                                            btn.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/70 text-white px-4 py-2 rounded-xl text-xs font-bold animate-fade-in z-[100]';
-                                            btn.innerText = `Saved "${cand}"`;
-                                            document.body.appendChild(btn);
-                                            setTimeout(() => btn.remove(), 1500);
+                                            // Refresh extraVerbs cache
+                                            if (window.DB && window.DB.getExtraVocab) {
+                                                extraVerbs = await window.DB.getExtraVocab();
+                                            }
                                             
+                                            // User request: No "Saved" notification, just open immediately
                                             // Refresh view if on Mastery page
                                             if (currentPage === 'mastery' && currentMasteryTab === 'notebook') {
                                                 renderMasteryPage();
                                             }
                                             
                                             // IMMEDIATELY OPEN THE WORD DETAIL MODAL
-                                            // This allows the user to see the AI generation in action or the definition
                                             if (window.openVerb) window.openVerb(cand);
                                             else openVerb(cand);
                                         }
@@ -7290,7 +7426,7 @@
                                     `;
                                 } else {
                                     essenceHtml = `
-                                        <div class="verb-card-block neumorphic-inset rounded-2xl px-4 py-3 text-center border border-white/40 bg-white/10 backdrop-blur-sm shadow-inner relative overflow-hidden group transition-all duration-200">
+                                        <div class="neumorphic-inset rounded-2xl px-4 py-3 text-center border border-white/40 bg-white/10 backdrop-blur-sm shadow-inner relative overflow-hidden group transition-all duration-200">
                                             <!-- Decorative Quotes -->
                                             <div class="absolute left-2 top-2 text-blue-400/10 text-4xl -rotate-12">
                                                 <i class="fas fa-quote-left"></i>
@@ -7360,7 +7496,7 @@
                                 colorStyle = "text-orange-600"; borderStyle = "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]";
                             }
 
-                            header.className = `${baseLayout} ${colorStyle} verb-card-block rounded-lg transition-all duration-200`;
+                            header.className = `${baseLayout} ${colorStyle} rounded-lg transition-all duration-200`;
                             header.innerHTML = `<span class="w-1.5 h-6 ${borderStyle} rounded-full mr-3 shrink-0"></span><span>${headerText}</span>`;
                             card.appendChild(header);
                             
@@ -7395,15 +7531,15 @@
                                     el.className = "space-y-2.5 mb-4";
                                 } else if (el.tagName === 'LI') {
                                     el.className = `list-disc ml-5 pl-2 ${baseText}`;
-                                    // Make list items interactive
-                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
+                                    // Make list items readable
+                                    el.classList.add('rounded-lg', 'p-2', 'transition-all', 'duration-200');
                                 } else if (el.tagName === 'P') {
                                     el.className = `mb-3 ${baseText}`;
-                                    // Make paragraphs interactive
-                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
+                                    // Make paragraphs readable
+                                    el.classList.add('rounded-lg', 'p-2', 'transition-all', 'duration-200');
                                 } else if (el.tagName === 'DIV' && el.parentElement === contentWrapper) {
-                                    // Make direct div children interactive
-                                    el.classList.add('verb-card-block', 'rounded-lg', 'p-2', 'transition-all', 'duration-200');
+                                    // Make direct div children readable
+                                    el.classList.add('rounded-lg', 'p-2', 'transition-all', 'duration-200');
                                 }
                         });
                         
@@ -8332,6 +8468,7 @@
         
         // FIX INPUT FOCUS: Allow native behavior
         // Ensure that touch events on inputs are NOT prevented by any global listener
+        // IMPROVEMENT: Use passive: true to prevent blocking the main scroll thread.
         window.addEventListener('touchstart', function(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 // IMPORTANT: Stop propagation to prevent parent listeners (like card swipe)
@@ -8339,7 +8476,7 @@
                 e.stopPropagation();
                 return true;
             }
-        }, { passive: false });
+        }, { passive: true });
 
         // Ensure touchend also propagates cleanly for inputs
         window.addEventListener('touchend', function(e) {
@@ -8347,7 +8484,7 @@
                 e.stopPropagation();
                 return true;
             }
-        }, { passive: false });
+        }, { passive: true });
 
         // Prevent other listeners from hijacking input clicks
         window.addEventListener('click', function(e) {
@@ -8356,7 +8493,7 @@
                 // Ensure focus happens
                 e.target.focus();
             }
-        }, { passive: false, capture: true }); // Use capture to intercept before others
+        }, { passive: true, capture: true }); // Use capture to intercept before others
 
         // JS-controlled Active State Logic
         (function() {
@@ -8364,114 +8501,127 @@
             let startX = 0;
             let startY = 0;
             let isScrolling = false;
+            let lastTouchTime = 0; // Guard against synthesized mouse events
+            let lastOverlayCloseTime = 0; // NEW: Prevent detail open on overlay close
+
+            // EXPOSE GLOBALLY
+            window.setLastOverlayCloseTime = (t) => { lastOverlayCloseTime = t; };
+            window.getLastOverlayCloseTime = () => lastOverlayCloseTime;
 
             function addPressedState(e) {
-                // Ignore inputs/textareas to allow normal typing/selection
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    // CRITICAL: Ensure we don't accidentally blur an active input when touching another part of it
+                // Touch guard: ignore mouse events that immediately follow touch events
+                if (e.type === 'mousedown' && (Date.now() - lastTouchTime < 600)) {
                     return;
                 }
-                // Ignore press state when interacting with exclude overlay to prevent card scaling mismatch
+                if (e.type === 'touchstart') {
+                    lastTouchTime = Date.now();
+                }
+
+                // NEW: Ignore if we JUST closed an overlay (prevent detail opening side-effect)
+                if (Date.now() - lastOverlayCloseTime < 300) {
+                    return;
+                }
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                // Ignore press state when interacting with exclude overlay
                 if (e.target.closest('.exclude-overlay')) {
                     return;
                 }
 
                 // Record start position for scroll detection
-                if (e.touches && e.touches[0]) {
+                if (e.type === 'touchstart' || e.type === 'touchmove') {
                     startX = e.touches[0].clientX;
                     startY = e.touches[0].clientY;
+                } else {
+                    startX = e.clientX;
+                    startY = e.clientY;
                 }
                 isScrolling = false;
 
                 // Pre-cleanup: remove any existing pressed states immediately
                 removePressedState();
 
-                // Find closest button-like element OR scrollable card
-                // Expanded list to include ANY element with onclick, button role, or neumorphic class
-                // REMOVED .neumorphic from selector to prevent inner decorative elements from hijacking clicks
-                // ADDED .learning-insight-card to support insights interactions
-                // ADDED .verb-card-block to support granular interactions within verb cards
-                // ADDED .action-card-btn to support central action buttons in review/mastery
+                // Find closest interactive target
                 const target = e.target.closest('button, a, .neumorphic-btn, .neumorphic-btn-sm, .neumorphic-toggle-btn, .nav-item, .verb-card, .learning-insight-card, .verb-card-block, .action-card-btn, [onclick], [role="button"]');
                 if (target && !target.disabled) {
-                    // EXCLUDE MODALS AND SPECIFIC CONTAINERS FROM PRESS EFFECT
-                    // Check if the target is ITSELF a modal or modal content wrapper
-                    if (target.id === 'verbModal' || target.id === 'learningModal' || target.id === 'settingsModal' || target.id === 'analyticsModal' || target.id === 'importConfirmModal' || target.classList.contains('fixed') || target.classList.contains('modal-content') || target.classList.contains('modal-overlay')) {
+                    // Filter out non-interactive containers
+                    if (target.id === 'verbModal' || target.id === 'learningModal' || target.classList.contains('fixed') || target.classList.contains('modal-overlay') || target.classList.contains('modal-content')) {
                         return;
                     }
-                    // If target is a verb card with an active overlay, do not add pressed state to avoid seam/scale mismatch
-                    if (target.classList && target.classList.contains('verb-card')) {
-                        const activeOverlay = target.querySelector('.exclude-overlay.active');
-                        if (activeOverlay) {
+                    
+                    // NEW: Explicitly exclude modal content from global press effects
+                    if (target.closest('.modal-content')) {
+                        // Only allow buttons inside modal to be pressed, not the containers or blocks
+                        if (!target.tagName.match(/BUTTON|A/) && !target.classList.contains('neumorphic-btn') && !target.classList.contains('neumorphic-btn-sm') && !target.classList.contains('action-card-btn') && !target.getAttribute('onclick')) {
                             return;
                         }
                     }
                     
-                    // Also check if target is inside a modal content area but IS the content area itself (not a button inside)
-                    // The .neumorphic class is often on the modal content wrapper, which we don't want to scale
-                    if (target.classList.contains('neumorphic') && !target.classList.contains('neumorphic-btn') && !target.classList.contains('neumorphic-btn-sm') && !target.classList.contains('verb-card') && !target.classList.contains('learning-insight-card') && !target.classList.contains('verb-card-block') && !target.classList.contains('action-card-btn') && !target.getAttribute('onclick') && target.tagName !== 'BUTTON' && target.tagName !== 'A') {
-                         return;
+                    // Specific check for verb-card with active overlay
+                    if (target.classList.contains('verb-card') && target.querySelector('.exclude-overlay.active')) {
+                        return;
                     }
 
                     activeElement = target;
 
-                    // PROMOTION LOGIC: If target is a block inside a main verb card (List View), transfer press to the card itself
-                    // This ensures the whole card scales as one unit, rather than just the block
+                    // Promotion logic for verb-card blocks (ONLY for list view cards, NOT modal details)
                     if (target.classList.contains('verb-card-block')) {
                         const parentCard = target.closest('.verb-card');
-                        if (parentCard) {
+                        // Ensure this is a list card, not inside a modal
+                        if (parentCard && !parentCard.closest('.modal-content')) {
                             activeElement = parentCard;
                         } else {
-                            // If block is NOT inside a verb-card (e.g. detail view), it should NOT be pressable
-                            // unless it explicitly has an onclick or button role.
-                            if (!target.hasAttribute('onclick') && target.getAttribute('role') !== 'button') {
-                                return;
-                            }
+                            // If block is not in a card (e.g. inside modal), ignore it unless it's a button
+                            return;
                         }
                     }
 
-                    // Delay adding pressed state slightly to prevent flash on quick scroll
-                    // But for responsiveness, we usually want instant. Let's rely on move cancellation.
-                    activeElement.classList.add('is-pressed');
-
-                    // SPECIAL LINKING REMOVED: Since we now promote to parent card, we don't need to manually link siblings.
-                    // Granular feedback for Detail View (which has no .verb-card parent) is preserved automatically.
+                    // Use requestAnimationFrame for smooth style application
+                    requestAnimationFrame(() => {
+                        if (activeElement) activeElement.classList.add('is-pressed');
+                    });
                 }
             }
 
             function removePressedState() {
                 if (activeElement) {
-                    activeElement.classList.remove('is-pressed');
-                    // ONLY blur if it's NOT an input
-                    if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
-                        try { activeElement.blur(); } catch(e){}
-                    }
+                    const el = activeElement;
                     activeElement = null;
-                }
-                // Cleanup any strays just in case (Global cleanup)
-                const pressed = document.querySelectorAll('.is-pressed');
-                if (pressed.length > 0) {
-                    pressed.forEach(el => {
+                    
+                    // Immediately remove the pressed class
+                    // This sets the base state back to scale(1) (visually instant if no transition)
+                    requestAnimationFrame(() => {
                         el.classList.remove('is-pressed');
-                        // ONLY blur if it's NOT an input
+                        el.classList.remove('overlay-press-card');
+                        el.style.transform = ''; // Clear inline transform
+                        
+                        // NO ANIMATION for rebound - User request "不要单词卡的点击抬升了"
+                        // Just clear state instantly.
+
                         if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') {
                             try { el.blur(); } catch(e){}
                         }
                     });
                 }
                 
-                // Clear selection if any exists
-                // BUT skip clearing if focus is inside an input/textarea
-                const activeEl = document.activeElement;
-                const isInputActive = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
-                
-                if (window.getSelection && !isInputActive) {
-                    try { window.getSelection().removeAllRanges(); } catch(e){}
+                // Optimized deep cleanup
+                if (document.getElementsByClassName('is-pressed').length > 0 || 
+                    document.getElementsByClassName('overlay-press-card').length > 0) {
+                    requestAnimationFrame(() => {
+                        const stuck = document.querySelectorAll('.is-pressed, .overlay-press-card');
+                        stuck.forEach(el => {
+                            el.classList.remove('is-pressed');
+                            el.classList.remove('overlay-press-card');
+                            el.style.transform = '';
+                        });
+                    });
                 }
                 
-                // Force focus removal from active element if it's not an input
-                if (activeEl && !isInputActive) {
-                    try { activeEl.blur(); } catch(e){}
+                // Clear selections safely
+                const activeEl = document.activeElement;
+                if (window.getSelection && (!activeEl || !activeEl.tagName.match(/INPUT|TEXTAREA/))) {
+                    try { window.getSelection().removeAllRanges(); } catch(e){}
                 }
             }
             
@@ -8489,16 +8639,18 @@
             };
             
             // Attach listeners to WINDOW to capture everything
-            // CRITICAL CHANGE: Do NOT use passive: false for window-level touchstart if possible, unless blocking default
-            // But here we need to intercept for custom press logic.
+            // CRITICAL CHANGE: Use passive: true to ensure scrolling is never blocked by press logic
             // We ALREADY handle input exception inside addPressedState.
-            window.addEventListener('touchstart', addPressedState, { passive: false });
+            window.addEventListener('touchstart', addPressedState, { passive: true });
+            window.addEventListener('mousedown', addPressedState, { passive: true });
 
             window.addEventListener('touchend', clearSelectionAndReset, { capture: true });
             window.addEventListener('touchcancel', clearSelectionAndReset, { capture: true });
             window.addEventListener('mouseup', clearSelectionAndReset, { capture: true });
+            window.addEventListener('click', removePressedState, { capture: true });
             document.addEventListener('mouseleave', removePressedState, { capture: true });
             window.addEventListener('dragend', removePressedState, { capture: true });
+            window.addEventListener('visibilitychange', removePressedState);
             
             // REMOVE AGGRESSIVE CONTEXT MENU BLOCKER FROM HERE IF IT EXISTS
             // (We already have a safer one above)
@@ -9062,9 +9214,10 @@
                             const explanations = window.db && window.db.explanations ? await window.db.explanations.toArray() : [];
                             const progress = window.db && window.db.learning_progress ? await window.db.learning_progress.toArray() : [];
                             const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
+                            const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
                             const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
                             const excluded = Array.from(excludedVerbs || []);
-                            const exportData = { explanations, progress, checkins, settings, excluded };
+                            const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
                             blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
                         } catch (localErr) {
                             throw localErr;
@@ -9373,8 +9526,10 @@
                             const resetModal = document.getElementById('resetConfirmModal');
                             
                             // Ensure success modal is also visible on top of settings
-                            if (settingsModal && !settingsModal.classList.contains('translate-y-full')) {
-                                settingsModal.appendChild(resetModal.parentElement || resetModal); // resetConfirmModal is created as child of body usually
+                            if (settingsModal && !settingsModal.classList.contains('translate-y-full') && resetModal) {
+                                if (!settingsModal.contains(resetModal)) {
+                                    settingsModal.appendChild(resetModal);
+                                }
                             }
                             
                             if (resetModal) {
@@ -9625,8 +9780,8 @@
                     // Update the batch if we are in Learn page
                     if (currentPage === 'learn') {
                         updateSavedBatch(verb);
-                        // Also update displayedVerbs locally so the card disappears on renderGrid
-                        displayedVerbs = displayedVerbs.filter(v => v['单词'].toLowerCase() !== verb.toLowerCase());
+                        // Do NOT filter displayedVerbs here yet, wait for the navigation logic
+                        // displayedVerbs = displayedVerbs.filter(v => v['单词'].toLowerCase() !== verb.toLowerCase());
                     }
 
                     // Update the badge in the modal IMMEDIATELY for visual feedback
@@ -9643,101 +9798,119 @@
                             stageBadge.classList.add('bg-blue-100', 'text-blue-600');
                         }
                     }
-                    
+
                     updateCounts();
                     
                     // Update session stats
                     sessionReviewStats.count++;
                     if (result === 'remembered') sessionReviewStats.remembered++;
+
+                    // User request: stay on card if multi-layer jump (e.g. clicking a link in explanation)
+                    // We prioritize the manual browsing history over automatic batch progression
+                    if (modalHistoryCount > 1) {
+                        // Hide learn button after marking as learned
+                        document.getElementById('studyModeControls')?.classList.add('hidden');
+                        
+                        // Update background grid
+                        if (currentPage === 'review') renderReviewPage();
+                        else renderGrid();
+                        return;
+                    }
                     
-                    // Logic for auto-jumping to next word
-                    if (currentFreq === 'review' || currentPage === 'review') {
-                        // Determine which list to use for navigation
-                        const sourceList = currentPage === 'review' ? reviewVerbsList : displayedVerbs;
-                        
-                        // Find current verb index in the source list
-                        const currentIndex = sourceList.findIndex(v => v['单词'].toLowerCase() === verb);
-                        
-                        // Wait a bit for the toast to be seen
+                    if (currentFreq.includes('review') || currentPage === 'review') {
+                        // NEW LOGIC: In Review Mode, automatically jump to next reviewable word
                         setTimeout(() => {
-                            // Find next word that is due for review
-                            let nextVerbToReview = null;
-                            const now = new Date();
+                            // Determine which list to use for navigation
+                            const sourceList = currentPage === 'review' ? (window.reviewVerbsList || []) : displayedVerbs;
                             
-                            // Start searching from currentIndex + 1
-                            for (let i = currentIndex + 1; i < sourceList.length; i++) {
-                                const v = sourceList[i];
-                                const status = learningStatus[v['单词'].toLowerCase()];
-                                if (status && new Date(status.next_review) <= now && status.status !== 'mastered') {
-                                    nextVerbToReview = v['单词'];
-                                    break;
-                                }
-                            }
+                            // Find current verb index in the source list
+                            const currentIndex = sourceList.findIndex(v => (v.word || v['单词']).toLowerCase() === verb.toLowerCase());
                             
-                            // If not found in subsequent items, search from the beginning (wrap around)
-                            if (!nextVerbToReview) {
-                                for (let i = 0; i < currentIndex; i++) {
+                            // Wait a bit for the toast to be seen
+                            setTimeout(() => {
+                                // Find next word that is due for review
+                                let nextVerbToReview = null;
+                                const now = new Date();
+                                
+                                // Start searching from currentIndex + 1
+                                for (let i = currentIndex + 1; i < sourceList.length; i++) {
                                     const v = sourceList[i];
-                                    const status = learningStatus[v['单词'].toLowerCase()];
+                                    const status = learningStatus[(v.word || v['单词']).toLowerCase()];
                                     if (status && new Date(status.next_review) <= now && status.status !== 'mastered') {
-                                        nextVerbToReview = v['单词'];
+                                        nextVerbToReview = v.word || v['单词'];
                                         break;
                                     }
                                 }
-                            }
-
-                            if (nextVerbToReview) {
-                                // Reset button states before transition
-                                if (window.globalResetPressedState) window.globalResetPressedState();
                                 
-                                // Open next word without closing modal (just switch content)
-                                openVerb(nextVerbToReview, true);
-                                // Re-render background UI
-                                if (currentPage === 'review') renderReviewPage();
-                                else renderGrid(); 
-                            } else {
-                                // No more words to review, close modal
-                                closeModal();
-                                // Reset buttons again after closing modal
-                                if (window.globalResetPressedState) window.globalResetPressedState();
-
-                                if (currentPage === 'review') {
-                                    renderReviewSummary();
-                                } else {
-                                    renderGrid();
+                                // If not found in subsequent items, search from the beginning (wrap around)
+                                if (!nextVerbToReview) {
+                                    for (let i = 0; i < currentIndex; i++) {
+                                        const v = sourceList[i];
+                                        const status = learningStatus[(v.word || v['单词']).toLowerCase()];
+                                        if (status && new Date(status.next_review) <= now && status.status !== 'mastered') {
+                                            nextVerbToReview = v.word || v['单词'];
+                                            break;
+                                        }
+                                    }
                                 }
-                            }
-                        }, 800);
+
+                                if (nextVerbToReview) {
+                                    // Reset button states before transition
+                                    if (window.globalResetPressedState) window.globalResetPressedState();
+                                    
+                                    // Reset history count for automatic jump
+                                    modalHistoryCount = 1;
+                                    
+                                    // Open next word without closing modal (just switch content)
+                                    openVerb(nextVerbToReview, true);
+                                    // Re-render background UI
+                                    if (currentPage === 'review') renderReviewPage();
+                                    else renderGrid(true); 
+                                } else {
+                                    // No more words to review, close modal
+                                    closeModal();
+                                    // Reset buttons again after closing modal
+                                    if (window.globalResetPressedState) window.globalResetPressedState();
+
+                                    if (currentPage === 'review') {
+                                        renderReviewSummary();
+                                    } else {
+                                        renderGrid(true);
+                                    }
+                                }
+                            }, 800);
+                        }, 50); // Small initial delay to ensure DOM is ready
                     } else if (currentPage === 'learn') {
                         // NEW LOGIC: In Learn Mode, automatically jump to next learnable word
                         setTimeout(() => {
-                            // Determine which list to use (displayedVerbs is the current batch)
-                            const sourceList = displayedVerbs;
-                            
-                            // Find current verb index
-                            const currentIndex = sourceList.findIndex(v => v['单词'].toLowerCase() === verb);
+                            // Find current verb index in the original displayedVerbs list
+                            const currentIndex = displayedVerbs.findIndex(v => (v.word || v['单词']).toLowerCase() === verb.toLowerCase());
                             
                             let nextVerbToLearn = null;
                             
-                            // Look for the next word that hasn't been mastered or is new
-                            // We prioritize words in the current batch first
-                            for (let i = currentIndex + 1; i < sourceList.length; i++) {
-                                const v = sourceList[i];
-                                // Simple check: if it's in the list, it's part of the current learn batch
-                                nextVerbToLearn = v['单词'];
-                                break;
+                            // Look for the next word in the list (before we filter it)
+                            if (currentIndex !== -1 && currentIndex + 1 < displayedVerbs.length) {
+                                const v = displayedVerbs[currentIndex + 1];
+                                nextVerbToLearn = v.word || v['单词'];
                             }
                             
+                            // NOW filter displayedVerbs so the learned card disappears from background grid
+                            displayedVerbs = displayedVerbs.filter(v => (v.word || v['单词']).toLowerCase() !== verb.toLowerCase());
+
                             if (nextVerbToLearn) {
                                 // Reset button states
                                 if (window.globalResetPressedState) window.globalResetPressedState();
                                 
+                                // Reset history count for automatic jump
+                                modalHistoryCount = 1;
+                                
                                 // Transition to next word seamlessly
-                                // IMPORTANT: Pass false for isReviewMode to keep it in Learn style
                                 openVerb(nextVerbToLearn, false);
                                 
-                                // Update background grid
-                                renderGrid();
+                                // Update background grid (renderGrid without reset will append, but offset might be issue)
+                                // Better to call renderGrid(true) but that might be heavy.
+                                // Let's just update the grid view.
+                                renderGrid(true); 
                             } else {
                                 // End of batch
                                 closeModal();
@@ -10018,7 +10191,8 @@
                     // 1. Close Learning/Verb Modal if active
                     const learningModal = document.getElementById('learningModal');
                     if (learningModal && learningModal.classList.contains('active')) {
-                        closeModal();
+                        // Use history.back() to support hierarchical navigation (A->B->C back to B back to A)
+                        history.back();
                         return;
                     }
 
