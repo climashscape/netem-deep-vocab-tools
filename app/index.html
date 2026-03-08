@@ -2142,17 +2142,27 @@
                 if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
                 const modal = document.getElementById('learningModal');
                 if (modal && modal.classList.contains('active')) return;
-                if (currentPage !== 'review') return;
+                if (currentPage !== 'review' && currentPage !== 'mastery') return;
                 const dirLeft = dx < 0;
                 const appContent = document.querySelector('.app-content');
                 if (appContent) {
                     appContent.classList.add(dirLeft ? 'swipe-left' : 'swipe-right');
                     setTimeout(() => appContent.classList.remove('swipe-left', 'swipe-right'), 180);
                 }
-                if (dirLeft) {
-                    if (currentReviewTab === 'session') switchReviewTab('library');
-                } else {
-                    if (currentReviewTab === 'library') switchReviewTab('session');
+                if (currentPage === 'review') {
+                    if (dirLeft) {
+                        if (currentReviewTab === 'session') switchReviewTab('library');
+                    } else {
+                        if (currentReviewTab === 'library') switchReviewTab('session');
+                    }
+                    return;
+                }
+                if (currentPage === 'mastery') {
+                    if (dirLeft) {
+                        if (currentMasteryTab === 'core') switchMasteryTab('notebook');
+                    } else {
+                        if (currentMasteryTab === 'notebook') switchMasteryTab('core');
+                    }
                 }
             }, { passive: true });
         }
@@ -7053,11 +7063,8 @@
                                     } else {
                                         // OOV Word Handling
                                         if (isCollected) {
-                                            // Already collected: Ask before opening (user request: "选择是否继续")
-                                            showConfirm('Already in Notebook', `"${cand}" is already in your Notebook. View AI deep analysis?`, () => {
-                                                if (window.openVerb) window.openVerb(cand);
-                                                else openVerb(cand);
-                                            });
+                                            if (window.openVerb) window.openVerb(cand);
+                                            else openVerb(cand);
                                         } else {
                                             // Not collected: Add to Notebook
                                             // 1. Fetch definition (using simple LLM or fallback)
