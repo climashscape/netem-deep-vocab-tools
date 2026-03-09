@@ -8330,12 +8330,10 @@
             if (modal) {
                 modal.classList.remove('peek-releasing');
             }
-            peekHoldTimer = setTimeout(() => {
-                if (isPeekHolding) {
-                    updatePeekLayoutMetrics();
-                    drawPeekCard();
-                }
-            }, 90);
+            if (isPeekHolding) {
+                updatePeekLayoutMetrics();
+                drawPeekCard();
+            }
         }
 
         function handlePeekEnd(event) {
