@@ -1024,10 +1024,13 @@
         .result-card.active {
             opacity: 1;
             z-index: 30;
-            transform: translate(-50%, -50%) scale(1) rotateX(0deg);
+            transform: translate3d(-50%, -50%, 0) scale(1) rotateX(0deg);
             pointer-events: auto;
             box-shadow: 20px 20px 40px rgb(163,177,198,0.8), 
                        -20px -20px 40px rgba(255,255,255, 0.7);
+            
+            /* Promote to own layer to avoid repaints during scroll/flip */
+            will-change: transform;
         }
         
         /* Previous Card (Gone Above) */
@@ -7772,6 +7775,10 @@
                         let hasFlippedInThisTouch = false; // NEW: Lock to prevent multiple flips in one touch
                         let gestureAxis = null;
                         let dragEligibility = 'none';
+                        let touchScrollable = null;
+                        let touchInScrollable = false;
+                        let pendingDiff = 0;
+                        let rafId = 0;
                         const swipeThreshold = 80; // Distance to trigger flip
 
                         outputContainer.ontouchstart = (e) => {
@@ -7792,6 +7799,13 @@
                             hasFlippedInThisTouch = false; // Reset flip lock
                             gestureAxis = null;
                             dragEligibility = 'none';
+                            touchScrollable = null;
+                            touchInScrollable = false;
+                            pendingDiff = 0;
+                            if (rafId) {
+                                cancelAnimationFrame(rafId);
+                                rafId = 0;
+                            }
                             
                             // Find active card
                             const cards = Array.from(outputContainer.querySelectorAll('.result-card'));
@@ -7799,15 +7813,15 @@
                             
                             if (activeCard) {
                                 // Determine initial scroll state to see if this should be a scroll gesture
-                                const scrollable = activeCard.querySelector('.flex-1.overflow-y-auto');
-                                if (scrollable) {
+                                touchScrollable = activeCard.querySelector('.flex-1.overflow-y-auto');
+                                if (touchScrollable) {
                                      // Use a stricter tolerance for "safe scroll zone" detection
-                                     const isAtTop = scrollable.scrollTop <= 2;
-                                     const isAtBottom = Math.ceil(scrollable.scrollTop + scrollable.clientHeight) >= scrollable.scrollHeight - 2;
+                                     const isAtTop = touchScrollable.scrollTop <= 10;
+                                     const isAtBottom = Math.ceil(touchScrollable.scrollTop + touchScrollable.clientHeight) >= touchScrollable.scrollHeight - 10;
                                      
                                      // If we are NOT at a boundary, this is purely a scroll gesture.
                                      // We should NOT allow it to become a card drag later in the same touch.
-                                     const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
+                                     const isScrollable = touchScrollable.scrollHeight > touchScrollable.clientHeight;
                                      if (isScrollable && !isAtTop && !isAtBottom) {
                                          isScrollGesture = true;
                                      } else if (isScrollable && isAtTop) {
@@ -7821,6 +7835,7 @@
 
                                 // Disable transition for direct 1:1 control
                                 activeCard.style.transition = 'none';
+                                activeCard.style.willChange = 'transform';
                             }
                         };
 
@@ -7849,22 +7864,40 @@
                                 const absX = Math.abs(diffX);
                                 if (absY > 8 || absX > 8) {
                                     gestureAxis = absY >= absX ? 'y' : 'x';
+                                    
+                                    // If we decided it's a Y gesture, but we are inside a scrollable area,
+                                    // we should double-check if we need to lock scroll gesture based on dynamic boundary.
+                                    // This handles cases where initial touchstart was "near" boundary but not "at" boundary (2px vs 10px),
+                                    // or if momentum scrolling brought us to boundary during the micro-movement.
+                                    if (gestureAxis === 'y' && isScrollGesture && touchScrollable) {
+                                         const isAtTop = touchScrollable.scrollTop <= 10;
+                            const isAtBottom = Math.ceil(touchScrollable.scrollTop + touchScrollable.clientHeight) >= touchScrollable.scrollHeight - 10;
+                                         
+                                         if (isAtTop && diff > 0) {
+                                             isScrollGesture = false; // Unlock!
+                                             dragEligibility = 'down';
+                                         } else if (isAtBottom && diff < 0) {
+                                             isScrollGesture = false; // Unlock!
+                                             dragEligibility = 'up';
+                                         }
+                                    }
                                 }
                             }
                             if (gestureAxis === 'x') return;
                             
                             // Check if we should allow drag based on scroll position
                             let allowDrag = false;
-                            const scrollable = activeCard.querySelector('.flex-1.overflow-y-auto');
                             
                             // 1. If touching non-scrollable area (header), always allow
-                            const isTouchInScrollable = scrollable && scrollable.contains(e.target);
+                            if (touchScrollable && !touchInScrollable) {
+                                touchInScrollable = touchScrollable.contains(e.target);
+                            }
                             
-                            if (!isTouchInScrollable || !scrollable) {
+                            if (!touchInScrollable || !touchScrollable) {
                                 allowDrag = true;
                             } else {
                                 // 2. If touching scrollable area, check boundaries
-                                const isScrollable = scrollable.scrollHeight > scrollable.clientHeight;
+                                const isScrollable = touchScrollable.scrollHeight > touchScrollable.clientHeight;
                                 
                                 if (!isScrollable) {
                                     allowDrag = true;
@@ -7885,11 +7918,13 @@
                                 if (Math.abs(diff) > 15) {
                                     e.preventDefault(); 
                                     isDragging = true;
-                                    
-                                    // Apply transform: translate(-50%, -50%) is the base center position
-                                    // We add the diff to the Y translation
-                                    // Using calc to combine percentage and pixel values
-                                    activeCard.style.transform = `translate(-50%, calc(-50% + ${diff}px)) scale(1) rotateX(0deg)`;
+                                    pendingDiff = diff;
+                                    if (!rafId) {
+                                        rafId = requestAnimationFrame(() => {
+                                            rafId = 0;
+                                            activeCard.style.transform = `translate3d(-50%, calc(-50% + ${pendingDiff}px), 0) scale(1) rotateX(0deg)`;
+                                        });
+                                    }
                                 }
                             }
                         };
@@ -7907,12 +7942,17 @@
                             // Restore smooth transition
                             // Use the same timing as CSS to ensure consistency
                             activeCard.style.transition = 'transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease'; 
-                            
-                            const currentY = e.changedTouches[0].clientY;
-                            const diff = currentY - touchStartY;
-                            
-                            // Clear manual transform so CSS classes can take over
-                            activeCard.style.transform = '';
+                            activeCard.style.willChange = 'transform';
+                                if (rafId) {
+                                    cancelAnimationFrame(rafId);
+                                    rafId = 0;
+                                }
+                                
+                                const currentY = e.changedTouches[0].clientY;
+                                const diff = currentY - touchStartY;
+                                
+                                // Clear manual transform so CSS classes can take over
+                                activeCard.style.transform = '';
                             
                             if (isDragging) {
                                 // Increased threshold for commit swipe (was swipeThreshold, usually 100)
@@ -7938,6 +7978,26 @@
                             activeCard = null;
                             gestureAxis = null;
                             dragEligibility = 'none';
+                            touchScrollable = null;
+                            touchInScrollable = false;
+                        };
+
+                        outputContainer.ontouchcancel = () => {
+                            if (activeCard) {
+                                activeCard.style.transition = 'transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease';
+                                activeCard.style.transform = '';
+                                activeCard.style.willChange = '';
+                            }
+                            if (rafId) {
+                                cancelAnimationFrame(rafId);
+                                rafId = 0;
+                            }
+                            isDragging = false;
+                            activeCard = null;
+                            gestureAxis = null;
+                            dragEligibility = 'none';
+                            touchScrollable = null;
+                            touchInScrollable = false;
                         };
 
                         // Clean up legacy handlers if they exist
