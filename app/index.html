@@ -763,8 +763,15 @@
         #learningModal.is-review-mode.peek-active #modalTitle {
             visibility: visible !important;
             opacity: 1 !important;
-            transform: scale(1.02);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateY(0) scale(1);
+            transition: all 0.28s ease;
+        }
+
+        #learningModal.is-review-mode.peek-releasing #modalTitle {
+            visibility: visible !important;
+            opacity: 0 !important;
+            transform: translateY(-1px) scale(0.998);
+            transition: opacity 0.24s ease-out, transform 0.24s ease-out;
         }
         
         #learningModal.is-review-mode.peek-active .result-card.active {
@@ -773,33 +780,35 @@
             transform: translate(-50%, -50%) scale(1);
             pointer-events: auto;
             visibility: visible;
-            z-index: 50;
+            z-index: 42;
         }
 
         /* ONLY the active card should be highlighted and centered during peek */
         #learningModal.is-review-mode.peek-active .result-card.active {
             visibility: visible !important;
             opacity: 1 !important;
-            z-index: 100 !important;
+            z-index: 48 !important;
             filter: blur(0);
-            transform: translate(-50%, -50%) scale(1); /* No scale to keep it grounded */
+            transform: translateX(-50%) scale(1);
             pointer-events: auto !important;
-            
-            /* Remove outer shadows to kill the "floating" effect */
-            box-shadow: none !important;
-            
-            /* Grounded border style */
-            border: none;
-            width: 88%; /* Narrower width for better focus */
-            max-width: 550px; /* Constrain width for desktop */
-            height: 200%; /* ADJUSTED: Slightly less than 220% but more than 185% */
-            top: 100%; /* ADJUSTED: Keep top edge near 0% (100 - 100 = 0) */
-            border-radius: 20px; /* Match modal's radius perfectly */
-            
-            /* Solid integration with background */
-            background: #e0e5ec !important; /* Identical to modal background */
-            backdrop-filter: none;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            width: min(94%, 680px);
+            top: 10px;
+            bottom: var(--peek-card-bottom, -4px);
+            height: auto;
+            border-radius: 28px;
+            background: linear-gradient(170deg, rgba(234, 240, 248, 0.96) 0%, rgba(224, 229, 236, 0.98) 48%, rgba(216, 224, 235, 0.96) 100%) !important;
+            box-shadow: 0 18px 40px rgba(120, 136, 163, 0.22), inset 1px 1px 0 rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(1px);
+            transition: all 0.24s ease;
+        }
+
+        #learningModal.is-review-mode.peek-releasing .result-card.active {
+            visibility: visible !important;
+            opacity: 0 !important;
+            transform: translateX(-50%) scale(0.992);
+            pointer-events: none !important;
+            transition: opacity 0.28s ease-out, transform 0.3s ease-out;
         }
 
         #learningModal.is-review-mode .result-card {
@@ -818,12 +827,32 @@
             visibility: hidden !important;
         }
 
+        #learningModal.is-review-mode .stage-container {
+            position: relative;
+        }
+
+        #learningModal.is-review-mode .stage-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 22px;
+            background: transparent;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            z-index: 38;
+        }
+
+        #learningModal.is-review-mode.peek-active .stage-container::after {
+            opacity: 0;
+        }
+
         /* Enhance internal spacing during peek for a clean integrated look */
         #learningModal.is-review-mode.peek-active .result-card.active .flex-1 {
             padding-left: 1.5rem !important;
             padding-right: 1.5rem !important;
-            padding-top: 1rem !important;
-            padding-bottom: 2rem !important; /* Space for the bottom buttons */
+            padding-top: 1.25rem !important;
+            padding-bottom: 2.25rem !important;
         }
 
         #learningModal.is-review-mode.peek-active .result-card.active h1,
@@ -832,7 +861,7 @@
         #learningModal.is-review-mode.peek-active .result-card.active h4 {
             padding-left: 1.5rem !important;
             padding-right: 1.5rem !important;
-            padding-top: 1.5rem !important;
+            padding-top: 1.2rem !important;
         }
 
         #learningModal.is-review-mode.peek-active .result-card.active .mx-6.border-b {
@@ -850,18 +879,30 @@
             -webkit-mask-image: none !important;
             mask-image: none !important;
             opacity: 1 !important; /* Must be visible to show children cards */
-            z-index: 150 !important; /* Bring above essence and title (z-60) */
+            z-index: 40 !important;
+        }
+
+        .peek-active #refreshBtn {
+            z-index: 220 !important;
         }
 
         #learningModal.is-review-mode #essenceContainer {
-            transition: all 0.4s ease;
+            transition: opacity 0.24s ease, filter 0.24s ease;
         }
 
         #learningModal.is-review-mode.peek-active #essenceContainer {
-            opacity: 0.15;
+            opacity: 0.08;
             pointer-events: none;
-            filter: blur(8px) grayscale(100%);
-            transform: translateY(0) scale(0.98);
+            filter: blur(4px) grayscale(70%);
+            transform: translateY(-20px) scale(1);
+        }
+
+        #learningModal.is-review-mode.peek-releasing #essenceContainer {
+            opacity: 1;
+            pointer-events: none;
+            filter: blur(0) grayscale(0);
+            transform: translateY(-20px) scale(1);
+            transition: opacity 0.26s ease-out, filter 0.26s ease-out;
         }
 
         /* Ensure Peek Button is always visible and on top when being held */
@@ -875,7 +916,7 @@
             box-shadow: inset 6px 6px 10px 0 rgba(163,177,198, 0.8), 
                        inset -6px -6px 10px 0 rgba(255,255,255, 0.9) !important;
             color: #3b82f6 !important;
-            /* transform: translateY(2px) scale(0.98); Removed for JS control */
+            transform: translateY(1px) scale(0.985);
         }
 
         .peek-active #peekBtn i {
@@ -1693,7 +1734,7 @@
                     <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full"></h2>
                 </div>
                 <!-- Refresh Button -->
-                <button onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
+                <button id="refreshBtn" onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
                     <i class="fas fa-sync-alt"></i>
                 </button>
                 <button id="priorityBtn" onclick="retreatToStage1()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all" style="display: none;" aria-label="重点记忆" title="重点记忆：退回到 Stage 1">
@@ -1729,11 +1770,12 @@
                 <!-- Review Mode: Peek Only -->
                 <div id="reviewModeControls" class="hidden flex gap-4 w-full max-w-xs">
                     <button id="peekBtn" 
-                        onmousedown="event.stopPropagation(); drawPeekCard()"
-                        onmouseup="event.stopPropagation(); document.getElementById('learningModal').classList.remove('peek-active')"
-                        onmouseleave="event.stopPropagation(); document.getElementById('learningModal').classList.remove('peek-active')"
-                        ontouchstart="event.stopPropagation(); drawPeekCard(); event.preventDefault();"
-                        ontouchend="event.stopPropagation(); document.getElementById('learningModal').classList.remove('peek-active')"
+                        onmousedown="handlePeekStart(event)"
+                        onmouseup="handlePeekEnd(event)"
+                        onmouseleave="handlePeekEnd(event)"
+                        ontouchstart="handlePeekStart(event)"
+                        ontouchend="handlePeekEnd(event)"
+                        ontouchcancel="handlePeekEnd(event)"
                         class="flex-1 neumorphic-btn py-4 text-gray-500 flex flex-col items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-95 transition-all duration-300">
                         <i class="fas fa-eye text-xl"></i>
                         <span class="text-[10px] font-black uppercase tracking-widest">Hold to Peek</span>
@@ -5664,7 +5706,7 @@
                 await window.DB.updateProgress(key, 1, nowIso, nextReviewIso, 'learning', (prev.review_count || 0) + 1);
                 const stageBadge = document.getElementById('modalStageBadge');
                 if (stageBadge) {
-                    stageBadge.className = "absolute bottom-5 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300 bg-blue-100 text-blue-600";
+                    stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[70] transition-all duration-300 bg-blue-100 text-blue-600";
                     stageBadge.innerText = "Stage 1";
                     stageBadge.classList.remove('hidden');
                 }
@@ -6310,6 +6352,8 @@
             setTimeout(() => {
                 // Now it's safe to remove mode classes and reset flags
                 modal.classList.remove('peek-active'); 
+                modal.classList.remove('peek-releasing');
+                clearTimeout(peekReleaseTimer);
                 modal.classList.remove('is-review-mode');
                 isReviewMode = false;
                 currentCardIndex = 0;
@@ -7698,17 +7742,9 @@
                     if (cards.length > 0) {
                         currentCardIndex = 0;
 
-                        // Ensure stage badge is moved to bottom-right of the active card context
-                        // We will append the badge to the outputContainer itself, positioned absolutely
-                        // so it overlays whatever card is active.
                         const stageBadge = document.getElementById('modalStageBadge');
                         if (stageBadge) {
-                            // Move it to outputContainer to ensure it's on top of cards
-                            outputContainer.appendChild(stageBadge);
-                            
-                            // Re-apply styling logic from openVerb to ensure correct colors
-                            // Reset classes first but keep layout classes
-                            stageBadge.className = "absolute bottom-5 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[60] transition-all duration-300";
+                            stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[70] transition-all duration-300";
                             
                             const status = learningStatus[spellingWord.toLowerCase()];
                             if (status) {
@@ -7723,6 +7759,7 @@
                                 stageBadge.classList.add('hidden');
                             }
                         }
+                        syncStageBadgeToActiveCard(cards);
                         
                         // Touch handling for mobile flip (1:1 tracking)
                         let touchStartY = 0;
@@ -8229,6 +8266,64 @@
         }
         // Vertical Card Navigation Logic
         // Modified to handle multiple cards from Markdown sections
+        let peekHoldTimer = null;
+        let peekReleaseTimer = null;
+        let isPeekHolding = false;
+        function updatePeekLayoutMetrics() {
+            const modal = document.getElementById('learningModal');
+            const stage = modal ? modal.querySelector('.stage-container') : null;
+            const reviewControls = document.getElementById('reviewControls');
+            if (!modal || !stage || !reviewControls) return;
+
+            const stageRect = stage.getBoundingClientRect();
+            const controlsRect = reviewControls.getBoundingClientRect();
+            const distance = controlsRect.top - stageRect.bottom;
+            const safeMargin = 10;
+            const bottomOffset = safeMargin - distance;
+            modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
+        }
+
+        function handlePeekStart(event) {
+            if (event) {
+                event.stopPropagation();
+                if (event.type === 'touchstart') {
+                    event.preventDefault();
+                }
+            }
+
+            isPeekHolding = true;
+            clearTimeout(peekHoldTimer);
+            clearTimeout(peekReleaseTimer);
+            const modal = document.getElementById('learningModal');
+            if (modal) {
+                modal.classList.remove('peek-releasing');
+            }
+            peekHoldTimer = setTimeout(() => {
+                if (isPeekHolding) {
+                    updatePeekLayoutMetrics();
+                    drawPeekCard();
+                }
+            }, 90);
+        }
+
+        function handlePeekEnd(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            isPeekHolding = false;
+            clearTimeout(peekHoldTimer);
+            const modal = document.getElementById('learningModal');
+            if (modal && modal.classList.contains('peek-active')) {
+                modal.classList.remove('peek-active');
+                modal.classList.add('peek-releasing');
+                clearTimeout(peekReleaseTimer);
+                peekReleaseTimer = setTimeout(() => {
+                    modal.classList.remove('peek-releasing');
+                }, 300);
+            }
+        }
+
         function drawPeekCard() {
             // No longer "drawing random" - we just show the cards sequentially
             // This function might be deprecated if we switch to simple scroll
@@ -8240,8 +8335,10 @@
             // CRITICAL FIX: Add peek-active class to show content in review mode
             const modal = document.getElementById('learningModal');
             if (modal) {
+                modal.classList.remove('peek-releasing');
                 modal.classList.add('peek-active');
             }
+            updatePeekLayoutMetrics();
             
             // Re-query cards as they might have been re-rendered
             const cards = Array.from(outputContainer.children).filter(child => child.classList.contains('result-card'));
@@ -8253,6 +8350,13 @@
             // Update classes
             updateCardClasses(cards);
         }
+
+        window.addEventListener('resize', () => {
+            const modal = document.getElementById('learningModal');
+            if (modal && modal.classList.contains('peek-active')) {
+                updatePeekLayoutMetrics();
+            }
+        });
 
         function switchCard(direction) {
             const outputContainer = document.getElementById('outputContainer');
@@ -8276,6 +8380,23 @@
             if (targetIndex !== currentCardIndex) {
                 currentCardIndex = targetIndex;
                 updateCardClasses(cards);
+            }
+        }
+
+        function syncStageBadgeToActiveCard(cards) {
+            const stageBadge = document.getElementById('modalStageBadge');
+            if (!stageBadge) return;
+
+            const cardList = Array.isArray(cards)
+                ? cards
+                : Array.from(document.querySelectorAll('#outputContainer .result-card'));
+            if (cardList.length === 0) return;
+
+            const activeCard = cardList[currentCardIndex] || cardList.find(card => card.classList.contains('active'));
+            if (!activeCard) return;
+
+            if (stageBadge.parentElement !== activeCard) {
+                activeCard.appendChild(stageBadge);
             }
         }
         
@@ -8304,6 +8425,8 @@
                     card.classList.add('next-2');
                 }
             });
+
+            syncStageBadgeToActiveCard(cards);
             
             // Update indicator if we have one
             const indicator = document.getElementById('card-indicator');
