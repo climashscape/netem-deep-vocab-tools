@@ -1512,7 +1512,7 @@
                             <div class="w-full bg-gray-200/40 h-2.5 rounded-full overflow-hidden neumorphic-inset p-0.5">
                                 <div id="daily-goal-progress" class="bg-gradient-to-r from-indigo-400 via-blue-500 to-cyan-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.2)]" style="width: 0%"></div>
                             </div>
-                            <p class="text-[10px] text-gray-400 mt-1.5 font-bold uppercase tracking-tighter opacity-60 italic text-center">Complete 40 new words & clear all reviews to check-in</p>
+                            <p id="daily-goal-hint" class="text-[10px] text-gray-400 mt-1.5 font-bold uppercase tracking-tighter opacity-60 italic text-center">Complete 40 new words & clear all reviews to check-in</p>
                         </div>
 
                         <!-- Recitation Check-in Calendar (7-Day View) -->
@@ -1522,10 +1522,16 @@
                                     <i class="fas fa-calendar-check text-blue-400 text-[11px]"></i>
                                     <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Check-in History</span>
                                 </div>
-                                <span id="checkin-streak" class="text-[11px] font-black text-orange-500 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1">
-                                    <i class="fas fa-fire-alt text-[10px]"></i>
-                                    <span>0 Day Streak</span>
-                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <span id="checkin-total" class="text-[11px] font-black text-blue-500 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1">
+                                        <i class="fas fa-trophy text-[10px]"></i>
+                                        <span>0 Days</span>
+                                    </span>
+                                    <span id="checkin-streak" class="text-[11px] font-black text-orange-500 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1">
+                                        <i class="fas fa-fire-alt text-[10px]"></i>
+                                        <span>0 Streak</span>
+                                    </span>
+                                </div>
                             </div>
                             <div id="checkin-calendar" class="flex justify-between gap-1.5 px-0.5">
                                 <!-- Injected by updateCheckinCalendar() -->
@@ -3146,12 +3152,22 @@
         function updateCheckinCalendar() {
             const calendar = document.getElementById('checkin-calendar');
             const streakBadge = document.getElementById('checkin-streak');
+            const totalBadge = document.getElementById('checkin-total');
             if (!calendar) return;
 
             // Uses global checkinHistory (array of dates)
             // Ensure today is strictly local YYYY-MM-DD
             const now = new Date();
             const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+            
+            // Calculate total days
+            const totalDays = checkinHistory.length;
+            if (totalBadge) {
+                totalBadge.innerHTML = `
+                    <i class="fas fa-trophy text-[10px]"></i>
+                    <span>${totalDays} Days</span>
+                `;
+            }
             
             // Calculate streak (consecutive days ending today or yesterday)
             let streak = 0;
@@ -3183,7 +3199,7 @@
             if (streakBadge) {
                 streakBadge.innerHTML = `
                     <i class="fas fa-fire-alt text-[10px]"></i>
-                    <span>${streak} Day Streak</span>
+                    <span>${streak} Streak</span>
                 `;
             }
 
@@ -3263,7 +3279,9 @@
                 }
             });
             
-            const DAILY_NEW_GOAL = 40;
+            // Fetch daily goal from settings
+            const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+            const DAILY_NEW_GOAL = parseInt(settings.daily_goal || '40');
 
             try {
                 // New definition: Only words that entered stage > 0 for the first time today
@@ -3280,6 +3298,11 @@
                     if (statsText) {
                         statsText.innerText = `${newWordsToday}/${DAILY_NEW_GOAL} New | ${dueWordsRemaining} Due`;
                         statsText.className = `text-[10px] font-black uppercase tracking-tight ${dueWordsRemaining === 0 && newWordsToday >= DAILY_NEW_GOAL ? 'text-green-500' : 'text-gray-400'}`;
+                    }
+                    
+                    const hintText = document.getElementById('daily-goal-hint');
+                    if (hintText) {
+                        hintText.innerText = `Complete ${DAILY_NEW_GOAL} new words & clear all reviews to check-in`;
                     }
                 }
                 
@@ -5404,7 +5427,7 @@
                 ${oovBadge}
                 ${imageHtml}
                 <div class="${contentClasses} relative z-10">
-                    <h3 class="${displayWord.length > 20 ? 'text-xs' : displayWord.length > 16 ? 'text-sm' : displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap leading-none px-1">
+                    <h3 class="${displayWord.length > 20 ? 'text-xs' : displayWord.length > 16 ? 'text-sm' : displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-none px-1" title="${displayWord}">
                         ${displayWord}
                     </h3>
                     <div class="flex items-center justify-center gap-1.5 mb-1">
@@ -8378,6 +8401,7 @@
         function handlePeekStart(event) {
             if (event) {
                 event.stopPropagation();
+                // Prevent context menu and default touch behavior immediately
                 if (event.type === 'touchstart') {
                     event.preventDefault();
                 }
@@ -8386,12 +8410,27 @@
             isPeekHolding = true;
             clearTimeout(peekHoldTimer);
             clearTimeout(peekReleaseTimer);
+            
             const modal = document.getElementById('learningModal');
             if (modal) {
+                // IMMEDIATE: Pre-calculate layout metrics before visual change
+                // This avoids layout thrashing during the class addition
+                const stage = modal.querySelector('.stage-container');
+                const reviewControls = document.getElementById('reviewControls');
+                if (stage && reviewControls) {
+                    const stageRect = stage.getBoundingClientRect();
+                    const controlsRect = reviewControls.getBoundingClientRect();
+                    const distance = controlsRect.top - stageRect.bottom;
+                    const safeMargin = 10;
+                    const bottomOffset = safeMargin - distance;
+                    modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
+                }
+                
+                // IMMEDIATE: Apply class synchronously for instant visual feedback
                 modal.classList.remove('peek-releasing');
-            }
-            if (isPeekHolding) {
-                updatePeekLayoutMetrics();
+                modal.classList.add('peek-active');
+                
+                // Trigger content update
                 drawPeekCard();
             }
         }
@@ -8599,6 +8638,25 @@
                         </label>
                     </div>
                 </div>
+                
+                <!-- Section: Daily Goal -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-flag-checkered text-xs"></i> Daily Goal
+                    </h3>
+                    <div class="neumorphic p-4 rounded-2xl space-y-2">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">New Words per Day</label>
+                            <div class="relative">
+                                <i class="fas fa-sort-numeric-up absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="number" name="daily_goal" 
+                                    class="w-full neumorphic-inset bg-transparent text-gray-700 text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all placeholder-gray-400" 
+                                    placeholder="40" min="5" max="200">
+                            </div>
+                            <p class="text-[10px] text-gray-400 ml-1 italic">Default is 40 words</p>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Section: LLM Configuration -->
                 <div class="space-y-3">
@@ -8709,35 +8767,115 @@
                     </div>
                 </div>
 
-                <!-- Section: Data -->
+                <!-- Section: Data & Backup -->
                 <div class="space-y-3">
                     <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                         <i class="fas fa-database text-xs"></i> Data & Backup
                     </h3>
+                    <div class="neumorphic p-2 rounded-2xl space-y-4">
+                        <!-- Auto Backup Section -->
+                        <div id="autoBackupSection" class="space-y-4 pb-4 border-b border-gray-200/50 hidden">
+                            <!-- Enable Toggle -->
+                            <div class="flex items-center justify-between p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-indigo-500 shrink-0">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-bold text-gray-700 block">Automatic Backup</span>
+                                        <span class="text-[10px] font-medium text-gray-400">Back up to Documents</span>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="autoBackupToggle" class="sr-only peer" onchange="toggleFrequencyDisplay(this.checked)">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+
+                            <!-- Frequency Selection -->
+                            <div id="backupFrequencyContainer" class="space-y-2 pt-2 px-3 transition-all hidden">
+                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Backup Frequency</label>
+                                 <div class="grid grid-cols-3 gap-2">
+                                     <!-- 15 Minutes -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="0.25" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             15 Min
+                                         </div>
+                                     </label>
+                                     <!-- 60 Minutes -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="1" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             60 Min
+                                         </div>
+                                     </label>
+                                     <!-- 3 Hours -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="3" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             3 Hours
+                                         </div>
+                                     </label>
+                                     <!-- Daily -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="24" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             Daily
+                                         </div>
+                                     </label>
+                                     <!-- Weekly -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="168" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             Weekly
+                                         </div>
+                                     </label>
+                                     <!-- Monthly -->
+                                     <label class="cursor-pointer">
+                                         <input type="radio" name="backup_frequency" value="720" class="peer sr-only">
+                                         <div class="neumorphic-btn py-2 px-1 text-center rounded-xl text-xs font-bold text-gray-500 peer-checked:text-blue-600 peer-checked:bg-blue-50 transition-all border border-transparent peer-checked:border-blue-200">
+                                             Monthly
+                                         </div>
+                                     </label>
+                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Actions -->
+                        <div class="space-y-2">
+                            <button type="button" onclick="exportData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                                <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-blue-500 mr-3 shrink-0">
+                                    <i class="fas fa-file-export"></i>
+                                </div>
+                                <div class="flex-1 text-left">
+                                    <span class="text-sm font-bold text-gray-700 block">Export Backup</span>
+                                    <span class="text-[10px] font-medium text-gray-400">Save progress to file</span>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                            </button>
+                            <div id="export-status-text" class="px-3 pb-2 text-[10px] font-medium text-gray-400"></div>
+                            
+                            <button type="button" onclick="importData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
+                                <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-green-500 mr-3 shrink-0">
+                                    <i class="fas fa-file-import"></i>
+                                </div>
+                                <div class="flex-1 text-left">
+                                    <span class="text-sm font-bold text-gray-700 block">Restore Data</span>
+                                    <span class="text-[10px] font-medium text-gray-400">Load from backup file</span>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Learning Progress -->
+                <div class="space-y-3">
+                    <h3 class="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fas fa-graduation-cap text-xs"></i> Learning Progress
+                    </h3>
                     <div class="neumorphic p-2 rounded-2xl space-y-2">
-                        <button type="button" onclick="exportData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
-                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-blue-500 mr-3 shrink-0">
-                                <i class="fas fa-file-export"></i>
-                            </div>
-                            <div class="flex-1 text-left">
-                                <span class="text-sm font-bold text-gray-700 block">Export Backup</span>
-                                <span class="text-[10px] font-medium text-gray-400">Save progress to file</span>
-                            </div>
-                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-                        </button>
-                        <div id="export-status-text" class="px-3 pb-2 text-[10px] font-medium text-gray-400"></div>
-                        
-                        <button type="button" onclick="importData()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
-                            <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-green-500 mr-3 shrink-0">
-                                <i class="fas fa-file-import"></i>
-                            </div>
-                            <div class="flex-1 text-left">
-                                <span class="text-sm font-bold text-gray-700 block">Restore Data</span>
-                                <span class="text-[10px] font-medium text-gray-400">Load from backup file</span>
-                            </div>
-                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-                        </button>
-                        
                         <button type="button" onclick="startNextRound()" class="w-full flex items-center p-3 cursor-pointer rounded-xl transition-all hover:bg-white/30 active:scale-[0.98]">
                             <div class="w-10 h-10 rounded-xl neumorphic-inset flex items-center justify-center text-purple-500 mr-3 shrink-0">
                                 <i class="fas fa-redo"></i>
@@ -10021,6 +10159,13 @@
 
         async function loadSettings() {
             try {
+                // Check if running in Capacitor native environment for Auto Backup
+                const isNative = window.Capacitor && (window.Capacitor.isNative || (window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem));
+                if (isNative) {
+                    const section = document.getElementById('autoBackupSection');
+                    if (section) section.classList.remove('hidden');
+                }
+
                 const res = await fetch('/api/settings', {
                     signal: pageAbortController.signal
                 });
@@ -10081,6 +10226,34 @@
                         else analysisMode = 'manual';
                     }
                     updateAnalysisModeUI(analysisMode);
+
+                    // Load Daily Goal (Explicitly)
+                    // Server data is already loaded via loop above, but let's be safe
+                    // Also check local storage for offline support
+                    const localSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    const dailyGoalInput = settingsForm.querySelector('input[name="daily_goal"]');
+                    if (dailyGoalInput) {
+                        // Priority: Server > Local > Default(40)
+                        dailyGoalInput.value = data.daily_goal || localSettings.daily_goal || 40;
+                    }
+
+                    // Load Auto Backup Setting
+                    const autoBackupToggle = document.getElementById('autoBackupToggle');
+                    if (autoBackupToggle) {
+                        const local = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                        const isEnabled = local.auto_backup === true;
+                        autoBackupToggle.checked = isEnabled;
+                        
+                        // Load Frequency
+                        const frequency = local.auto_backup_frequency || '24';
+                        const freqRadios = document.querySelectorAll('input[name="backup_frequency"]');
+                        freqRadios.forEach(r => {
+                            if (r.value === frequency) r.checked = true;
+                        });
+                        
+                        // Show/Hide Frequency Options
+                        toggleFrequencyDisplay(isEnabled);
+                    }
 
                     // Trigger change event
                     const providerSelect = settingsForm.querySelector('[name="image_provider"]');
@@ -10316,6 +10489,24 @@
                 const pollModelInput = document.querySelector('input[name="pollinations_model"]');
                 if (pollModelInput) newSettings.pollinations_model = pollModelInput.value.trim();
 
+                // Capture Daily Goal
+                const dailyGoalInput = document.querySelector('input[name="daily_goal"]');
+                if (dailyGoalInput) {
+                    newSettings.daily_goal = dailyGoalInput.value.trim();
+                }
+
+                // Capture Auto Backup
+                const autoBackupToggle = document.getElementById('autoBackupToggle');
+                if (autoBackupToggle) {
+                    newSettings.auto_backup = autoBackupToggle.checked;
+                    
+                    // Capture Frequency
+                    const freqInput = document.querySelector('input[name="backup_frequency"]:checked');
+                    if (freqInput) {
+                        newSettings.auto_backup_frequency = freqInput.value;
+                    }
+                }
+
                 // Capture Analysis Mode (Radio)
                 // FORCE RE-QUERY: Explicitly query for the checked radio again
                 let analysisModeValue = null;
@@ -10505,6 +10696,116 @@
             return originalFetch(url, options);
         };
 
+        function toggleFrequencyDisplay(enabled) {
+            const container = document.getElementById('backupFrequencyContainer');
+            if (!container) return;
+            if (enabled) {
+                container.classList.remove('hidden');
+                container.classList.add('block');
+            } else {
+                container.classList.add('hidden');
+                container.classList.remove('block');
+            }
+        }
+
+        async function checkAutoBackup() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                if (!settings.auto_backup) return;
+
+                const lastBackup = parseInt(localStorage.getItem('last_auto_backup_ts') || '0');
+                const now = Date.now();
+                const freqHours = parseFloat(settings.auto_backup_frequency || '24');
+                const threshold = freqHours * 60 * 60 * 1000;
+
+                // Perform backup if > threshold since last backup
+                if (now - lastBackup > threshold) {
+                    console.log(`AutoBackup: Starting backup (Interval: ${freqHours}h)...`);
+                    await performSilentBackup();
+                    localStorage.setItem('last_auto_backup_ts', now.toString());
+                    console.log('AutoBackup: Completed.');
+                }
+            } catch (e) {
+                console.error('AutoBackup failed:', e);
+            }
+        }
+
+        async function performSilentBackup() {
+            try {
+                // 1. Prepare data
+                if (!window.db && window.initDB) await window.initDB();
+                const explanations = window.db && window.db.explanations ? await window.db.explanations.toArray() : [];
+                const progress = window.db && window.db.learning_progress ? await window.db.learning_progress.toArray() : [];
+                const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
+                const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
+                const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
+                
+                const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
+                const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+                
+                const extension = 'json';
+                const filename = `netem_autobackup_${new Date().toLocaleDateString('en-CA')}.${extension}`;
+
+                // 2. Save file using Capacitor Filesystem if available
+                if (window.Capacitor && (window.Capacitor.isNative || (window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem))) {
+                    const { Filesystem } = window.Capacitor.Plugins;
+                    const Directory = {
+                        Documents: 'DOCUMENTS',
+                        Cache: 'CACHE',
+                        Data: 'DATA',
+                        Library: 'LIBRARY',
+                        External: 'EXTERNAL'
+                    };
+                    
+                    // Use Documents for auto backup so it persists and is visible
+                    const saveDirectory = Directory.Documents; 
+                    
+                    const ab = await blob.arrayBuffer();
+                    const bytes = new Uint8Array(ab);
+                    const totalLength = bytes.byteLength;
+                    const CHUNK_SIZE = 1024 * 1024 * 1.5; 
+                    
+                    let offset = 0;
+                    let isFirstChunk = true;
+                    
+                    while (offset < totalLength) {
+                        const end = Math.min(offset + CHUNK_SIZE, totalLength);
+                        const chunkBytes = bytes.subarray(offset, end);
+                        let binary = '';
+                        const chunkLen = chunkBytes.byteLength;
+                        const SUB_CHUNK = 32768;
+                        for (let i = 0; i < chunkLen; i += SUB_CHUNK) {
+                            binary += String.fromCharCode.apply(null, chunkBytes.subarray(i, Math.min(i + SUB_CHUNK, chunkLen)));
+                        }
+                        const base64Chunk = btoa(binary);
+                        
+                        if (isFirstChunk) {
+                            await Filesystem.writeFile({ 
+                                path: filename, 
+                                data: base64Chunk, 
+                                directory: saveDirectory
+                            });
+                            isFirstChunk = false;
+                        } else {
+                            await Filesystem.appendFile({ 
+                                path: filename, 
+                                data: base64Chunk, 
+                                directory: saveDirectory
+                            });
+                        }
+                        offset += CHUNK_SIZE;
+                    }
+                    console.log(`AutoBackup: Saved to ${saveDirectory}/${filename}`);
+                } else {
+                    console.log('AutoBackup: Capacitor Filesystem not available, skipping file write.');
+                }
+            } catch (e) {
+                console.error('AutoBackup: Error performing silent backup', e);
+                throw e;
+            }
+        }
+
         // Initialize listeners
         document.addEventListener('DOMContentLoaded', async () => {
             // FORCE CLEANUP: Remove any lingering refresh buttons that might be cached in DOM
@@ -10528,6 +10829,7 @@
             // Initial data load
             await loadLearningStatus();
             await loadSettings();
+            await checkAutoBackup();
             await loadVerbs(); // Changed from loadAllVerbs to loadVerbs
 
             // Handle Android Hardware Back Button
