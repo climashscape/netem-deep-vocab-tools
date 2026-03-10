@@ -7479,10 +7479,9 @@
                                             };
                                             fragment.appendChild(span);
                                             
-                                            lastIndex = phraseStart + phraseLen;
-                                            
-                                            // Advance regex index to end of phrase
+                                            // Update regex.lastIndex to skip the phrase
                                             regex.lastIndex = phraseStart + phraseLen;
+                                            lastIndex = regex.lastIndex;
                                         } else {
                                             // Skip parts of phrase we already processed
                                             // regex.lastIndex will naturally catch up or we manually force it?

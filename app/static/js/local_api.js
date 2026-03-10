@@ -876,11 +876,40 @@ const LocalAPI = {
 
         let verbList = [];
         if (typeof verbs === 'string') {
-            if (verbs.includes(',')) {
-                verbList = verbs.split(',').map(v => v.trim());
+            // Check for known multi-word phrases first to prevent splitting
+            const phrases = [
+                'ice cream', 'living room', 'dining room', 'washing machine', 
+                'high school', 'middle school', 'primary school', 
+                'bus stop', 'train station', 'post office', 
+                'alarm clock', 'credit card', 'identity card',
+                'human being', 'human beings',
+                'no matter', 'in front of', 'next to', 'look forward to'
+            ];
+            
+            let tempVerbs = verbs;
+            const extractedPhrases = [];
+            
+            // Extract phrases
+            phrases.forEach(phrase => {
+                const regex = new RegExp(`\\b${phrase}\\b`, 'gi');
+                if (regex.test(tempVerbs)) {
+                    extractedPhrases.push(phrase);
+                    // Remove from string to avoid double counting
+                    tempVerbs = tempVerbs.replace(regex, ' ');
+                }
+            });
+            
+            // Split remaining words
+            let remainingWords = [];
+            if (tempVerbs.includes(',')) {
+                remainingWords = tempVerbs.split(',').map(v => v.trim());
             } else {
-                verbList = verbs.split(/\s+/).map(v => v.trim());
+                remainingWords = tempVerbs.split(/\s+/).map(v => v.trim());
             }
+            
+            // Combine (phrases first, then remaining words)
+            // Filter out empty strings
+            verbList = [...extractedPhrases, ...remainingWords].filter(v => v.length > 0);
         } else if (Array.isArray(verbs)) {
             verbList = verbs;
         } else {
