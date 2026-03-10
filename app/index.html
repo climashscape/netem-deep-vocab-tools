@@ -793,7 +793,7 @@
             pointer-events: auto !important;
             border: 1px solid rgba(255, 255, 255, 0.75);
             width: min(94%, 680px);
-            top: 10px;
+            top: 4px;
             bottom: var(--peek-card-bottom, -4px);
             height: auto;
             border-radius: 28px;
@@ -853,7 +853,7 @@
             padding-left: 1.5rem !important;
             padding-right: 1.5rem !important;
             padding-top: 1.25rem !important;
-            padding-bottom: 2.25rem !important;
+            padding-bottom: 1.5rem !important;
         }
 
         #learningModal.is-review-mode.peek-active .result-card.active h1,
@@ -2018,34 +2018,34 @@
 
     <!-- Analytics / Ebbinghaus Chart Modal -->
     <div id="analyticsModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeAnalytics()">
-        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-6 w-full max-w-2xl mx-4 transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
+        <div class="bg-[#e0e5ec] rounded-2xl shadow-xl p-4 w-full max-w-2xl mx-4 max-h-[95vh] overflow-y-auto hide-scrollbar transform scale-95 transition-transform duration-300 border border-white/50" onclick="event.stopPropagation()">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
             <!-- Close Indicator (Mobile Friendly) -->
-            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden" onclick="closeAnalytics()">
-                <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
+            <div class="w-full flex justify-center pb-1 opacity-40 md:hidden" onclick="closeAnalytics()">
+                <div class="w-12 h-1 bg-gray-400/40 rounded-full"></div>
             </div>
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-purple-500">
-                        <i class="fas fa-chart-line"></i>
+                    <div class="w-9 h-9 rounded-xl neumorphic flex items-center justify-center text-purple-500">
+                        <i class="fas fa-chart-line text-sm"></i>
                     </div>
                     <div>
-                        <h3 class="text-lg font-black text-gray-700">Learning Analytics</h3>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ebbinghaus Forgetting Curve</p>
+                        <h3 class="text-base font-black text-gray-700">Learning Analytics</h3>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Ebbinghaus Forgetting Curve</p>
                     </div>
                 </div>
-                <button onclick="closeAnalytics()" class="w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors md:flex hidden">
-                    <i class="fas fa-times"></i>
+                <button onclick="closeAnalytics()" class="w-7 h-7 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors md:flex hidden">
+                    <i class="fas fa-times text-xs"></i>
                 </button>
             </div>
 
-            <div id="ebbinghausChart" class="w-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center overflow-x-auto">
+            <div id="ebbinghausChart" class="w-full min-h-[320px] flex items-center justify-center overflow-x-auto overflow-y-hidden">
                 <!-- SVG Chart injected here -->
             </div>
 
-            <div class="mt-6 pt-6 border-t border-gray-200/60 text-center">
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+            <div class="mt-2 pt-2 border-t border-gray-200/60 text-center">
+                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
                     Points represent words in your current review scope.<br>
                     Higher stages indicate stronger memory consolidation.
                 </p>
@@ -4701,8 +4701,8 @@
             
             // Use a stable width and fixed height for the SVG
             const width = container.clientWidth || 320;
-            const svgHeight = 200; // Increased height
-            const padding = 30; // Increased padding for jitter safety
+            const svgHeight = 320; // Increased height for looser distribution
+            const padding = 45; // Increased padding
             const stagesCount = 10; // 0-9
             
             // Colors for each stage: A single professional Blue scale (Light to Deep)
@@ -4727,8 +4727,8 @@
                     const t = i / 100;
                     const x = t * (width - 2 * padding) + padding;
                     // Ebbinghaus Forgetting Curve formula: R = e^(-t/S)
-                    // We map it to the chart space
-                    const yValue = 0.15 + 0.75 * (startY * Math.exp(-t * flatness));
+                    // We map it to the chart space using a more centered range (0.2 to 0.7)
+                    const yValue = 0.2 + 0.5 * (startY * Math.exp(-t * flatness));
                     const y = svgHeight - padding - (yValue * (svgHeight - 2 * padding));
                     points.push(`${x},${y}`);
                 }
@@ -4743,7 +4743,8 @@
                 const x = t * (width - 2 * padding) + padding;
                 // As stage progress (t) increases, retention (yValue) increases (concave down)
                 // Using a learning curve shape: 1 - e^(-kt)
-                const yValue = 0.2 + 0.7 * (1 - Math.exp(-t * 3.5)) / (1 - Math.exp(-3.5));
+                // Using the more centered range (0.2 to 0.7) for consistency
+                const yValue = 0.2 + 0.5 * (1 - Math.exp(-t * 3.5)) / (1 - Math.exp(-3.5));
                 const y = svgHeight - padding - (yValue * (svgHeight - 2 * padding));
                 masteryPoints.push(`${x},${y}`);
             }
@@ -4808,14 +4809,11 @@
                 // Ensure stageCounts array is initialized if accessed by index
                 if (stageCounts[stage] !== undefined) stageCounts[stage]++;
                 
-                const width = container.clientWidth || 300;
-                const svgHeight = 200;
-                const padding = 30;
-
                 const t = stage / (stagesCount - 1);
                 const xBase = t * (width - 2 * padding) + padding;
                 // Map word position to the Mastery Curve
-                const yValue = 0.2 + 0.7 * (1 - Math.exp(-t * 3.5)) / (1 - Math.exp(-3.5));
+                // Slightly compressed yValue range (0.2 to 0.7) to give more headroom/footroom
+                const yValue = 0.2 + 0.5 * (1 - Math.exp(-t * 3.5)) / (1 - Math.exp(-3.5));
                 const yBase = svgHeight - padding - (yValue * (svgHeight - 2 * padding));
                 
                 // Add jitter: Use a better pseudo-random distribution to avoid clustering
@@ -4831,12 +4829,12 @@
                     return x - Math.floor(x) - 0.5;
                 };
 
-                // Use a wider spread for better visibility
-                // X jitter: kept within lane (approx +/- 14px)
-                const jitterX = rand(hash) * 28; 
+                // Use a tighter spread for better clarity
+                // X jitter: kept within lane (approx +/- 11px)
+                const jitterX = rand(hash) * 22; 
                 
-                // Y jitter: Allow more vertical spread (approx +/- 40px) to utilize height
-                const jitterY = rand(hash + 12345) * 80;
+                // Y jitter: Spread (approx +/- 70px) for looser vertical distribution
+                const jitterY = rand(hash + 12345) * 140;
                 
                 // Clamp coordinates to stay within SVG axes (quadrant)
                 const x = Math.max(padding + 4, Math.min(width - padding - 4, xBase + jitterX));
@@ -4853,7 +4851,7 @@
             });
             
             // Generate Legend HTML
-            let legendHtml = '<div class="flex flex-wrap justify-center gap-x-4 gap-y-3 mt-4 px-2">';
+            let legendHtml = '<div class="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2 px-2">';
             stageColors.forEach((color, i) => {
                 legendHtml += `
                     <div class="flex items-center gap-1.5">
@@ -4865,7 +4863,7 @@
             
             container.innerHTML = `
                 <div class="relative animate-fade-in">
-                    <svg width="${width}" height="${svgHeight}" viewBox="0 0 ${width} ${svgHeight}" class="overflow-visible">
+                    <svg width="${width}" height="${svgHeight}" viewBox="0 0 ${width} ${svgHeight}" class="overflow-hidden">
                         <defs>
                             <linearGradient id="curveGradient" x1="0%" y1="100%" x2="0%" y2="0%">
                                 <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.01" />
@@ -8547,13 +8545,13 @@
             const modalContent = modal.querySelector('.modal-content');
             if (modalContent) {
                 const modalRect = modalContent.getBoundingClientRect();
-                const marginFromBottom = 15; 
+                const marginFromBottom = 2; 
                 const bottomOffset = stageRect.bottom - modalRect.bottom + marginFromBottom;
                 modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
             } else {
                 // Fallback if modal content not found
                 const screenBottom = window.innerHeight;
-                const marginFromBottom = 20;
+                const marginFromBottom = 4;
                 const bottomOffset = stageRect.bottom - screenBottom + marginFromBottom;
                 modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
             }
