@@ -819,6 +819,7 @@
             pointer-events: none;
             visibility: hidden;
             z-index: 5;
+            will-change: transform, opacity, filter;
         }
 
         /* Other cards in review mode should stay hidden even when peeking */
@@ -1517,17 +1518,17 @@
 
                         <!-- Recitation Check-in Calendar (7-Day View) -->
                         <div class="pt-4 border-t border-gray-200/40">
-                            <div class="flex items-center justify-between mb-3 px-1">
+                            <div class="flex flex-wrap items-center justify-between gap-y-2 mb-3 px-1">
                                 <div class="flex items-center gap-1.5">
                                     <i class="fas fa-calendar-check text-blue-400 text-[11px]"></i>
-                                    <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Check-in History</span>
+                                    <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Check-in History</span>
                                 </div>
                                 <div class="flex items-center gap-1.5">
-                                    <span id="checkin-total" class="text-[11px] font-black text-blue-500 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1">
+                                    <span id="checkin-total" class="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1 whitespace-nowrap">
                                         <i class="fas fa-trophy text-[10px]"></i>
                                         <span>0 Days</span>
                                     </span>
-                                    <span id="checkin-streak" class="text-[11px] font-black text-orange-500 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1">
+                                    <span id="checkin-streak" class="text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100/50 shadow-sm uppercase tracking-tight flex items-center gap-1 whitespace-nowrap">
                                         <i class="fas fa-fire-alt text-[10px]"></i>
                                         <span>0 Streak</span>
                                     </span>
@@ -2996,19 +2997,60 @@
                         const item = extraVocab[i];
                         const card = document.createElement('div');
                         card.id = 'verb-card-' + item.word;
-                        card.className = 'verb-card group relative flex flex-col items-center justify-center p-4 rounded-2xl neumorphic active:scale-95 transition-all duration-200 cursor-pointer h-24 bg-purple-50/10 border border-purple-100/50 hover:bg-purple-50/30';
-                        card.innerHTML = `
-                            <div class="exclude-overlay p-4 rounded-none overflow-hidden z-30" style="border-radius: 0 !important;">
-                                <div class="w-full max-w-[170px] space-y-4 relative z-10">
-                                    <button class="notebook-remove-btn exclude-confirm-btn text-red-500">
-                                        <i class="fas fa-trash-alt text-sm"></i>
-                                        <span class="leading-tight">Confirm Delete</span>
+                        
+                        // Optimized Compact UI (No Image, Smaller Card)
+                        card.className = 'verb-card group relative flex flex-col w-full bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-all duration-200 cursor-pointer overflow-hidden border border-purple-100 min-h-[100px] justify-center';
+                        
+                        const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) : '';
+
+                        // Overlay for delete confirmation
+                        const overlayHtml = `
+                            <div class="exclude-overlay absolute inset-0 bg-white/95 backdrop-blur-sm z-30 flex flex-col items-center justify-center transition-opacity duration-200 opacity-0 pointer-events-none rounded-xl">
+                                <div class="w-full max-w-[140px] space-y-3 relative z-10 p-2">
+                                    <button class="notebook-remove-btn exclude-confirm-btn w-full py-2 rounded-lg bg-red-50 text-red-500 font-bold text-[10px] uppercase tracking-wider hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                        <span>Delete</span>
                                     </button>
-                                    <div class="text-gray-400 text-[9px] font-bold uppercase tracking-wider text-center opacity-60">Click outside to cancel</div>
+                                    <div class="text-gray-400 text-[8px] font-bold uppercase tracking-wider text-center opacity-60">Cancel</div>
                                 </div>
                             </div>
-                            <h3 class="text-lg font-black text-gray-700 group-hover:text-purple-600 transition-colors truncate w-full text-center">${item.word}</h3>
                         `;
+
+                        // Content Section (Compact & Full Title)
+                        const contentHtml = `
+                            <div class="verb-content verb-card-block flex-1 flex flex-col px-4 py-3 relative z-10">
+                                <div class="flex items-start justify-between gap-2 mb-1.5">
+                                    <h3 class="text-base font-black text-gray-800 group-hover:text-purple-600 transition-colors leading-tight break-words flex-1" style="word-break: break-word;">
+                                        ${item.word}
+                                    </h3>
+                                    <span class="shrink-0 text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-black uppercase tracking-wider border border-purple-100/50">
+                                        OOV
+                                    </span>
+                                </div>
+                                
+                                <p class="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2 mb-2 flex-1" title="${item.definition || ''}">
+                                    ${item.definition || 'No definition available'}
+                                </p>
+                                
+                                <div class="flex items-center justify-between text-[9px] text-gray-300 font-bold uppercase tracking-wider border-t border-gray-50 pt-1.5 mt-auto">
+                                    <div class="flex items-center gap-1">
+                                        <i class="fas fa-bookmark text-purple-300 text-[8px]"></i>
+                                        <span>Notebook</span>
+                                    </div>
+                                    <span>${dateStr}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Border Overlay
+                        const borderOverlay = `<div class="absolute inset-0 border border-purple-200/40 rounded-xl pointer-events-none z-20 transition-colors duration-300 group-hover:border-purple-300/60"></div>`;
+
+                        card.innerHTML = `
+                            ${borderOverlay}
+                            ${overlayHtml}
+                            ${contentHtml}
+                        `;
+                        
                         let longPressTimer;
                         let isLongPress = false;
                         let isPressing = false;
@@ -5427,7 +5469,7 @@
                 ${oovBadge}
                 ${imageHtml}
                 <div class="${contentClasses} relative z-10">
-                    <h3 class="${displayWord.length > 20 ? 'text-xs' : displayWord.length > 16 ? 'text-sm' : displayWord.length > 12 ? 'text-base' : displayWord.length > 8 ? 'text-lg' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-none px-1" title="${displayWord}">
+                    <h3 class="${displayWord.length > 20 ? 'text-[10px]' : displayWord.length > 16 ? 'text-xs' : displayWord.length > 12 ? 'text-sm' : displayWord.length > 8 ? 'text-base' : 'text-xl'} font-black mb-1 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-none px-1" title="${displayWord}">
                         ${displayWord}
                     </h3>
                     <div class="flex items-center justify-center gap-1.5 mb-1">
@@ -6182,6 +6224,14 @@
                 modal.classList.add('is-review-mode');
                 document.getElementById('studyModeControls')?.classList.add('hidden');
                 document.getElementById('reviewModeControls')?.classList.remove('hidden');
+                
+                // Pre-calculate peek layout metrics for smoother interaction
+                // Use requestAnimationFrame to ensure DOM is ready
+                requestAnimationFrame(() => {
+                    if (typeof updatePeekLayoutMetrics === 'function') {
+                        updatePeekLayoutMetrics();
+                    }
+                });
             } else {
                 modal.classList.remove('is-review-mode');
                 
@@ -7342,11 +7392,48 @@
                     // Global cache for word canonicalization results within a session/render
                     const linkCache = new Map();
 
+                    // Pre-scan text for multi-word phrases to avoid splitting them
+                    // Returns a map of start index -> phrase length (in chars)
+                    function scanPhrases(text) {
+                        const phraseMap = new Map();
+                        // Define common phrases here (can be expanded via DB or config)
+                        const phrases = [
+                            'ice cream', 'living room', 'dining room', 'washing machine', 
+                            'high school', 'middle school', 'primary school', 
+                            'bus stop', 'train station', 'post office', 
+                            'alarm clock', 'credit card', 'identity card',
+                            'human being', 'human beings',
+                            'no matter', 'in front of', 'next to', 'look forward to'
+                        ];
+                        
+                        const lowerText = text.toLowerCase();
+                        
+                        phrases.forEach(phrase => {
+                            let pos = 0;
+                            while ((pos = lowerText.indexOf(phrase, pos)) !== -1) {
+                                // Ensure phrase boundaries (whole words only)
+                                const before = pos === 0 ? ' ' : lowerText[pos - 1];
+                                const after = (pos + phrase.length >= lowerText.length) ? ' ' : lowerText[pos + phrase.length];
+                                
+                                if (/[^a-z0-9]/.test(before) && /[^a-z0-9]/.test(after)) {
+                                    // Mark this range as a phrase
+                                    phraseMap.set(pos, phrase.length);
+                                }
+                                pos += 1; // Overlapping check? No, just advance.
+                            }
+                        });
+                        return phraseMap;
+                    }
+
                     function walkAndLink(node, currentVerb) {
                         const childNodes = Array.from(node.childNodes);
                         childNodes.forEach(child => {
                             if (child.nodeType === 3) { // Text node
                                 const text = child.nodeValue;
+                                const phraseMap = scanPhrases(text);
+                                
+                                // Regex to match words AND now handle skipping phrases manually
+                                // We iterate character by character or use a smarter regex loop
                                 const regex = /[a-zA-Z']+/g;
                                 let match;
                                 let lastIndex = 0;
@@ -7354,6 +7441,59 @@
                                 let hasMatches = false;
 
                                 while ((match = regex.exec(text)) !== null) {
+                                    // Check if this match is inside a known phrase
+                                    let isInsidePhrase = false;
+                                    let phraseStart = -1;
+                                    let phraseLen = 0;
+                                    
+                                    for (const [start, len] of phraseMap.entries()) {
+                                        if (match.index >= start && match.index < start + len) {
+                                            isInsidePhrase = true;
+                                            phraseStart = start;
+                                            phraseLen = len;
+                                            break;
+                                        }
+                                    }
+
+                                    if (isInsidePhrase) {
+                                        // If we hit a phrase start, process the WHOLE phrase as one token
+                                        if (match.index === phraseStart) {
+                                            hasMatches = true;
+                                            
+                                            // Text before phrase
+                                            if (phraseStart > lastIndex) {
+                                                fragment.appendChild(document.createTextNode(text.substring(lastIndex, phraseStart)));
+                                            }
+                                            
+                                            const phraseText = text.substr(phraseStart, phraseLen);
+                                            
+                                            const span = document.createElement('span');
+                                            span.className = 'cursor-pointer hover:bg-blue-100/50 transition-colors px-0.5 rounded-sm border-b border-transparent hover:border-blue-400/30 hover:border-dotted';
+                                            span.textContent = phraseText;
+                                            span.onclick = (e) => {
+                                                // Phrases are treated as OOV or special candidates
+                                                // Pass as single candidate to skip selector if we want direct open, 
+                                                // or pass as is to let selector handle it.
+                                                // For phrases, we pass the phrase itself as the candidate.
+                                                showLinkSelector(e, phraseText, [phraseText]);
+                                            };
+                                            fragment.appendChild(span);
+                                            
+                                            lastIndex = phraseStart + phraseLen;
+                                            
+                                            // Advance regex index to end of phrase
+                                            regex.lastIndex = phraseStart + phraseLen;
+                                        } else {
+                                            // Skip parts of phrase we already processed
+                                            // regex.lastIndex will naturally catch up or we manually force it?
+                                            // We need to ignore matches inside the phrase.
+                                            // Since we set regex.lastIndex above, we shouldn't be here for subsequent words in phrase.
+                                            // BUT if regex found a match *inside* (e.g. "cream" in "ice cream" after "ice"),
+                                            // we just ignore it.
+                                        }
+                                        continue;
+                                    }
+
                                     const word = match[0];
                                     const wordKey = word.toLowerCase();
                                     
@@ -8413,25 +8553,12 @@
             
             const modal = document.getElementById('learningModal');
             if (modal) {
-                // IMMEDIATE: Pre-calculate layout metrics before visual change
-                // This avoids layout thrashing during the class addition
-                const stage = modal.querySelector('.stage-container');
-                const reviewControls = document.getElementById('reviewControls');
-                if (stage && reviewControls) {
-                    const stageRect = stage.getBoundingClientRect();
-                    const controlsRect = reviewControls.getBoundingClientRect();
-                    const distance = controlsRect.top - stageRect.bottom;
-                    const safeMargin = 10;
-                    const bottomOffset = safeMargin - distance;
-                    modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
-                }
-                
                 // IMMEDIATE: Apply class synchronously for instant visual feedback
-                modal.classList.remove('peek-releasing');
-                modal.classList.add('peek-active');
-                
-                // Trigger content update
-                drawPeekCard();
+                // Layout metrics are now pre-calculated in openVerb/resize
+                requestAnimationFrame(() => {
+                    modal.classList.remove('peek-releasing');
+                    modal.classList.add('peek-active');
+                });
             }
         }
 
@@ -9579,15 +9706,8 @@
                 }
 
                 if (data && data.status === 'success') {
-                    // Force clear local storage items that are not handled by backend
-                    localStorage.removeItem('app_settings');
-                    localStorage.removeItem('visuals_provider');
-                    localStorage.removeItem('excludedVerbs');
-                    localStorage.removeItem('analysisMode');
-                    localStorage.removeItem('autoAiAnalysis');
-                    localStorage.removeItem('cacheOnlyMode');
-                    localStorage.removeItem('checkin_history');
-                    localStorage.removeItem('netem_learn_batch');
+                    // Force clear ALL local storage to ensure a clean slate (including round_index, daily progress, etc.)
+                    localStorage.clear();
                     
                     // Show success
                     if (modal) {
@@ -10454,7 +10574,7 @@
             }
         }
         
-        function saveSettings() {
+        async function saveSettings() {
             const saveBtn = document.getElementById('saveSettings');
             const originalText = saveBtn ? saveBtn.innerText : 'Save';
             
@@ -10733,16 +10853,30 @@
         async function performSilentBackup() {
             try {
                 // 1. Prepare data
-                if (!window.db && window.initDB) await window.initDB();
-                const explanations = window.db && window.db.explanations ? await window.db.explanations.toArray() : [];
-                const progress = window.db && window.db.learning_progress ? await window.db.learning_progress.toArray() : [];
-                const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
-                const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
-                const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
-                const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
-                
-                const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
-                const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+                // Try to use the API first to ensure consistency with Manual Export (includes legacy data filtering)
+                let blob;
+                try {
+                    const res = await fetch('/api/export');
+                    if (res.ok) {
+                        blob = await res.blob();
+                    }
+                } catch (e) {
+                    console.warn("AutoBackup: API export failed, falling back to local generation", e);
+                }
+
+                // Fallback if API failed
+                if (!blob) {
+                    if (!window.db && window.initDB) await window.initDB();
+                    const explanations = window.db && window.db.explanations ? await window.db.explanations.toArray() : [];
+                    const progress = window.db && window.db.learning_progress ? await window.db.learning_progress.toArray() : [];
+                    const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
+                    const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
+                    const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
+                    const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
+                    
+                    const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
+                    blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+                }
                 
                 const extension = 'json';
                 const filename = `netem_autobackup_${new Date().toLocaleDateString('en-CA')}.${extension}`;
