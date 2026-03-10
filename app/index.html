@@ -450,7 +450,7 @@
             /* Performance optimizations */
             will-change: transform, opacity;
             content-visibility: auto;
-            contain-intrinsic-size: 150px 240px;
+            contain-intrinsic-size: 150px 224px;
         }
         .verb-card.overlay-active {
             border-color: transparent; /* Eliminate visible seam when overlay is active */
@@ -3059,25 +3059,21 @@
                         // Content Section (Compact & Full Title)
                         const contentHtml = `
                             <div class="verb-content verb-card-block flex-1 flex flex-col px-4 py-3 relative z-10">
-                                <div class="flex items-start justify-between gap-2 mb-1.5">
-                                    <h3 class="text-base font-black text-gray-800 group-hover:text-purple-600 transition-colors leading-tight break-words flex-1" style="word-break: break-word;">
-                                        ${item.word}
-                                    </h3>
-                                    <span class="shrink-0 text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-black uppercase tracking-wider border border-purple-100/50">
-                                        OOV
-                                    </span>
-                                </div>
+                                <h3 data-fit-title="1" class="text-xl font-black text-gray-800 group-hover:text-purple-600 transition-colors tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-normal px-1 pb-0.5" title="${item.word}">
+                                    ${item.word}
+                                </h3>
                                 
-                                <p class="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2 mb-2 flex-1" title="${item.definition || ''}">
-                                    ${item.definition || 'No definition available'}
-                                </p>
-                                
-                                <div class="flex items-center justify-between text-[9px] text-gray-300 font-bold uppercase tracking-wider border-t border-gray-50 pt-1.5 mt-auto">
-                                    <div class="flex items-center gap-1">
-                                        <i class="fas fa-bookmark text-purple-300 text-[8px]"></i>
-                                        <span>Notebook</span>
+                                <div class="flex-1 flex flex-col pt-0.5">
+                                    <p class="text-[11px] text-gray-400 font-semibold leading-relaxed line-clamp-2 flex-1 italic opacity-90" title="${item.definition || ''}">
+                                        ${item.definition || 'No definition available'}
+                                    </p>
+                                    <div class="flex items-center justify-between text-[9px] text-gray-400 font-black uppercase tracking-wider border-t border-gray-100/60 pt-1.5 mt-2">
+                                        <div class="flex items-center gap-1">
+                                            <i class="fas fa-bookmark text-purple-300 text-[8px]"></i>
+                                            <span>Notebook</span>
+                                        </div>
+                                        <span>${dateStr}</span>
                                     </div>
-                                    <span>${dateStr}</span>
                                 </div>
                             </div>
                         `;
@@ -3090,6 +3086,11 @@
                             ${overlayHtml}
                             ${contentHtml}
                         `;
+
+                        requestAnimationFrame(() => {
+                            const titleEl = card.querySelector('h3[data-fit-title="1"]');
+                            if (titleEl) fitVerbCardTitle(titleEl);
+                        });
                         
                         let longPressTimer;
                         let isLongPress = false;
@@ -5376,7 +5377,7 @@
             const animClass = isExcluded ? 'strike-anim active' : 'strike-anim';
 
             let imageHtml = '';
-            let contentClasses = 'verb-content verb-card-block flex-1 flex flex-col items-center px-3 pt-3 pb-2 min-h-[100px] transition-all duration-200';
+            let contentClasses = 'verb-content verb-card-block flex-1 flex flex-col items-center px-3 pt-2 pb-2 min-h-[92px] transition-all duration-200';
             
             // Check image provider setting
             const appSettings = JSON.parse(localStorage.getItem('app_settings') || '{}');
@@ -5398,7 +5399,7 @@
                 // to physically separate image from the outer border by 1px of whitespace.
                 // This guarantees the image pixels can NEVER touch the outer edge.
                 imageHtml = `
-                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-32 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
+                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-28 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
                     <div class="frosted-placeholder">
                         <i class="fas fa-image"></i>
                     </div>
@@ -5407,7 +5408,7 @@
                 contentClasses += ' justify-start pt-2';
             } else if (displayImageUrl && itemWord) {
                 imageHtml = `
-                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-32 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
+                <div class="verb-image-container verb-card-block w-[calc(100%-2px)] mx-auto mt-[1px] h-28 overflow-hidden relative shrink-0 transition-all duration-200 rounded-t-[14px]">
                     <img src="${displayImageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="${itemWord}" loading="lazy" onerror="showFrostedPlaceholder(this)">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                 </div>`;
