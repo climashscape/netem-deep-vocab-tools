@@ -4818,14 +4818,25 @@
                 const yValue = 0.2 + 0.7 * (1 - Math.exp(-t * 3.5)) / (1 - Math.exp(-3.5));
                 const yBase = svgHeight - padding - (yValue * (svgHeight - 2 * padding));
                 
-                // Add jitter: Reduced X jitter to keep points in their "lanes"
+                // Add jitter: Use a better pseudo-random distribution to avoid clustering
                 let hash = 0;
                 for (let i = 0; i < word.length; i++) {
                     hash = ((hash << 5) - hash) + word.charCodeAt(i);
                     hash |= 0;
                 }
-                const jitterX = ((hash % 10) / 10 - 0.5) * 10;
-                const jitterY = (((hash >> 4) % 10) / 10 - 0.5) * 25;
+                
+                // Pseudo-random float between -0.5 and 0.5
+                const rand = (seed) => {
+                    const x = Math.sin(seed) * 10000;
+                    return x - Math.floor(x) - 0.5;
+                };
+
+                // Use a wider spread for better visibility
+                // X jitter: kept within lane (approx +/- 14px)
+                const jitterX = rand(hash) * 28; 
+                
+                // Y jitter: Allow more vertical spread (approx +/- 40px) to utilize height
+                const jitterY = rand(hash + 12345) * 80;
                 
                 // Clamp coordinates to stay within SVG axes (quadrant)
                 const x = Math.max(padding + 4, Math.min(width - padding - 4, xBase + jitterX));
@@ -8530,11 +8541,22 @@
             if (!modal || !stage || !reviewControls) return;
 
             const stageRect = stage.getBoundingClientRect();
-            const controlsRect = reviewControls.getBoundingClientRect();
-            const distance = controlsRect.top - stageRect.bottom;
-            const safeMargin = 10;
-            const bottomOffset = safeMargin - distance;
-            modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
+            
+            // User requested to extend the explanation length significantly downwards
+            // We extend to the bottom of the modal content container (covering the controls)
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                const modalRect = modalContent.getBoundingClientRect();
+                const marginFromBottom = 15; 
+                const bottomOffset = stageRect.bottom - modalRect.bottom + marginFromBottom;
+                modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
+            } else {
+                // Fallback if modal content not found
+                const screenBottom = window.innerHeight;
+                const marginFromBottom = 20;
+                const bottomOffset = stageRect.bottom - screenBottom + marginFromBottom;
+                modal.style.setProperty('--peek-card-bottom', `${bottomOffset}px`);
+            }
         }
 
         function handlePeekStart(event) {
