@@ -443,14 +443,14 @@
             overflow: hidden;
             border: 1px solid rgba(255,255,255,0.4);
             width: 100%;
-            max-width: 160px; /* User request: reduce card size further from 200px to 160px */
+            max-width: 150px;
             margin-left: auto;
             margin-right: auto;
             
             /* Performance optimizations */
             will-change: transform, opacity;
             content-visibility: auto;
-            contain-intrinsic-size: 160px 240px;
+            contain-intrinsic-size: 150px 240px;
         }
         .verb-card.overlay-active {
             border-color: transparent; /* Eliminate visible seam when overlay is active */
@@ -680,6 +680,8 @@
 
         /* Modal Overlay */
         .modal-overlay {
+            --modal-gap-x: clamp(6px, 2vw, 12px);
+            --modal-gap-y: clamp(10px, 2vh, 16px);
             position: fixed;
             top: 0;
             left: 0;
@@ -689,8 +691,12 @@
             backdrop-filter: blur(5px);
             z-index: 50;
             display: flex;
-            align-items: center;
+            align-items: stretch;
             justify-content: center;
+            padding-left: var(--modal-gap-x);
+            padding-right: var(--modal-gap-x);
+            padding-top: calc(var(--safe-top) + var(--modal-gap-y));
+            padding-bottom: calc(var(--safe-bottom) + var(--modal-gap-y));
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
@@ -703,15 +709,36 @@
         }
 
         .modal-content {
-            width: 95%;
-            max-width: 950px;
-            /* Shrink modal height slightly (more top/bottom margin) */
-            height: calc(100vh - var(--safe-bottom) - 80px);
+            width: 98%;
+            max-width: 1000px;
+            height: 100%;
+            max-height: calc(100vh - var(--safe-top) - var(--safe-bottom) - (2 * var(--modal-gap-y)));
             display: flex;
             flex-direction: column;
             position: relative;
             box-sizing: border-box; /* Ensure padding doesn't push width out */
+            margin: 0 auto;
             padding-bottom: var(--safe-bottom);
+            overflow: hidden;
+            border-radius: 20px;
+        }
+
+        .modal-header {
+            contain: paint;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            will-change: transform;
+        }
+
+        .verb-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            justify-items: center;
+        }
+        
+        #reviewControls {
+            position: sticky;
+            bottom: 0;
         }
 
         /* Hide scrollbar utility */
@@ -752,6 +779,13 @@
             visibility: hidden;
         }
 
+        /* Phonetic should always be visible in review mode */
+        #learningModal.is-review-mode #modalPhonetic {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
         /* Ensure Essence Container is visible and prominent in review mode */
         #learningModal.is-review-mode #essenceContainer {
             margin-top: auto;
@@ -774,17 +808,17 @@
             transition: opacity 0.24s ease-out, transform 0.24s ease-out;
         }
         
-        #learningModal.is-review-mode.peek-active .result-card.active {
+        /* #learningModal.is-review-mode.peek-active .result-card.active {
             filter: blur(0);
             opacity: 1;
             transform: translate(-50%, -50%) scale(1);
             pointer-events: auto;
             visibility: visible;
             z-index: 42;
-        }
+        } */
 
-        /* ONLY the active card should be highlighted and centered during peek */
-        #learningModal.is-review-mode.peek-active .result-card.active {
+        /* ONLY the active card should be highlighted and centered during peek - REMOVED AS REQUESTED */
+        /* #learningModal.is-review-mode.peek-active .result-card.active {
             visibility: visible !important;
             opacity: 1 !important;
             z-index: 48 !important;
@@ -801,7 +835,7 @@
             box-shadow: 0 18px 40px rgba(120, 136, 163, 0.22), inset 1px 1px 0 rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(1px);
             transition: all 0.24s ease;
-        }
+        } */
 
         #learningModal.is-review-mode.peek-releasing .result-card.active {
             visibility: visible !important;
@@ -892,9 +926,10 @@
         }
 
         #learningModal.is-review-mode.peek-active #essenceContainer {
-            opacity: 0.08;
+            /* Keep essence visible when peeking word title now that popup is gone */
+            opacity: 1;
             pointer-events: none;
-            filter: blur(4px) grayscale(70%);
+            filter: none;
             transform: translateY(-20px) scale(1);
         }
 
@@ -952,10 +987,7 @@
         /* Carousel / Slider Styles */
         #outputContainer {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: var(--stage-pad, 0px);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -967,10 +999,12 @@
 
         /* Container wrapper for outputContainer to handle relative layout */
         .stage-container {
-            flex: 1;
+            flex: 1 1 0;
+            min-height: 0;
+            --stage-pad: clamp(6px, 2vw, 12px);
             position: relative;
             margin: 0;
-            overflow: visible; /* Let shadows breathe */
+            overflow: hidden; /* Prevent card shadows from overlapping header/controls */
             
             /* Smooth edge fading using mask-image */
             -webkit-mask-image: linear-gradient(
@@ -1001,9 +1035,12 @@
                        -10px -10px 20px rgba(255,255,255, 0.6);
             padding: 0;
             
-            width: 94%;
+            width: 96%;
             max-width: 720px;
-            height: 94%;
+            /* Adaptive height for cards */
+            height: auto;
+            max-height: 100%;
+            min-height: 0;
             overflow: hidden;
             
             transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
@@ -1396,7 +1433,7 @@
                 </div>
                 
                 <div class="px-4 pt-2">
-                    <main id="verbsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
+                    <main id="verbsGrid" class="verb-grid gap-3 pb-24">
                         <!-- Cards will be injected here -->
                     </main>
                 </div>
@@ -1421,7 +1458,7 @@
                       <div id="review-stats-placeholder"></div>
                   </div>
                 <div class="px-4 pt-2">
-                    <div id="reviewGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
+                    <div id="reviewGrid" class="verb-grid gap-3 pb-24">
                         <!-- Review cards will be injected here -->
                     </div>
                 </div>
@@ -1444,7 +1481,7 @@
                       <div id="mastery-stats-placeholder"></div>
                   </div>
                 <div class="px-4 pt-2">
-                    <div id="masteryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-24">
+                    <div id="masteryGrid" class="verb-grid gap-3 pb-24">
                         <!-- Mastered cards will be injected here -->
                     </div>
                 </div>
@@ -1517,7 +1554,7 @@
                         </div>
 
                         <!-- Recitation Check-in Calendar (7-Day View) -->
-                        <div class="pt-4 border-t border-gray-200/40">
+                        <div class="pt-2 border-t border-gray-200/40">
                             <div class="flex flex-wrap items-center justify-between gap-y-2 mb-3 px-1">
                                 <div class="flex items-center gap-1.5">
                                     <i class="fas fa-calendar-check text-blue-400 text-[11px]"></i>
@@ -1717,7 +1754,7 @@
 
     <!-- Modal for Learning -->
     <div id="learningModal" class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content relative flex flex-col bg-[#e0e5ec] rounded-[20px] shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+        <div class="modal-content relative flex flex-col bg-[#e0e5ec] rounded-[20px] shadow-2xl" onclick="event.stopPropagation()">
             <!-- Safe Area Spacer for Mobile Status Bar -->
             <div class="h-[var(--safe-top)] md:hidden"></div>
             <!-- Close Indicator (Mobile Friendly) - Hidden as requested -->
@@ -1738,7 +1775,7 @@
             </div>
 
             <!-- Modal Header -->
-            <div class="px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec] flex items-center gap-3">
+            <div class="modal-header px-5 pt-3 pb-1 shrink-0 w-full relative z-[60] bg-[#e0e5ec] flex items-center gap-3">
                 <div class="flex flex-col items-start pr-12 min-w-0 flex-1">
                     <div id="modalStageBadge" class="hidden px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold border border-blue-200 shrink-0 mb-1">Stage 0</div>
                     <h2 id="modalTitle" class="text-2xl font-black text-gray-700 capitalize truncate drop-shadow-sm w-full cursor-pointer hover:text-blue-600 transition-colors" style="font-size: 1.5rem;" onclick="playAudio(event, this.innerText, 2)"></h2>
@@ -1761,7 +1798,7 @@
             </div>
             
             <!-- ESSENCE CARD AREA (Sticky Bottom) -->
-            <div id="essenceContainer" class="px-0 pb-4 pt-1 shrink-0 hidden z-[60] transition-all duration-500 bg-[#e0e5ec] flex justify-center">
+            <div id="essenceContainer" class="px-0 pb-2 pt-2 shrink-0 hidden z-[60] transition-all duration-500 bg-[#e0e5ec] flex justify-center">
                 <!-- Essence content wrapper will have the same width constraints as cards -->
                 <div id="essenceContentWrapper" class="w-[94%] max-w-[720px]">
                     <!-- Essence content will be injected here -->
@@ -1769,7 +1806,7 @@
             </div>
 
             <!-- Ebbinghaus Review Controls -->
-            <div id="reviewControls" class="px-4 pb-4 pt-2 flex justify-center gap-4 z-[60] bg-[#e0e5ec] hidden">
+            <div id="reviewControls" class="px-4 pb-4 pt-2 flex justify-center gap-4 z-[60] bg-[#e0e5ec] shrink-0 hidden">
                 <!-- Study Mode: Only "Mark as Learned" -->
                 <div id="studyModeControls" class="flex gap-4">
                     <button onclick="recordReview('remembered')" class="neumorphic-btn px-8 py-3 text-blue-600 flex items-center gap-2 hover:scale-105 active:scale-95 transition-all">
@@ -2683,7 +2720,7 @@
                 
                 // Don't show cards, show a Start Review button
                 grid.innerHTML = `
-                    <div class="col-span-full py-20 text-center animate-fade-in relative overflow-hidden">
+                    <div class="col-span-full py-20 text-center animate-fade-in relative">
                         <div id="review-session-init" class="transition-opacity duration-300 w-full">
                             <!-- Action Button: Analytics -->
                             <div onclick="window.globalResetPressedState(); showAnalytics()" class="action-card-btn neumorphic-btn-sm w-16 h-16 flex items-center justify-center text-blue-500 mx-auto mb-6 cursor-pointer transition-transform">
@@ -5479,7 +5516,7 @@
                 ${oovBadge}
                 ${imageHtml}
                 <div class="${contentClasses} relative z-10">
-                    <h3 class="${displayWord.length > 20 ? 'text-[10px]' : displayWord.length > 16 ? 'text-xs' : displayWord.length > 12 ? 'text-sm' : displayWord.length > 8 ? 'text-base' : 'text-xl'} font-black mb-1.5 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-normal px-1 pb-0.5" title="${displayWord}">
+                    <h3 data-fit-title="1" class="text-xl font-black mb-1.5 transition-colors select-none ${excludedClass} ${animClass} tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis leading-normal px-1 pb-0.5" title="${displayWord}">
                         ${displayWord}
                     </h3>
                     <div class="flex items-center justify-center gap-1.5 mb-1">
@@ -5496,8 +5533,54 @@
                 </div>
                 ${refreshBtn}
             `;
+
+            requestAnimationFrame(() => {
+                const titleEl = card.querySelector('h3[data-fit-title="1"]');
+                if (titleEl) fitVerbCardTitle(titleEl);
+            });
             return card;
         }
+
+        function fitVerbCardTitle(titleEl) {
+            if (!titleEl) return;
+            const width = titleEl.clientWidth;
+            if (!width) return;
+            const text = (titleEl.textContent || '').trim();
+            if (!text) return;
+
+            const basePx = 20;
+            const minPx = 14;
+
+            titleEl.style.fontSize = `${basePx}px`;
+            if (titleEl.scrollWidth <= width) {
+                return;
+            }
+
+            let lo = minPx;
+            let hi = basePx;
+            let best = minPx;
+
+            while (hi - lo > 0.5) {
+                const mid = (lo + hi) / 2;
+                titleEl.style.fontSize = `${mid}px`;
+                if (titleEl.scrollWidth <= width) {
+                    best = mid;
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+
+            titleEl.style.fontSize = `${best}px`;
+        }
+
+        let verbTitleResizeRaf = 0;
+        window.addEventListener('resize', () => {
+            if (verbTitleResizeRaf) cancelAnimationFrame(verbTitleResizeRaf);
+            verbTitleResizeRaf = requestAnimationFrame(() => {
+                document.querySelectorAll('h3[data-fit-title="1"]').forEach(el => fitVerbCardTitle(el));
+            });
+        });
 
         // Helper for image placeholders
         function showFrostedPlaceholder(imgElement) {
@@ -6299,6 +6382,9 @@
             // We want to move this badge to the bottom-right of the modal content
             // Let's find the badge element first.
             const stageBadge = document.getElementById('modalStageBadge');
+            if (stageBadge) {
+                stageBadge.style.opacity = '0';
+            }
             
             // IMPORTANT: Move badge to safe zone (modal-content) BEFORE anything else clears outputContainer
             // This prevents it from being wiped out by subsequent analyzeVerbs calls
@@ -6846,6 +6932,12 @@
                 progressContainer.classList.remove('hidden');
                 progressBar.style.width = '0%';
                 progressText.innerText = refresh ? 'Refreshing explanation...' : 'Searching database...';
+            }
+            
+            const stageBadge = document.getElementById('modalStageBadge');
+            if (stageBadge) {
+                stageBadge.style.opacity = '0';
+                stageBadge.style.pointerEvents = 'none';
             }
 
             // Start Progress Animation
@@ -8395,6 +8487,14 @@
                 outputContainer.appendChild(errCard);
             } finally {
                 if (progressContainer) progressContainer.classList.add('hidden');
+                if (stageBadge) {
+                    stageBadge.style.pointerEvents = '';
+                    if (stageBadge.classList.contains('hidden')) {
+                        stageBadge.style.opacity = '0';
+                    } else {
+                        stageBadge.style.opacity = '1';
+                    }
+                }
             }
         }
         async function refreshExplanation() {
@@ -8766,6 +8866,14 @@
         function syncStageBadgeToActiveCard(cards) {
             const stageBadge = document.getElementById('modalStageBadge');
             if (!stageBadge) return;
+
+            if (modal && modal.classList.contains('is-review-mode')) {
+                const outputContainer = document.getElementById('outputContainer');
+                if (outputContainer && stageBadge.parentElement !== outputContainer) {
+                    outputContainer.appendChild(stageBadge);
+                }
+                return;
+            }
 
             const cardList = Array.isArray(cards)
                 ? cards
@@ -10641,43 +10749,14 @@
                             }, 800);
                         }, 50); // Small initial delay to ensure DOM is ready
                     } else if (currentPage === 'learn') {
-                        // NEW LOGIC: In Learn Mode, automatically jump to next learnable word
+                        document.getElementById('studyModeControls')?.classList.add('hidden');
                         setTimeout(() => {
-                            // Find current verb index in the original displayedVerbs list
-                            const currentIndex = displayedVerbs.findIndex(v => (v.word || v['单词']).toLowerCase() === verb.toLowerCase());
-                            
-                            let nextVerbToLearn = null;
-                            
-                            // Look for the next word in the list (before we filter it)
-                            if (currentIndex !== -1 && currentIndex + 1 < displayedVerbs.length) {
-                                const v = displayedVerbs[currentIndex + 1];
-                                nextVerbToLearn = v.word || v['单词'];
-                            }
-                            
-                            // NOW filter displayedVerbs so the learned card disappears from background grid
                             displayedVerbs = displayedVerbs.filter(v => (v.word || v['单词']).toLowerCase() !== verb.toLowerCase());
-
-                            if (nextVerbToLearn) {
-                                // Reset button states
-                                if (window.globalResetPressedState) window.globalResetPressedState();
-                                
-                                // Reset history count for automatic jump
-                                modalHistoryCount = 1;
-                                
-                                // Transition to next word seamlessly
-                                openVerb(nextVerbToLearn, false);
-                                
-                                // Update background grid (renderGrid without reset will append, but offset might be issue)
-                                // Better to call renderGrid(true) but that might be heavy.
-                                // Let's just update the grid view.
-                                renderGrid(true); 
-                            } else {
-                                // End of batch
-                                closeModal();
-                                if (window.globalResetPressedState) window.globalResetPressedState();
-                                applyFilters(); // This will refresh the grid and potentially load new batch
+                            renderGrid(true);
+                            if (displayedVerbs.length === 0) {
+                                applyFilters();
                             }
-                        }, 800);
+                        }, 220);
                     } else {
                         // Default fallback (e.g. search result, me page)
                         setTimeout(() => {
