@@ -3316,9 +3316,19 @@
         }
 
         // --- New Words Tracking (for Daily Goal) ---
+        function getLogicalDate() {
+            const now = new Date();
+            // Flexible window: 0-4am counts as previous day
+            if (now.getHours() < 4) {
+                const logical = new Date(now);
+                logical.setDate(logical.getDate() - 1);
+                return logical;
+            }
+            return now;
+        }
+
         function getTodayKey() {
-            const d = new Date();
-            return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            return getLogicalDate().toLocaleDateString('en-CA'); // YYYY-MM-DD
         }
         function getTodayNewWords() {
             try {
@@ -3340,10 +3350,10 @@
         }
 
         async function autoCheckin() {
-            // Use local date for today to match calendar logic
-            const now = new Date();
-            const today = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            // Use logical date for today (0-4am flexible window)
+            const logicalDate = getLogicalDate();
+            const today = logicalDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const todayStart = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 4);
             
             // Calculate Today's Progress locally (Sync with Header Today)
             // User request: "New" count should match the "Today" header count
@@ -4648,8 +4658,8 @@
             // We calculate stats based on the CURRENT POS and Frequency filter (the "Word Library" scope)
             // Header stats (Total/Review/Mastered) should reflect the progress within this combined scope
             const scopeStats = { total: 0, reviewing: 0, mastered: 0, due: 0, today: 0 };
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+            const logicalDate = getLogicalDate();
+            const todayStart = new Date(logicalDate.getFullYear(), logicalDate.getMonth(), logicalDate.getDate(), 4);
             
             // Calculate stats based on current POS AND Frequency filter
             // We use allVerbs (not searchMatches) because the header/badge should reflect the overall progress in this library range
