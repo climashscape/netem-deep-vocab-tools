@@ -8,6 +8,8 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+.cursor/
+.workbuddy/
 *.swp
 
 # Python
