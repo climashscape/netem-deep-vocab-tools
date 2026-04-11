@@ -118,6 +118,12 @@
                 transform: none !important; 
                 background-color: inherit !important;
             }
+            
+            /* Fix: Disable image hover scale on touch devices */
+            .verb-card:hover img,
+            .group:hover img {
+                transform: none !important;
+            }
         }
 
         /* Global Pressed State (JS Controlled) */
@@ -536,32 +542,30 @@
             text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
 
-        /* Exclude Confirmation Overlay */
+
+        /* Long Press Overlay (Mark Mastered / Reset) */
         .exclude-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(224, 229, 236, 0.9); /* #e0e5ec with opacity */
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 20;
-            border-radius: 24px;
             opacity: 0;
-            visibility: hidden;
             pointer-events: none;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
-            transform: none;
+            transition: opacity 0.2s ease;
+            z-index: 30;
         }
         .exclude-overlay.active {
             opacity: 1;
-            visibility: visible;
             pointer-events: auto;
-            /* keep transform inherited from card for perfect sync */
         }
-        .exclude-overlay.overlay-press {
-            opacity: 0.96; /* subtle feedback during press to avoid flicker */
+        .exclude-overlay .mastery-confirm-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 4px 4px 8px rgba(163,177,198,0.6), 
+                       -4px -4px 8px rgba(255,255,255,0.9);
         }
         .exclude-confirm-btn {
             background: #e0e5ec;
@@ -579,17 +583,14 @@
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.25px;
+            color: #2563eb; /* blue-600 */
         }
-        .notebook-remove-btn {
-            min-height: 42px;
-            padding-left: 12px;
-            padding-right: 12px;
+        .exclude-confirm-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 4px 4px 8px rgba(163,177,198,0.6), 
+                       -4px -4px 8px rgba(255,255,255,0.9);
         }
-        .exclude-confirm-btn:active {
-            box-shadow: inset 2px 2px 4px rgba(163,177,198,0.6), 
-                       inset -2px -2px 4px rgba(255,255,255,0.8);
-            transform: scale(0.97);
-        }
+
         .mastery-confirm-btn {
             background: #e0e5ec;
             box-shadow: 3px 3px 6px rgba(163,177,198,0.5), 
@@ -607,13 +608,6 @@
             text-transform: uppercase;
             letter-spacing: 0.25px;
             color: #d97706; /* orange-600 */
-        }
-        .exclude-cancel-area {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            color: white;
-            font-size: 14px;
         }
 
         /* Updated Pull to Refresh Indicator */
@@ -1902,41 +1896,6 @@
         </div>
     </div>
 
-    <!-- Excluded Verbs Modal -->
-    <div id="excludedModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center hidden" onclick="closeExcludedModal(event)">
-        <div class="bg-[#e0e5ec] w-[90%] max-w-md rounded-3xl p-6 neumorphic animate-fade-in flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
-            <!-- Safe Area Spacer for Mobile Status Bar -->
-            <div class="h-[var(--safe-top)] md:hidden"></div>
-            <!-- Close Indicator (Mobile Friendly) - Hidden -->
-            <div class="w-full flex justify-center pb-4 opacity-40 md:hidden hidden" onclick="closeExcludedModal()">
-                <div class="w-12 h-2 bg-gray-400/40 rounded-full"></div>
-            </div>
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-red-500">
-                        <i class="fas fa-trash-alt"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-black text-gray-700">Excluded Verbs</h3>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Words you've cleared</p>
-                    </div>
-                </div>
-                <button onclick="closeExcludedModal()" class="w-8 h-8 rounded-full neumorphic flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors hidden">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="neumorphic-inset p-4 rounded-2xl max-h-[60vh] overflow-y-auto hide-scrollbar mb-6">
-                <div id="modalExcludedList" class="flex flex-wrap gap-2">
-                    <p class="text-xs text-gray-400 italic w-full text-center py-4">No excluded verbs</p>
-                </div>
-            </div>
-
-            <button onclick="saveExcludedChanges()" class="w-full py-3 rounded-xl neumorphic-btn text-blue-600 font-black text-sm uppercase tracking-wider">
-                Save Changes
-            </button>
-        </div>
-    </div>
 
     <!-- Confirm Modal -->
     <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
@@ -2037,7 +1996,7 @@
                         <i class="fas fa-undo text-blue-500 text-xs"></i>
                         <span class="text-xs font-black text-gray-700 uppercase tracking-wider">Clear Progress Only <span class="countdown-text">(5s)</span></span>
                     </div>
-                    <p class="text-[10px] text-gray-400 font-bold text-left">Resets memory stages and review plans. Keeps settings and excluded words.</p>
+                    <p class="text-[10px] text-gray-400 font-bold text-left">Resets memory stages and review plans. Keeps settings.</p>
                 </button>
 
                 <!-- Option 2: Full Initialize -->
@@ -2046,7 +2005,7 @@
                         <i class="fas fa-power-off text-red-500 text-xs"></i>
                         <span class="text-xs font-black text-red-600 uppercase tracking-wider">Full Reset <span class="countdown-text">(5s)</span></span>
                     </div>
-                    <p class="text-[10px] text-gray-400 font-bold text-left">Wipes all data including progress, excluded words, and settings.</p>
+                    <p class="text-[10px] text-gray-400 font-bold text-left">Wipes all data including progress and settings.</p>
                 </button>
             </div>
 
@@ -2440,9 +2399,6 @@
             if (posArray.includes('all')) return true;
             const verb = v.word || v['单词'];
             if (!verb) return false;
-            
-            if (posArray.includes('excluded')) return excludedVerbs.has(verb);
-            if (excludedVerbs.has(verb)) return false; // Other tabs hide excluded
 
             return posArray.some(pos => {
                 // Dynamic POS correction inside matchesPos
@@ -2661,7 +2617,7 @@
         let reviewRenderFrameId = null;
         let masteryRenderFrameId = null;
 
-        function renderReviewPage() {
+        function renderReviewPage(skipUpdateCounts = false) {
             // Cancel any ongoing rendering from previous calls
             if (reviewRenderFrameId) {
                 cancelAnimationFrame(reviewRenderFrameId);
@@ -2673,8 +2629,10 @@
             
             const now = new Date();
             
-            // Sync counts based on current filters
-            updateCounts();
+            // Sync counts based on current filters (skip if called from recordReview which already updated)
+            if (!skipUpdateCounts) {
+                updateCounts();
+            }
 
             if (currentReviewTab === 'session') {
                 // SESSION MODE: Show words due for review
@@ -2682,9 +2640,6 @@
                 reviewVerbsList = allVerbs.filter(v => {
                     const status = learningStatus[v['单词'].toLowerCase()];
                     if (!status) return false;
-                    
-                    // Excluded Logic
-                    if (excludedVerbs.has(v['单词'])) return false;
                     
                     // POS Filter logic
                     if (!matchesPos(v, currentPos)) return false;
@@ -2706,6 +2661,20 @@
                     const statusB = learningStatus[b['单词'].toLowerCase()];
                     return new Date(statusA.next_review) - new Date(statusB.next_review);
                 });
+                
+                // Check if we're showing the "Start Review" screen (not cards)
+                const sessionInit = document.getElementById('review-session-init');
+                if (sessionInit && reviewVerbsList.length > 0) {
+                    // Just update the text, don't re-render
+                    const textEl = sessionInit.querySelector('p.text-xs');
+                    if (textEl) {
+                        const newText = `${reviewVerbsList.length} words are ready for review`;
+                        if (textEl.innerText.trim() !== newText) {
+                            textEl.innerText = newText;
+                        }
+                    }
+                    return;
+                }
                 
                 if (reviewVerbsList.length === 0) {
                     grid.innerHTML = `
@@ -2745,9 +2714,6 @@
                     const status = learningStatus[v['单词'].toLowerCase()];
                     // "Reset to Learn" sets it to Stage 0, we want to see it in Library.
                     if (!status || status.status === 'mastered') return false;
-                    
-                    // Excluded Logic
-                    if (excludedVerbs.has(v['单词'])) return false;
                     
                     // POS Filter logic
                     if (!matchesPos(v, currentPos)) return false;
@@ -2957,15 +2923,7 @@
             showConfirm('Remove from Notebook', `Are you sure you want to remove "${word}" from your Notebook?`, executeRemove);
         }
         
-        // Excluded Verbs Logic (Legacy support or merge into notebook?)
-        // The previous step merged "Excluded" INTO the notebook tab, but the user explicitly asked for "Excluded Verbs" to be merged into Mastery page
-        // AND THEN asked for "OOV Learning".
-        // It seems I might have overwritten the "Excluded" display with "OOV" display in the previous step.
-        // If the user wants BOTH "Excluded" and "OOV Notebook" in Mastery page, we need THREE tabs or combine them.
-        // Let's check the previous request: "现在excluded verbs合并进mastery页面" -> I did that.
-        // Then: "完成词库外单词学习功能" -> I replaced the "Excluded" logic with "OOV" logic in the same "Notebook" tab.
-        // This might be a mistake if they want to keep "Excluded".
-        // Let's add a THIRD tab: "Excluded".
+        // OOV (Out-of-Vocabulary) Words Logic
         
         function switchMasteryTab(tab) {
             currentMasteryTab = tab;
@@ -3186,10 +3144,9 @@
             const masteredVerbs = allVerbs.filter(v => {
                 const word = (v.word || v['单词']).toLowerCase();
                 const status = learningStatus[word];
-                const isExcluded = excludedVerbs.has(word);
                 const isMastered = status && status.status === 'mastered';
 
-                if (!isMastered && !isExcluded) return false;
+                if (!isMastered) return false;
                 if (!matchesPos(v, currentPos)) return false;
                 if (!matchesFreq(v, currentFreq)) return false;
                 if (query && !word.includes(query)) return false;
@@ -3450,11 +3407,7 @@
             const query = document.getElementById('searchInput')?.value || '';
             
             // Calculate stats based on ALL verbs, not just filtered ones
-            const targetVerbs = allVerbs.filter(v => {
-                // Exclude excluded verbs from progress stats
-                if (excludedVerbs.has(v['单词'])) return false;
-                return true;
-            });
+            const targetVerbs = allVerbs;
 
             // 1. Calculate Status Stats
             const stats = {
@@ -3516,8 +3469,7 @@
             // 3. Update Overall Progress Bar (Global: all 5530 words)
             const globalTotal = allVerbs.length || 5530;
             const startedCount = Object.keys(learningStatus).length;
-            const excludedCount = excludedVerbs.size;
-            const globalPercent = globalTotal > 0 ? Math.round(((startedCount + excludedCount) / globalTotal) * 100) : 0;
+            const globalPercent = globalTotal > 0 ? Math.round((startedCount / globalTotal) * 100) : 0;
             
             safeUpdate('profile-progress-percent', globalPercent + '%');
             
@@ -3951,7 +3903,6 @@
                         localStorage.clear();
                         // 3. Reset local variables
                         learningStatus = {};
-                        excludedVerbs = new Set();
                         
                         finishClearance('Application reset successfully');
                         // Optional: reload to ensure clean state
@@ -4099,17 +4050,6 @@
             setTimeout(() => modal.classList.add('hidden'), 300);
         }
         
-        // Excluded Verbs (LocalStorage)
-        let excludedVerbs = new Set();
-        let pendingUnexclude = new Set(); // Track words to be unexcluded on save
-        try {
-            const saved = localStorage.getItem('excludedVerbs');
-            if (saved) {
-                excludedVerbs = new Set(JSON.parse(saved));
-            }
-        } catch (e) {
-            console.error("Error loading excluded verbs:", e);
-        }
 
         // Cloud Sync & Export/Import Logic
         async function cloudSync() {
@@ -4126,11 +4066,8 @@
                     // Show info message
                     showMessage('Exporting', 'Preparing your data backup, please wait...', 'info');
                     
-                    // Get excluded verbs as JSON string
-                    const excludedData = localStorage.getItem('excludedVerbs') || '[]';
-                    
-                    // Trigger Export with excluded verbs
-                    const response = await fetch(`/api/export?excluded_verbs=${encodeURIComponent(excludedData)}`);
+                    // Trigger Export
+                    const response = await fetch('/api/export');
                     if (!response.ok) throw new Error('Export failed');
                     
                     const blob = await response.blob();
@@ -4193,16 +4130,6 @@
                         
                         if (res.ok) {
                             const data = await res.json();
-                            
-                            // Handle excluded verbs if returned from backend
-                            if (data.excluded_verbs) {
-                                localStorage.setItem('excludedVerbs', data.excluded_verbs);
-                                try {
-                                    excludedVerbs = new Set(JSON.parse(data.excluded_verbs));
-                                } catch (e) {
-                                    console.error("Error parsing imported excluded verbs:", e);
-                                }
-                            }
                             
                             const syncText = document.getElementById('sync-status-text');
                               if (syncText) syncText.innerText = `Last import: Just now (Success)`;
@@ -4320,7 +4247,6 @@
 
             await loadLearningStatus();
             loadVerbs();
-            renderExcludedVerbs(); // Update badge on load
             
             // Initialize filter scroll indicators
             setTimeout(() => {
@@ -4542,20 +4468,13 @@
             const searchMatches = allVerbs.filter(v => (v.word || v['单词'] || '').toLowerCase().includes(query));
 
             // Reset counts
-            const posCounts = { noun: 0, verb: 0, noun_verb: 0, other: 0, adj_adv: 0, prep_conj: 0, excluded: 0 };
+            const posCounts = { noun: 0, verb: 0, noun_verb: 0, other: 0, adj_adv: 0, prep_conj: 0 };
             const freqCounts = { must: 0, core: 0, advanced: 0, basic: 0, rare: 0, other: 0, review: 0, mastered: 0 };
             const now = new Date();
 
             // 1. Calculate POS counts (Filter by Search AND Current Frequency)
             // We want to see available POS options within the current Frequency scope
             const matchesForPos = searchMatches.filter(v => {
-                const verbKey = (v.word || v['单词']).toLowerCase();
-                const status = learningStatus[verbKey];
-                const isExcluded = excludedVerbs.has(verbKey);
-                
-                // Count excluded regardless of frequency filter
-                if (isExcluded) return true;
-                
                 // Dynamic POS correction for filtering logic
                 let tempV = { ...v };
                 const word = (v.word || v['单词']).toLowerCase();
@@ -4572,53 +4491,37 @@
             });
 
             matchesForPos.forEach(v => {
-                const isExcluded = excludedVerbs.has((v.word || v['单词']).toLowerCase());
+                // Normalize pos string
+                let pos = v.pos || v.part_of_speech || 'other';
                 
-                if (isExcluded) {
-                    posCounts.excluded++;
-                } else {
-                    // Normalize pos string
-                    let pos = v.pos || v.part_of_speech || 'other';
-                    
-                    // Dynamic POS correction based on word identity for common mislabeled words
-                    // Source data has many mislabeled POS (e.g. 'and' as 'other', 'but' as 'adj_adv')
-                    const word = (v.word || v['单词']).toLowerCase();
-                    const knownPrepConj = new Set(['and', 'but', 'or', 'so', 'for', 'nor', 'yet', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'with', 'from', 'as', 'about', 'after', 'against', 'among', 'around', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond', 'during', 'except', 'inside', 'into', 'near', 'off', 'outside', 'over', 'past', 'since', 'through', 'throughout', 'till', 'toward', 'under', 'underneath', 'until', 'upon', 'within', 'without', 'although', 'because', 'if', 'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose', 'why', 'how']);
-                    
-                    if (knownPrepConj.has(word)) {
-                        pos = 'prep_conj';
-                    }
+                // Dynamic POS correction based on word identity for common mislabeled words
+                // Source data has many mislabeled POS (e.g. 'and' as 'other', 'but' as 'adj_adv')
+                const word = (v.word || v['单词']).toLowerCase();
+                const knownPrepConj = new Set(['and', 'but', 'or', 'so', 'for', 'nor', 'yet', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'with', 'from', 'as', 'about', 'after', 'against', 'among', 'around', 'before', 'behind', 'below', 'beneath', 'beside', 'between', 'beyond', 'during', 'except', 'inside', 'into', 'near', 'off', 'outside', 'over', 'past', 'since', 'through', 'throughout', 'till', 'toward', 'under', 'underneath', 'until', 'upon', 'within', 'without', 'although', 'because', 'if', 'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose', 'why', 'how']);
+                
+                if (knownPrepConj.has(word)) {
+                    pos = 'prep_conj';
+                }
 
-                    // Only count regular POS if NOT excluded
-                    if (pos === 'prep' || pos === 'prep_conj' || pos === 'conj') {
-                        posCounts.prep_conj++;
-                    } else if (pos === 'adj' || pos === 'adv' || pos === 'adj_adv') {
-                        posCounts.adj_adv++;
-                    } else if (pos && posCounts[pos] !== undefined) {
-                        posCounts[pos]++;
-                    } else {
-                        // Fallback to other
-                        posCounts.other++;
-                    }
+                if (pos === 'prep' || pos === 'prep_conj' || pos === 'conj') {
+                    posCounts.prep_conj++;
+                } else if (pos === 'adj' || pos === 'adv' || pos === 'adj_adv') {
+                    posCounts.adj_adv++;
+                } else if (pos && posCounts[pos] !== undefined) {
+                    posCounts[pos]++;
+                } else {
+                    // Fallback to other
+                    posCounts.other++;
                 }
             });
             
             // 2. Calculate Frequency counts (Filter by Search AND Current POS)
             // We want to see available Frequency options within the current POS scope
-            let matchesForFreq = [];
-            
-            if (currentPos.includes('excluded')) {
-                matchesForFreq = searchMatches.filter(v => excludedVerbs.has((v.word || v['单词']).toLowerCase()));
-            } else {
-                matchesForFreq = searchMatches.filter(v => {
-                    const verbKey = (v.word || v['单词']).toLowerCase();
-                    if (excludedVerbs.has(verbKey)) return false;
-                    
-                    // If we are looking for Review or Mastered words, don't filter them out!
-                    // We only filter them out when counting the "Learnable" frequency groups
-                    return matchesPos(v, currentPos);
-                });
-            }
+            const matchesForFreq = searchMatches.filter(v => {
+                // If we are looking for Review or Mastered words, don't filter them out!
+                // We only filter them out when counting the "Learnable" frequency groups
+                return matchesPos(v, currentPos);
+            });
 
             matchesForFreq.forEach(v => {
                 const verbKey = (v.word || v['单词']).toLowerCase();
@@ -4641,8 +4544,8 @@
             });
 
             // Update DOM - POS Row
-            // "All" count should include ALL items (including learned/mastered) but exclude excluded items
-            const activeItemsCount = searchMatches.filter(v => !excludedVerbs.has((v.word || v['单词']).toLowerCase())).length;
+            // "All" count should include ALL items (including learned/mastered)
+            const activeItemsCount = searchMatches.length;
             
             safeUpdate('count-pos-all', activeItemsCount);
             safeUpdate('count-noun', posCounts.noun);
@@ -4664,8 +4567,6 @@
             // Calculate stats based on current POS AND Frequency filter
             // We use allVerbs (not searchMatches) because the header/badge should reflect the overall progress in this library range
             const matchesCurrentSelection = allVerbs.filter(v => {
-                const verbKey = (v.word || v['单词']).toLowerCase();
-                if (excludedVerbs.has(verbKey)) return false;
                 return matchesPos(v, currentPos) && matchesFreq(v, currentFreq);
             });
 
@@ -4691,12 +4592,14 @@
                     // Reviewing: Any word in the Ebbinghaus cycle that is NOT mastered
                     if (status.status === 'learning') {
                         scopeStats.reviewing++;
-                        
-                        // Also track which ones are actually DUE for the bottom nav badge
-                        if (new Date(status.next_review) <= now) {
-                            scopeStats.due++;
-                        }
                     }
+                    
+                    // Due for review: NOT mastered AND next_review <= now
+                    // This matches the logic in renderReviewPage for consistency
+                    if (status.status !== 'mastered' && new Date(status.next_review) <= now) {
+                        scopeStats.due++;
+                    }
+                    
                     if (status.status === 'mastered') scopeStats.mastered++;
                 }
             });
@@ -4724,7 +4627,7 @@
             updateProfileStats();
 
             // Update "All" button count in Frequency row (Full count for current POS)
-            const allInPosScope = allVerbs.filter(v => !excludedVerbs.has((v.word || v['单词']).toLowerCase()) && matchesPos(v, currentPos)).length;
+            const allInPosScope = allVerbs.filter(v => matchesPos(v, currentPos)).length;
             safeUpdate('count-freq-all', allInPosScope);
             
             // Update Review Badge in bottom nav (Only DUE words)
@@ -4838,9 +4741,6 @@
                     isFreqMatched = matchesFreq(v, currentFreq);
                 }
                 if (!isFreqMatched) return false;
-                
-                // Exclude manual exclusions
-                if (excludedVerbs.has((v.word || v['单词']).toLowerCase())) return false;
                 
                 return true;
             });
@@ -4972,15 +4872,7 @@
                             currentPos.splice(index, 1);
                         }
                     } else {
-                        // If 'excluded' is selected, it should be the only one
-                        if (pos === 'excluded') {
-                            currentPos = ['excluded'];
-                        } else {
-                            // If 'excluded' was selected, remove it when selecting regular pos
-                            const exclIndex = currentPos.indexOf('excluded');
-                            if (exclIndex > -1) currentPos.splice(exclIndex, 1);
-                            currentPos.push(pos);
-                        }
+                        currentPos.push(pos);
                     }
                 }
             }
@@ -5081,9 +4973,6 @@
             const coreMatches = allVerbs.filter(v => {
                 const verbKey = (v.word || v['单词']).toLowerCase();
                 const matchesSearch = verbKey.includes(query);
-                
-                // Exclude verbs that the user has manually excluded
-                if (typeof excludedVerbs !== 'undefined' && excludedVerbs.has(verbKey)) return false;
                 
                 if (!matchesPos(v, currentPos)) return false;
                 
@@ -5381,10 +5270,8 @@
             }
             */
 
-            // Exclude / Restore Status
-            const isExcluded = excludedVerbs.has((item.word || item['单词']).toLowerCase());
-            const excludedClass = isExcluded ? 'text-red-400' : 'text-gray-700 verb-title-text';
-            const animClass = isExcluded ? 'strike-anim active' : 'strike-anim';
+            const excludedClass = 'text-gray-700 verb-title-text';
+            const animClass = 'strike-anim';
 
             let imageHtml = '';
             let contentClasses = 'verb-content verb-card-block flex-1 flex flex-col items-center px-3 pt-2 pb-2 min-h-[92px] transition-all duration-200';
@@ -5480,9 +5367,9 @@
                             <i class="fas fa-trophy text-sm"></i>
                             <span class="whitespace-nowrap">Mark Mastered</span>
                         </button>
-                        <button class="exclude-confirm-btn text-gray-500">
-                            <i class="fas fa-eye-slash text-sm"></i>
-                            <span class="whitespace-nowrap">Confirm Exclude</span>
+                        <button class="exclude-confirm-btn text-blue-600">
+                            <i class="fas fa-history text-sm"></i>
+                            <span class="whitespace-nowrap">Reset</span>
                         </button>
                         <div class="text-gray-400 text-[9px] font-bold uppercase tracking-wider text-center pt-1 opacity-60">Click outside to cancel</div>
                     </div>
@@ -5615,21 +5502,20 @@
                 if (currentPage === 'mastery') {
                     // Mastery Page: Only "Reset to Review"
                     if (masteryBtn) masteryBtn.style.display = 'none';
+                    if (excludeBtn) excludeBtn.style.display = 'flex';
                     excludeBtn.innerHTML = '<i class="fas fa-history text-sm"></i> <span>Confirm Reset</span>';
                     excludeBtn.classList.remove('text-gray-500');
                     excludeBtn.classList.add('text-blue-600');
                     excludeBtn.onclick = (e) => resetToReview(e, word);
                 } else {
-                    // Learn Page or Review Library: "Mark as Mastered" and "Exclude"
+                    // Learn Page or Review Library: Only "Mark as Mastered"
                     if (masteryBtn) {
                         masteryBtn.style.display = 'flex';
                         masteryBtn.innerHTML = '<i class="fas fa-trophy text-sm"></i> <span>Mark Mastered</span>';
                         masteryBtn.onclick = (e) => confirmMastery(e, word);
                     }
-                    excludeBtn.innerHTML = '<i class="fas fa-eye-slash text-sm"></i> <span>Confirm Exclude</span>';
-                    excludeBtn.classList.remove('text-blue-600');
-                    excludeBtn.classList.add('text-gray-500');
-                    excludeBtn.onclick = (e) => confirmExclude(e, word);
+                    // Hide exclude button
+                    if (excludeBtn) excludeBtn.style.display = 'none';
                 }
                 
                 // Force layout reflow before starting animations
@@ -5845,12 +5731,6 @@
                             next_review: result.next_review
                         };
                         
-                        // Also un-exclude if it was excluded
-                        if (excludedVerbs.has(key)) {
-                            excludedVerbs.delete(key);
-                            localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
-                        }
-                        
                         setTimeout(() => {
                             renderMasteryPage(); // Refresh the grid
                             updateCounts(); // Sync header stats
@@ -5956,45 +5836,6 @@
             if (window.setLastOverlayCloseTime) window.setLastOverlayCloseTime(Date.now());
         }
 
-        function confirmExclude(event, word) {
-            event.stopPropagation();
-            const card = document.getElementById('verb-card-' + word);
-            if (card) {
-                card.classList.add('card-fade-out');
-                setTimeout(() => {
-                    excludedVerbs.add(word);
-                    // Also save exclusion to localStorage immediately
-                    localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
-                    
-                    // Sync to server
-                    fetch('/api/exclude', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ verb: word, exclude: true })
-                    }).catch(e => console.error("Failed to sync exclusion to server", e));
-
-                    // Update batch
-                    if (currentPage === 'learn') {
-                        updateSavedBatch(word);
-                        displayedVerbs = displayedVerbs.filter(v => v['单词'].toLowerCase() !== word.toLowerCase());
-                    } else if (currentPage === 'review') {
-                        renderReviewPage();
-                    } else if (currentPage === 'mastery') {
-                        renderMasteryPage();
-                    }
-
-                    card.remove();
-                    updateCounts();
-                    updateProfileStats();
-                    
-                    // If no more cards in Learn, trigger a refresh
-                    if (currentPage === 'learn' && displayedVerbs.length === 0) {
-                        applyFilters();
-                    }
-                }, 400);
-            }
-        }
-
         function loadMoreVerbs() {
             if (offset < displayedVerbs.length && !isLoading) {
                 renderGrid(false);
@@ -6059,100 +5900,6 @@
             }, 250); // 250ms debounce
         }
 
-        // Excluded Words Logic
-        function toggleExclude(event, word) {
-            // Stop propagation to prevent opening the card
-            if (event) event.stopPropagation();
-            
-            const target = event.target;
-            const card = document.getElementById('verb-card-' + word);
-            
-            // Check if we are currently excluded
-            const isCurrentlyExcluded = excludedVerbs.has(word);
-            
-            if (isCurrentlyExcluded) {
-                // RESTORE action
-                // 1. Start reverse strikethrough animation (Left to Right disappearance)
-                // Remove .active (width 100%) and add .removing (anchors right, width 0%)
-                target.classList.add('removing');
-                target.classList.remove('active');
-                
-                // Color change: wait for line to disappear
-                setTimeout(() => {
-                    target.classList.remove('removing'); // Cleanup
-                    target.classList.remove('text-red-400');
-                    target.classList.add('text-gray-700');
-                    target.classList.add('group-hover:text-blue-600'); // Restore hover effect
-                }, 400);
-
-                // If in Excluded tab, fade out the card because it's leaving the list
-                if (currentPos === 'excluded') {
-                    if (card) {
-                        // 2. Wait for strikethrough removal (400ms) then fade out card
-                        setTimeout(() => {
-                            // Start fade out
-                            card.classList.add('card-fade-out');
-                            
-                            // 3. Wait for fade out (400ms) then update data
-                            setTimeout(() => {
-                                 excludedVerbs.delete(word);
-                                 finishToggle();
-                            }, 400); 
-                        }, 400);
-                    } else {
-                        excludedVerbs.delete(word);
-                        finishToggle();
-                    }
-                } else {
-                    // Not in excluded tab (shouldn't happen usually as excluded items are hidden elsewhere)
-                    excludedVerbs.delete(word);
-                    finishToggle();
-                }
-            } else {
-                // EXCLUDE action
-                // 1. Start strikethrough animation
-                target.classList.add('active');
-                target.classList.add('text-red-400');
-                target.classList.remove('text-gray-700');
-                target.classList.remove('group-hover:text-blue-600'); // Remove hover effect to keep red color
-                
-                // 2. Wait for strikethrough (400ms) then fade out card
-                setTimeout(() => {
-                    if (card) {
-                        card.classList.add('card-fade-out');
-                    }
-                    
-                    // 3. Wait for fade out (400ms) then update data
-                    setTimeout(() => {
-                        excludedVerbs.add(word);
-                        finishToggle();
-                    }, 400);
-                    
-                }, 400);
-            }
-            
-            async function finishToggle() {
-                // Save to LocalStorage
-                localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
-                
-                // Sync to Server
-                try {
-                    await fetch('/api/exclude', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ verb: word, exclude: !isCurrentlyExcluded })
-                    });
-                } catch (e) {
-                    console.error("Failed to sync exclusion to server", e);
-                }
-
-                // Refresh view
-                updateCounts();
-                applyFilters();
-                updateProfileStats();
-                renderExcludedVerbs(); // Update badge and modal list
-            }
-        }
 
         // Probability Calculation Logic
         function updateKaoyanCountdown() {
@@ -6718,6 +6465,7 @@
                              if (!learningStatus[wordLower]) learningStatus[wordLower] = {};
                              learningStatus[wordLower].stage = result.new_stage;
                              learningStatus[wordLower].next_review = result.next_review;
+                             learningStatus[wordLower].last_review = new Date().toISOString(); // Required for Today count
                              learningStatus[wordLower].status = result.new_stage >= 9 ? 'mastered' : 'learning'; // Assuming 9 stages
                         }
 
@@ -6737,6 +6485,20 @@
 
                         // Sync global counters and nav badge immediately
                         if (typeof updateCounts === 'function') updateCounts();
+
+                        // Update Review Session page text if showing "Start Review" screen
+                        if (currentPage === 'review' && currentReviewTab === 'session') {
+                            const sessionInit = document.getElementById('review-session-init');
+                            if (sessionInit && reviewVerbsList.length > 0) {
+                                const textEl = sessionInit.querySelector('p.text-xs');
+                                if (textEl) {
+                                    const newText = `${reviewVerbsList.length} words are ready for review`;
+                                    if (textEl.innerText.trim() !== newText) {
+                                        textEl.innerText = newText;
+                                    }
+                                }
+                            }
+                        }
 
                         // If skipped (due to double click logic in backend), we still proceed to close modal
                         // because visually the user already got it right.
@@ -9639,138 +9401,6 @@
             // Then perform full load (which might fetch updated data if we were using a real backend)
             loadSettings();
         }
-
-        function openExcludedModal() {
-            const modal = document.getElementById('excludedModal');
-            if (modal) {
-                pendingUnexclude.clear(); // Reset pending list on open
-                pushModalState(closeExcludedModal);
-                modal.classList.remove('hidden');
-                renderExcludedVerbs();
-            }
-        }
-
-        function closeExcludedModal(fromPopState = false) {
-            const modal = document.getElementById('excludedModal');
-            if (modal) {
-                if (fromPopState !== true) {
-                    // Let popstate handle the stack pop
-                    history.back();
-                }
-                pendingUnexclude.clear(); // Clear pending on cancel/close
-                modal.classList.add('hidden');
-            }
-        }
-
-        async function saveExcludedChanges() {
-            if (pendingUnexclude.size === 0) {
-                closeExcludedModal();
-                return;
-            }
-
-            const wordsToRestore = Array.from(pendingUnexclude);
-            const modal = document.getElementById('excludedModal');
-            const saveBtn = modal.querySelector('button[onclick="saveExcludedChanges()"]');
-            
-            // UI Feedback
-            const originalText = saveBtn.innerText;
-            saveBtn.innerText = 'SAVING...';
-            saveBtn.disabled = true;
-
-            try {
-                // Batch update (sequential but fast enough)
-                for (const word of wordsToRestore) {
-                    await fetch('/api/exclude', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ verb: word, exclude: false })
-                    });
-                    excludedVerbs.delete(word);
-                }
-
-                // Sync to LocalStorage
-                localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
-                
-                // Final UI Update
-                updateCounts();
-                applyFilters();
-                updateProfileStats();
-                renderExcludedVerbs();
-                
-                modal.classList.add('hidden');
-            } catch (e) {
-                console.error("Failed to save changes", e);
-            } finally {
-                saveBtn.innerText = originalText;
-                saveBtn.disabled = false;
-                pendingUnexclude.clear();
-            }
-        }
-
-        function renderExcludedVerbs() {
-            const modalContainer = document.getElementById('modalExcludedList');
-            const badge = document.getElementById('excludedBadgeCount');
-            
-            if (badge) {
-                badge.innerText = excludedVerbs.size;
-                if (excludedVerbs.size > 0) {
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
-
-            if (!modalContainer) return;
-
-            if (excludedVerbs.size === 0) {
-                modalContainer.innerHTML = '<p class="text-xs text-gray-400 italic w-full text-center py-4">No excluded verbs</p>';
-                return;
-            }
-
-            modalContainer.innerHTML = Array.from(excludedVerbs).sort().map(word => {
-                const isPending = pendingUnexclude.has(word);
-                return `
-                    <div onclick="togglePendingUnexclude('${word}')" 
-                         class="group flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${isPending ? 'bg-red-50 border-red-200 opacity-50' : 'bg-white/50 border-gray-200 hover:bg-red-50 hover:border-red-100'}">
-                        <span class="text-xs font-bold ${isPending ? 'text-red-400 line-through' : 'text-gray-600 group-hover:text-red-500'}">${word}</span>
-                        <i class="fas ${isPending ? 'fa-undo text-red-300' : 'fa-times text-gray-400 group-hover:text-red-300'} text-[10px]"></i>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function togglePendingUnexclude(word) {
-            if (pendingUnexclude.has(word)) {
-                pendingUnexclude.delete(word);
-            } else {
-                pendingUnexclude.add(word);
-            }
-            renderExcludedVerbs();
-        }
-
-        // Keep this for direct toggle from main list, but ensure it clears pending if used
-        async function unexcludeVerb(word) {
-            try {
-                const res = await fetch('/api/exclude', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ verb: word, exclude: false })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    excludedVerbs.delete(word);
-                    // Sync to LocalStorage
-                    localStorage.setItem('excludedVerbs', JSON.stringify([...excludedVerbs]));
-                    
-                    renderExcludedVerbs();
-                    updateCounts();
-                    applyFilters();
-                    updateProfileStats(); // Sync profile stats immediately
-                }
-            } catch (e) {
-                console.error("Failed to unexclude verb", e);
-            }
-        }
         
         function closeSettings(fromPopState = false) {
             if (fromPopState !== true) {
@@ -10041,13 +9671,12 @@
                     }
                     if (statusEl) statusEl.innerText = 'Preparing backup...';
                     
-                    const excludedVerbsList = Array.from(excludedVerbs).join(',');
                     let blob;
                     try {
                         const timeoutMs = 4000;
                         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs));
                         const res = await Promise.race([
-                            fetch(`/api/export?excluded_verbs=${encodeURIComponent(excludedVerbsList)}`),
+                            fetch('/api/export'),
                             timeout
                         ]);
                         if (!res || !res.ok) throw new Error('Export failed');
@@ -10062,8 +9691,7 @@
                             const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
                             const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
                             const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
-                            const excluded = Array.from(excludedVerbs || []);
-                            const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
+                            const exportData = { explanations, progress, checkins, extra_vocabulary, settings };
                             blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
                         } catch (localErr) {
                             throw localErr;
@@ -10356,17 +9984,6 @@
                         const result = await res.json();
                         
                         if (result.status === 'success') {
-                            // Restore excluded verbs if returned
-                            if (result.excluded_verbs) {
-                                try {
-                                    const verbs = result.excluded_verbs.split(',').filter(v => v);
-                                    excludedVerbs = new Set(verbs);
-                                    localStorage.setItem('excludedVerbs', JSON.stringify(Array.from(excludedVerbs)));
-                                } catch (e) {
-                                    console.warn("Failed to restore excluded verbs", e);
-                                }
-                            }
-                            
                             // Use custom modal for success message instead of alert
                             showResetConfirmation(); // Reuse the reset confirmation modal structure but for success message
                             const resetModal = document.getElementById('resetConfirmModal');
@@ -10692,10 +10309,17 @@
                         // Hide learn button after marking as learned
                         document.getElementById('studyModeControls')?.classList.add('hidden');
                         
-                        // Update background grid
-                        if (currentPage === 'review') renderReviewPage();
+                        // Update background grid (skip updateCounts since we already called it above)
+                        if (currentPage === 'review') renderReviewPage(true);
                         else renderGrid();
                         return;
+                    }
+                    
+                    // Immediately update the review page text to sync with badge
+                    // (skip updateCounts since we already called it above)
+                    if (currentPage === 'review') {
+                        // renderReviewPage will only update text if "Start Review" screen is showing
+                        renderReviewPage(true);
                     }
                     
                     if (currentFreq.includes('review') || currentPage === 'review') {
@@ -10744,9 +10368,8 @@
                                     
                                     // Open next word without closing modal (just switch content)
                                     openVerb(nextVerbToReview, true);
-                                    // Re-render background UI
-                                    if (currentPage === 'review') renderReviewPage();
-                                    else renderGrid(true); 
+                                    // Note: renderReviewPage() already called above for immediate UI sync
+                                    if (currentPage !== 'review') renderGrid(true); 
                                 } else {
                                     // No more words to review, close modal
                                     closeModal();
@@ -11084,9 +10707,8 @@
                     const checkins = window.db && window.db.checkins ? await window.db.checkins.toArray() : [];
                     const extra_vocabulary = window.db && window.db.extra_vocabulary ? await window.db.extra_vocabulary.toArray() : [];
                     const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
-                    const excluded = JSON.parse(localStorage.getItem('excludedVerbs') || '[]');
                     
-                    const exportData = { explanations, progress, checkins, extra_vocabulary, settings, excluded };
+                    const exportData = { explanations, progress, checkins, extra_vocabulary, settings };
                     blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
                 }
                 
@@ -11198,14 +10820,7 @@
                         return;
                     }
                     
-                    // 3. Close Excluded Modal if open
-                    const excludedModal = document.getElementById('excludedModal');
-                    if (excludedModal && !excludedModal.classList.contains('hidden')) {
-                        closeExcludedModal();
-                        return;
-                    }
-
-                    // 3.5 Close Analytics Modal if open
+                    // 3. Close Analytics Modal if open
                     const analyticsModal = document.getElementById('analyticsModal');
                     if (analyticsModal && !analyticsModal.classList.contains('hidden')) {
                         closeAnalytics();
