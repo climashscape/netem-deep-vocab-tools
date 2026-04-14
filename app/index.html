@@ -391,12 +391,17 @@
         /* Smaller buttons for actions */
         .neumorphic-btn-sm {
             background: #e0e5ec;
-            box-shadow: 3px 3px 6px 0 rgba(163,177,198, 0.7), 
+            box-shadow: 3px 3px 6px 0 rgba(163,177,198, 0.7),
                        -3px -3px 6px 0 rgba(255,255,255, 0.8);
             border-radius: 50px;
             transition: all 0.2s ease-in-out;
-            color: #4a5568;
-            cursor: pointer;
+        }
+
+        /* Progress Reset Buttons - Pressed State */
+        .progress-btn:active {
+            box-shadow: inset 2px 2px 5px rgba(163,177,198,0.6), inset -2px -2px 5px rgba(255,255,255,0.7) !important;
+            transform: scale(0.92);
+            color: #374151 !important;
         }
 
         /* Chip Buttons for Filters */
@@ -567,6 +572,7 @@
             box-shadow: 4px 4px 8px rgba(163,177,198,0.6), 
                        -4px -4px 8px rgba(255,255,255,0.9);
         }
+
         .exclude-confirm-btn {
             background: #e0e5ec;
             box-shadow: 3px 3px 6px rgba(163,177,198,0.5), 
@@ -1778,12 +1784,21 @@
                     <div id="modalPhonetic" class="text-[10px] font-black text-gray-400 mt-0.5 flex items-center gap-2 tracking-wider uppercase min-h-[22px]"></div>
                 </div>
                 <!-- Refresh Button -->
-                <button id="refreshBtn" onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all">
+                <button id="refreshBtn" onclick="refreshExplanation()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 transition-all duration-100 active:scale-90 active:shadow-[inset_3px_3px_6px_rgba(163,177,198,0.6),inset_-3px_-3px_6px_rgba(255,255,255,0.7)]">
                     <i class="fas fa-sync-alt"></i>
                 </button>
-                <button id="priorityBtn" onclick="retreatToStage1()" class="absolute top-3 right-4 w-10 h-10 rounded-xl neumorphic flex items-center justify-center text-blue-500 active:scale-95 transition-all" style="display: none;" aria-label="重点记忆" title="重点记忆：退回到 Stage 1">
-                    <i class="fas fa-undo"></i>
-                </button>
+                <!-- Progress Reset Buttons (3 independent buttons) -->
+                <div id="priorityBtnContainer" class="absolute top-3 right-4 flex gap-1.5" style="display: none;">
+                    <button id="resetStep1Btn" onclick="resetToStep1()" class="progress-btn w-9 h-9 rounded-lg flex items-center justify-center text-gray-500 transition-all duration-100" style="background: #e0e5ec; box-shadow: 3px 3px 6px rgba(163,177,198,0.5), -3px -3px 6px rgba(255,255,255,0.7);" aria-label="重置到 Step 1" title="重置到 Step 1">
+                        <i class="fas fa-undo text-xs"></i>
+                    </button>
+                    <button id="retreatBtn" onclick="retreatSteps()" class="progress-btn w-9 h-9 rounded-lg flex items-center justify-center text-gray-500 transition-all duration-100" style="background: #e0e5ec; box-shadow: 3px 3px 6px rgba(163,177,198,0.5), -3px -3px 6px rgba(255,255,255,0.7);" aria-label="往前拨 1-3 步" title="往前拨 1-3 步">
+                        <i class="fas fa-backward text-xs"></i>
+                    </button>
+                    <button id="masterBtn" onclick="setToMaster()" class="progress-btn w-9 h-9 rounded-lg flex items-center justify-center text-gray-500 transition-all duration-100" style="background: #e0e5ec; box-shadow: 3px 3px 6px rgba(163,177,198,0.5), -3px -3px 6px rgba(255,255,255,0.7);" aria-label="直接掌握" title="直接掌握 (Step 9)">
+                        <i class="fas fa-check-double text-xs"></i>
+                    </button>
+                </div>
             </div>
             
             <!-- Content Area (The Stage) -->
@@ -5836,6 +5851,159 @@
             if (window.setLastOverlayCloseTime) window.setLastOverlayCloseTime(Date.now());
         }
 
+        // ==================== Progress Reset Functions ====================
+        
+        // Stage intervals in minutes (same as EBBINGHAUS_STAGES)
+        const STAGE_INTERVALS = [5, 30, 720, 1440, 2880, 5760, 10080, 21600, 43200];
+        
+        function getNextReviewTime(stage) {
+            const date = new Date();
+            date.setMinutes(date.getMinutes() + STAGE_INTERVALS[stage - 1]);
+            return date.toISOString();
+        }
+        
+        function updateStageBadge(stage, status) {
+            const stageBadge = document.getElementById('modalStageBadge');
+            if (!stageBadge) return;
+            
+            if (status === 'mastered') {
+                stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[70] transition-all duration-300 bg-green-100 text-green-600";
+                stageBadge.innerText = "Mastered";
+            } else {
+                stageBadge.className = "absolute bottom-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm z-[70] transition-all duration-300 bg-blue-100 text-blue-600";
+                stageBadge.innerText = "Stage " + stage;
+            }
+        }
+        
+        // Helper: Go to next word in review mode
+        function goToNextReviewWord() {
+            if (!isReviewMode || !spellingWord) return;
+            
+            const key = spellingWord.toLowerCase();
+            const list = reviewVerbsList || [];
+            const currentIdx = list.findIndex(v => (v.word || v['单词']).toLowerCase() === key);
+            
+            // Find next word that is not mastered (skip time check since we're in active session)
+            let nextVerb = null;
+            
+            // Search forward from current position
+            for (let i = currentIdx + 1; i < list.length; i++) {
+                const v = list[i];
+                const word = (v.word || v['单词']);
+                const wordKey = word.toLowerCase();
+                const status = learningStatus[wordKey];
+                // Skip if mastered, otherwise include
+                if (!status || status.status !== 'mastered') {
+                    nextVerb = word;
+                    break;
+                }
+            }
+            
+            // Wrap around to beginning
+            if (!nextVerb) {
+                for (let i = 0; i < currentIdx; i++) {
+                    const v = list[i];
+                    const word = (v.word || v['单词']);
+                    const wordKey = word.toLowerCase();
+                    const status = learningStatus[wordKey];
+                    if (!status || status.status !== 'mastered') {
+                        nextVerb = word;
+                        break;
+                    }
+                }
+            }
+            
+            setTimeout(() => {
+                if (nextVerb) {
+                    if (window.globalResetPressedState) window.globalResetPressedState();
+                    openVerb(nextVerb, true);
+                    renderReviewPage();
+                } else {
+                    closeModal();
+                    if (window.globalResetPressedState) window.globalResetPressedState();
+                    renderReviewSummary();
+                }
+            }, 300);
+        }
+        
+        // 1. Reset to Step 1
+        async function resetToStep1() {
+            if (!isReviewMode || !spellingWord) return;
+            
+            const key = spellingWord.toLowerCase();
+            const nowIso = new Date().toISOString();
+            const nextReviewIso = getNextReviewTime(1);
+            const prev = learningStatus[key] || {};
+            
+            learningStatus[key] = {
+                stage: 1,
+                last_review: nowIso,
+                next_review: nextReviewIso,
+                status: 'learning',
+                review_count: (prev.review_count || 0) + 1
+            };
+            
+            await window.DB.updateProgress(key, 1, nowIso, nextReviewIso, 'learning', (prev.review_count || 0) + 1);
+            updateStageBadge(1, 'learning');
+            updateCounts();
+            goToNextReviewWord();
+        }
+        
+        // 2. Retreat 1-3 steps (往更小的 step 方向)
+        async function retreatSteps() {
+            if (!isReviewMode || !spellingWord) return;
+            
+            const key = spellingWord.toLowerCase();
+            const prev = learningStatus[key];
+            if (!prev) {
+                resetToStep1();
+                return;
+            }
+            
+            const currentStage = prev.stage || 1;
+            const retreatAmount = Math.min(Math.floor(Math.random() * 3) + 1, currentStage - 1); // 1-3步，但不超过当前stage
+            const newStage = Math.max(1, currentStage - retreatAmount);
+            
+            const nowIso = new Date().toISOString();
+            const nextReviewIso = getNextReviewTime(newStage);
+            
+            learningStatus[key] = {
+                stage: newStage,
+                last_review: nowIso,
+                next_review: nextReviewIso,
+                status: 'learning',
+                review_count: (prev.review_count || 0) + 1
+            };
+            
+            await window.DB.updateProgress(key, newStage, nowIso, nextReviewIso, 'learning', (prev.review_count || 0) + 1);
+            updateStageBadge(newStage, 'learning');
+            updateCounts();
+            goToNextReviewWord();
+        }
+        
+        // 3. Set to Master (Step 9)
+        async function setToMaster() {
+            if (!isReviewMode || !spellingWord) return;
+            
+            const key = spellingWord.toLowerCase();
+            const nowIso = new Date().toISOString();
+            const nextReviewIso = getNextReviewTime(9);
+            const prev = learningStatus[key] || {};
+            
+            learningStatus[key] = {
+                stage: 9,
+                last_review: nowIso,
+                next_review: nextReviewIso,
+                status: 'mastered',
+                review_count: (prev.review_count || 0) + 1
+            };
+            
+            await window.DB.updateProgress(key, 9, nowIso, nextReviewIso, 'mastered', (prev.review_count || 0) + 1);
+            updateStageBadge(9, 'mastered');
+            updateCounts();
+            goToNextReviewWord();
+        }
+
         function loadMoreVerbs() {
             if (offset < displayedVerbs.length && !isLoading) {
                 renderGrid(false);
@@ -6214,9 +6382,9 @@
                     refreshBtn.style.display = ''; // Reset to default
                 }
             }
-            const priorityBtn = document.getElementById('priorityBtn');
-            if (priorityBtn) {
-                priorityBtn.style.display = isReviewMode ? '' : 'none';
+            const priorityBtnContainer = document.getElementById('priorityBtnContainer');
+            if (priorityBtnContainer) {
+                priorityBtnContainer.style.display = isReviewMode ? 'flex' : 'none';
             }
 
             // Show/Hide Review Controls (the bottom buttons like "Mark as Learned" or "Already Mastered")
@@ -6876,7 +7044,7 @@
                                         const refreshBtnHtml = `
                                             <button 
                                                 onclick="refreshFromCard(event, '${originalWord}')"
-                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100"
+                                                class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-blue-500 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all shadow-sm z-10 border border-blue-100 active:scale-90 active:bg-blue-50"
                                                 title="Refresh explanation"
                                             >
                                                 <i class="fas fa-sync-alt text-xs"></i>
@@ -8299,6 +8467,9 @@
         const apiCheckStatus = document.getElementById('apiCheckStatus');
 
         async function openRefreshConfirmModal(verb, onConfirm) {
+            // Prevent duplicate opens
+            if (!refreshConfirmModal.classList.contains('hidden')) return;
+            
             confirmVerbSpan.innerText = verb;
             
             // Check API settings
@@ -8342,8 +8513,6 @@
 
             pushModalState(closeRefreshConfirmModal);
             refreshConfirmModal.classList.remove('hidden');
-            // Trigger reflow for transition
-            void refreshConfirmModal.offsetWidth;
             refreshConfirmModal.classList.remove('opacity-0');
             refreshConfirmModal.querySelector('div').classList.remove('scale-95');
             refreshConfirmModal.querySelector('div').classList.add('scale-100');
@@ -8363,18 +8532,13 @@
 
         function closeRefreshConfirmModal(fromPopState = false) {
             if (fromPopState !== true) {
-                // const idx = modalStack.indexOf(closeRefreshConfirmModal);
-                // if (idx > -1) modalStack.splice(idx, 1);
                 history.back();
             }
+            refreshConfirmModal.classList.add('hidden');
             refreshConfirmModal.classList.add('opacity-0');
             refreshConfirmModal.querySelector('div').classList.remove('scale-100');
             refreshConfirmModal.querySelector('div').classList.add('scale-95');
-            
-            setTimeout(() => {
-                refreshConfirmModal.classList.add('hidden');
-                confirmRefreshBtn.onclick = null; // Clean up
-            }, 300);
+            confirmRefreshBtn.onclick = null;
         }
         // Auto Image Generation Queue Logic
         function addToQueue(verb) {
