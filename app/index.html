@@ -9041,15 +9041,18 @@
                     spellingInput.style.opacity = '1';
                     spellingInput.style.visibility = 'visible';
                     
-                    setTimeout(() => {
-                        spellingInput.focus();
-                        // Keyboard.show() must be called AFTER focus() is effective
-                        setTimeout(() => {
-                            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
-                                window.Capacitor.Plugins.Keyboard.show();
-                            }
-                        }, 50);
-                    }, 100);
+                    // Use requestAnimationFrame for more reliable focus on Android
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            spellingInput.focus();
+                            // Keyboard.show() must be called AFTER focus() is effective
+                            setTimeout(() => {
+                                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
+                                    window.Capacitor.Plugins.Keyboard.show();
+                                }
+                            }, 50);
+                        });
+                    });
                 }
             }
         }
