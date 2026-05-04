@@ -6943,6 +6943,9 @@
             // Wait for modal fade-out transition before resetting internal state
             // This prevents "flashing" of content as modes change
             setTimeout(() => {
+                // CRITICAL: If modal was reopened during the 300ms delay, do NOT clear state
+                if (modal.classList.contains('active')) return;
+
                 // Now it's safe to remove mode classes and reset flags
                 modal.classList.remove('peek-active'); 
                 modal.classList.remove('peek-releasing');
@@ -8998,15 +9001,6 @@
                     modalTitle.innerText = modalTitle.dataset.realWord;
                 }
             }
-            
-            // Keep spelling input focused to maintain keyboard open
-            // Use setTimeout to ensure focus happens after event processing
-            const spellingInput = document.getElementById('spellingInput');
-            if (spellingInput) {
-                setTimeout(() => {
-                    spellingInput.focus();
-                }, 10);
-            }
         }
 
         function handlePeekEnd(event) {
@@ -9025,6 +9019,14 @@
                 const modalTitle = document.getElementById('modalTitle');
                 if (modalTitle && modalTitle.dataset.realWord) {
                     modalTitle.innerText = '*'.repeat(modalTitle.dataset.realWord.length);
+                }
+                
+                // Refocus spelling input after releasing peek so user can continue typing
+                const spellingInput = document.getElementById('spellingInput');
+                if (spellingInput) {
+                    setTimeout(() => {
+                        spellingInput.focus();
+                    }, 10);
                 }
                 
                 clearTimeout(peekReleaseTimer);
