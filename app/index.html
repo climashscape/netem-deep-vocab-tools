@@ -9021,9 +9021,6 @@
             const modal = document.getElementById('learningModal');
             if (modal && modal.classList.contains('peek-active')) {
                 modal.classList.remove('peek-active');
-                // NOTE: Do NOT add peek-releasing class here!
-                // peek-releasing sets pointer-events: none on essenceContainer,
-                // which prevents the spelling input from receiving focus.
                 
                 // Restore asterisks in title after peek
                 const modalTitle = document.getElementById('modalTitle');
@@ -9031,23 +9028,45 @@
                     modalTitle.innerText = '*'.repeat(modalTitle.dataset.realWord.length);
                 }
 
-                // Refocus spelling input after releasing peek so user can continue typing
-                // On Android, focus() from touchend is blocked by browser security
-                // Solution: Simulate a real click on the input to trigger focus + keyboard
-                const spellingInput = document.getElementById('spellingInput');
-                if (spellingInput) {
-                    // Force pointer-events: auto on the input and its parent containers
-                    spellingInput.style.pointerEvents = 'auto';
-                    const spellingContainer = document.getElementById('spellingContainer');
-                    if (spellingContainer) spellingContainer.style.pointerEvents = 'auto';
-                    const essenceContainer = document.getElementById('essenceContainer');
-                    if (essenceContainer) essenceContainer.style.pointerEvents = 'auto';
-                    
-                    // Simulate a real user click - this bypasses Android's touch-to-focus restrictions
-                    setTimeout(() => {
-                        spellingInput.click();
-                    }, 150);
-                }
+                // Refocus spelling input after releasing peek
+                // Key insight: Android WebView only allows focus from real user gestures
+                // We must dispatch a trusted touch event to satisfy this requirement
+                setTimeout(() => {
+                    const spellingInput = document.getElementById('spellingInput');
+                    if (spellingInput) {
+                        // Create a touch event that simulates user touching the input
+                        const touchObj = new Touch({
+                            identifier: Date.now(),
+                            target: spellingInput,
+                            clientX: spellingInput.getBoundingClientRect().left + 10,
+                            clientY: spellingInput.getBoundingClientRect().top + 10,
+                            radiusX: 2.5,
+                            radiusY: 2.5,
+                            rotationAngle: 0,
+                            force: 0.5
+                        });
+                        
+                        const touchStartEvent = new TouchEvent('touchstart', {
+                            cancelable: true,
+                            bubbles: true,
+                            touches: [touchObj],
+                            targetTouches: [touchObj],
+                            changedTouches: [touchObj]
+                        });
+                        
+                        const touchEndEvent = new TouchEvent('touchend', {
+                            cancelable: true,
+                            bubbles: true,
+                            touches: [],
+                            targetTouches: [],
+                            changedTouches: [touchObj]
+                        });
+                        
+                        spellingInput.dispatchEvent(touchStartEvent);
+                        spellingInput.dispatchEvent(touchEndEvent);
+                        spellingInput.focus();
+                    }
+                }, 100);
             }
         }
 
