@@ -9029,27 +9029,19 @@
                 }
 
                 // Refocus spelling input after releasing peek
-                // Trick: Append a hidden dummy element to trigger DOM change, then remove it
-                // This satisfies Android's DOM-change requirement without visual flicker
+                // Solution: Clone the input element and replace it with the clone
+                // This triggers DOM change without visual flicker (clone looks identical)
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
                     const savedValue = spellingInput.value;
-                    const parent = spellingInput.parentElement;
+                    const clone = spellingInput.cloneNode(true);
+                    clone.value = savedValue;
+                    spellingInput.parentNode.replaceChild(clone, spellingInput);
                     
-                    // Create and immediately remove a dummy element to trigger DOM change
-                    const dummy = document.createElement('span');
-                    dummy.style.display = 'none';
-                    parent.appendChild(dummy);
-                    
-                    requestAnimationFrame(() => {
-                        dummy.remove();
-                        // Restore value if needed
-                        spellingInput.value = savedValue;
-                        // Focus
-                        setTimeout(() => {
-                            spellingInput.focus();
-                        }, 50);
-                    });
+                    // Focus the clone after a short delay
+                    setTimeout(() => {
+                        clone.focus();
+                    }, 50);
                 }
             }
         }
