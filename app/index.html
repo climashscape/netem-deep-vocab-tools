@@ -9030,11 +9030,12 @@
                 }
                 
                 // Refocus spelling input after releasing peek so user can continue typing
+                // Use same delay as modal open (100ms) to ensure input method activates properly
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
                     setTimeout(() => {
                         spellingInput.focus();
-                    }, 10);
+                    }, 100);
                 }
                 
                 clearTimeout(peekReleaseTimer);
