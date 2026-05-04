@@ -9021,7 +9021,9 @@
             const modal = document.getElementById('learningModal');
             if (modal && modal.classList.contains('peek-active')) {
                 modal.classList.remove('peek-active');
-                modal.classList.add('peek-releasing');
+                // NOTE: Do NOT add peek-releasing class here!
+                // peek-releasing sets pointer-events: none on essenceContainer,
+                // which prevents the spelling input from receiving focus.
                 
                 // Restore asterisks in title after peek
                 const modalTitle = document.getElementById('modalTitle');
@@ -9037,7 +9039,6 @@
                     setTimeout(() => {
                         spellingInput.focus();
                         // Keyboard.show() must be called AFTER focus() is effective
-                        // Add a small delay to ensure focus is established
                         setTimeout(() => {
                             if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
                                 window.Capacitor.Plugins.Keyboard.show();
@@ -9045,11 +9046,6 @@
                         }, 50);
                     }, 100);
                 }
-
-                clearTimeout(peekReleaseTimer);
-                peekReleaseTimer = setTimeout(() => {
-                    modal.classList.remove('peek-releasing');
-                }, 300);
             }
         }
 
