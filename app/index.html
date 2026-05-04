@@ -9032,27 +9032,21 @@
                 }
 
                 // Refocus spelling input after releasing peek so user can continue typing
-                // On Android, focus() from touchend doesn't activate keyboard
-                // Solution: Use Capacitor Keyboard.show() API to explicitly show keyboard
+                // On Android, focus() from touchend is blocked by browser security
+                // Solution: Simulate a real click on the input to trigger focus + keyboard
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
-                    // Force pointer-events: auto on the input to override any parent restrictions
+                    // Force pointer-events: auto on the input and its parent containers
                     spellingInput.style.pointerEvents = 'auto';
-                    spellingInput.style.opacity = '1';
-                    spellingInput.style.visibility = 'visible';
+                    const spellingContainer = document.getElementById('spellingContainer');
+                    if (spellingContainer) spellingContainer.style.pointerEvents = 'auto';
+                    const essenceContainer = document.getElementById('essenceContainer');
+                    if (essenceContainer) essenceContainer.style.pointerEvents = 'auto';
                     
-                    // Use requestAnimationFrame for more reliable focus on Android
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            spellingInput.focus();
-                            // Keyboard.show() must be called AFTER focus() is effective
-                            setTimeout(() => {
-                                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
-                                    window.Capacitor.Plugins.Keyboard.show();
-                                }
-                            }, 50);
-                        });
-                    });
+                    // Simulate a real user click - this bypasses Android's touch-to-focus restrictions
+                    setTimeout(() => {
+                        spellingInput.click();
+                    }, 150);
                 }
             }
         }
