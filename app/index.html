@@ -1904,24 +1904,6 @@
             <!-- Title, Phonetic & Actions Row -->
             <div class="px-4 pt-0 pb-1.5 shrink-0 w-full flex items-center gap-3" style="background:var(--bg-secondary);">
                 <div class="flex flex-col items-start min-w-0 flex-1">
-                    <!-- Hidden word indicator for review mode -->
-                    <div id="hiddenWordIndicator" class="hidden w-full flex items-center justify-center py-1 cursor-pointer" onclick="const title=document.getElementById('modalTitle'); playAudio(event, title.dataset.realWord, 1)">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--text-secondary)" stroke="none">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--text-secondary)" stroke="none" class="ml-1">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--text-secondary)" stroke="none" class="ml-1">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--text-secondary)" stroke="none" class="ml-1">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--text-secondary)" stroke="none" class="ml-1">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                    </div>
                     <h2 id="modalTitle" class="text-[22px] font-bold text-[var(--text-primary)] capitalize truncate w-full cursor-pointer" onclick="playAudio(event, this.dataset.realWord || this.innerText, 1)"></h2>
                     <div id="modalPhonetic" class="text-[11px] font-medium text-[var(--text-tertiary)] mt-0.5 flex items-center gap-2 tracking-wider uppercase min-h-[20px]"></div>
                 </div>
@@ -6690,17 +6672,13 @@
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
             }
 
-            // Set title: show asterisk icons in review mode, real word otherwise
-            const hiddenIndicator = document.getElementById('hiddenWordIndicator');
+            // Set title: show asterisks in review mode, real word otherwise
             if (isReview) {
                 modalTitle.dataset.realWord = verb;
-                modalTitle.classList.add('hidden');
-                if (hiddenIndicator) hiddenIndicator.classList.remove('hidden');
+                modalTitle.innerText = '*'.repeat(verb.length);
             } else {
                 modalTitle.dataset.realWord = '';
                 modalTitle.innerText = verb;
-                modalTitle.classList.remove('hidden');
-                if (hiddenIndicator) hiddenIndicator.classList.add('hidden');
             }
             
             // Clear and show skeletons immediately to avoid layout jump
@@ -9016,11 +8994,8 @@
                 
                 // Show real word in title during peek
                 const modalTitle = document.getElementById('modalTitle');
-                const hiddenIndicator = document.getElementById('hiddenWordIndicator');
                 if (modalTitle && modalTitle.dataset.realWord) {
                     modalTitle.innerText = modalTitle.dataset.realWord;
-                    modalTitle.classList.remove('hidden');
-                    if (hiddenIndicator) hiddenIndicator.classList.add('hidden');
                 }
             }
             
@@ -9046,12 +9021,10 @@
                 modal.classList.remove('peek-active');
                 modal.classList.add('peek-releasing');
                 
-                // Restore hidden state after peek
+                // Restore asterisks in title after peek
                 const modalTitle = document.getElementById('modalTitle');
-                const hiddenIndicator = document.getElementById('hiddenWordIndicator');
                 if (modalTitle && modalTitle.dataset.realWord) {
-                    modalTitle.classList.add('hidden');
-                    if (hiddenIndicator) hiddenIndicator.classList.remove('hidden');
+                    modalTitle.innerText = '*'.repeat(modalTitle.dataset.realWord.length);
                 }
                 
                 clearTimeout(peekReleaseTimer);
