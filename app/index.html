@@ -9029,44 +9029,22 @@
                 }
 
                 // Refocus spelling input after releasing peek
-                // Key insight: Android WebView only allows focus from real user gestures
-                // We must dispatch a trusted touch event to satisfy this requirement
-                setTimeout(() => {
-                    const spellingInput = document.getElementById('spellingInput');
-                    if (spellingInput) {
-                        // Create a touch event that simulates user touching the input
-                        const touchObj = new Touch({
-                            identifier: Date.now(),
-                            target: spellingInput,
-                            clientX: spellingInput.getBoundingClientRect().left + 10,
-                            clientY: spellingInput.getBoundingClientRect().top + 10,
-                            radiusX: 2.5,
-                            radiusY: 2.5,
-                            rotationAngle: 0,
-                            force: 0.5
-                        });
-                        
-                        const touchStartEvent = new TouchEvent('touchstart', {
-                            cancelable: true,
-                            bubbles: true,
-                            touches: [touchObj],
-                            targetTouches: [touchObj],
-                            changedTouches: [touchObj]
-                        });
-                        
-                        const touchEndEvent = new TouchEvent('touchend', {
-                            cancelable: true,
-                            bubbles: true,
-                            touches: [],
-                            targetTouches: [],
-                            changedTouches: [touchObj]
-                        });
-                        
-                        spellingInput.dispatchEvent(touchStartEvent);
-                        spellingInput.dispatchEvent(touchEndEvent);
-                        spellingInput.focus();
-                    }
-                }, 100);
+                // Key insight: Re-rendering the input HTML triggers the same behavior as modal open
+                const essenceWrapper = document.getElementById('essenceContentWrapper');
+                if (essenceWrapper) {
+                    // Save current HTML
+                    const currentHtml = essenceWrapper.innerHTML;
+                    // Clear and re-render to trigger DOM change
+                    essenceWrapper.innerHTML = '';
+                    setTimeout(() => {
+                        essenceWrapper.innerHTML = currentHtml;
+                        // Now focus should work like modal open
+                        setTimeout(() => {
+                            const input = document.getElementById('spellingInput');
+                            if (input) input.focus();
+                        }, 100);
+                    }, 10);
+                }
             }
         }
 
