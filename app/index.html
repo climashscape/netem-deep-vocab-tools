@@ -9029,20 +9029,25 @@
                 }
 
                 // Refocus spelling input after releasing peek
-                // Key insight: Re-rendering the input HTML triggers the same behavior as modal open
+                // Save input value before any DOM manipulation
+                const spellingInput = document.getElementById('spellingInput');
+                const savedValue = spellingInput ? spellingInput.value : '';
+                
+                // Use opacity:0 instead of clearing to avoid flicker
                 const essenceWrapper = document.getElementById('essenceContentWrapper');
                 if (essenceWrapper) {
-                    // Save current HTML
-                    const currentHtml = essenceWrapper.innerHTML;
-                    // Clear and re-render to trigger DOM change
-                    essenceWrapper.innerHTML = '';
+                    essenceWrapper.style.opacity = '0';
                     setTimeout(() => {
-                        essenceWrapper.innerHTML = currentHtml;
-                        // Now focus should work like modal open
+                        essenceWrapper.style.opacity = '1';
+                        // Restore input value
+                        const newInput = document.getElementById('spellingInput');
+                        if (newInput && savedValue) {
+                            newInput.value = savedValue;
+                        }
+                        // Focus
                         setTimeout(() => {
-                            const input = document.getElementById('spellingInput');
-                            if (input) input.focus();
-                        }, 100);
+                            if (newInput) newInput.focus();
+                        }, 50);
                     }, 10);
                 }
             }
