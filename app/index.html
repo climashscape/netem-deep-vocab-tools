@@ -9029,26 +9029,27 @@
                 }
 
                 // Refocus spelling input after releasing peek
-                // Save input value before any DOM manipulation
+                // Trick: Append a hidden dummy element to trigger DOM change, then remove it
+                // This satisfies Android's DOM-change requirement without visual flicker
                 const spellingInput = document.getElementById('spellingInput');
-                const savedValue = spellingInput ? spellingInput.value : '';
-                
-                // Use opacity:0 instead of clearing to avoid flicker
-                const essenceWrapper = document.getElementById('essenceContentWrapper');
-                if (essenceWrapper) {
-                    essenceWrapper.style.opacity = '0';
-                    setTimeout(() => {
-                        essenceWrapper.style.opacity = '1';
-                        // Restore input value
-                        const newInput = document.getElementById('spellingInput');
-                        if (newInput && savedValue) {
-                            newInput.value = savedValue;
-                        }
+                if (spellingInput) {
+                    const savedValue = spellingInput.value;
+                    const parent = spellingInput.parentElement;
+                    
+                    // Create and immediately remove a dummy element to trigger DOM change
+                    const dummy = document.createElement('span');
+                    dummy.style.display = 'none';
+                    parent.appendChild(dummy);
+                    
+                    requestAnimationFrame(() => {
+                        dummy.remove();
+                        // Restore value if needed
+                        spellingInput.value = savedValue;
                         // Focus
                         setTimeout(() => {
-                            if (newInput) newInput.focus();
+                            spellingInput.focus();
                         }, 50);
-                    }, 10);
+                    });
                 }
             }
         }
