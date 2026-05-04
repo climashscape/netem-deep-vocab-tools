@@ -9036,6 +9036,11 @@
                 // Solution: Use Capacitor Keyboard.show() API to explicitly show keyboard
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
+                    // Force pointer-events: auto on the input to override any parent restrictions
+                    spellingInput.style.pointerEvents = 'auto';
+                    spellingInput.style.opacity = '1';
+                    spellingInput.style.visibility = 'visible';
+                    
                     setTimeout(() => {
                         spellingInput.focus();
                         // Keyboard.show() must be called AFTER focus() is effective
