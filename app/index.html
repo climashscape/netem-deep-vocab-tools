@@ -1137,7 +1137,10 @@
         .dark .appearance-card:hover, .dark .appearance-card:focus { background: var(--fill-tertiary) !important; }
 
         /* --- Learning Modal Review Mode --- */
-        #learningModal.is-review-mode #modalTitle,
+        #learningModal.is-review-mode #modalTitle {
+            color: transparent !important;
+            text-shadow: 0 0 0 var(--text-tertiary);
+        }
         #learningModal.is-review-mode .result-card {
             opacity: 0 !important;
             pointer-events: none !important;
@@ -1908,7 +1911,7 @@
             <!-- Title, Phonetic & Actions Row -->
             <div class="px-4 pt-0 pb-1.5 shrink-0 w-full flex items-center gap-3" style="background:var(--bg-secondary);">
                 <div class="flex flex-col items-start min-w-0 flex-1">
-                    <h2 id="modalTitle" class="text-[22px] font-bold text-[var(--text-primary)] capitalize truncate w-full cursor-pointer" onclick="playAudio(event, this.innerText, 1)"></h2>
+                    <h2 id="modalTitle" class="text-[22px] font-bold text-[var(--text-primary)] capitalize truncate w-full cursor-pointer" onclick="playAudio(event, this.dataset.realWord || this.innerText, 1)"></h2>
                     <div id="modalPhonetic" class="text-[11px] font-medium text-[var(--text-tertiary)] mt-0.5 flex items-center gap-2 tracking-wider uppercase min-h-[20px]"></div>
                 </div>
                 <!-- Refresh Button -->
@@ -6676,7 +6679,14 @@
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
             }
 
-            modalTitle.innerText = verb;
+            // Set title: show asterisks in review mode, real word otherwise
+            if (isReviewMode) {
+                modalTitle.dataset.realWord = verb;
+                modalTitle.innerText = '*'.repeat(verb.length);
+            } else {
+                modalTitle.dataset.realWord = '';
+                modalTitle.innerText = verb;
+            }
             
             // Clear and show skeletons immediately to avoid layout jump
             const phoneticContainer = document.getElementById('modalPhonetic');
@@ -8988,6 +8998,12 @@
                     modal.classList.remove('peek-releasing');
                     modal.classList.add('peek-active');
                 });
+                
+                // Show real word in title during peek
+                const modalTitle = document.getElementById('modalTitle');
+                if (modalTitle && modalTitle.dataset.realWord) {
+                    modalTitle.innerText = modalTitle.dataset.realWord;
+                }
             }
             
             // Keep spelling input focused to maintain keyboard open
@@ -9011,6 +9027,13 @@
             if (modal && modal.classList.contains('peek-active')) {
                 modal.classList.remove('peek-active');
                 modal.classList.add('peek-releasing');
+                
+                // Restore asterisks in title after peek
+                const modalTitle = document.getElementById('modalTitle');
+                if (modalTitle && modalTitle.dataset.realWord) {
+                    modalTitle.innerText = '*'.repeat(modalTitle.dataset.realWord.length);
+                }
+                
                 clearTimeout(peekReleaseTimer);
                 peekReleaseTimer = setTimeout(() => {
                     modal.classList.remove('peek-releasing');
