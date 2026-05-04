@@ -1137,10 +1137,7 @@
         .dark .appearance-card:hover, .dark .appearance-card:focus { background: var(--fill-tertiary) !important; }
 
         /* --- Learning Modal Review Mode --- */
-        #learningModal.is-review-mode #modalTitle {
-            color: transparent !important;
-            text-shadow: 0 0 0 var(--text-tertiary);
-        }
+        /* Title text is controlled by JS (shows asterisks in review mode) */
         #learningModal.is-review-mode .result-card {
             opacity: 0 !important;
             pointer-events: none !important;
@@ -1169,16 +1166,12 @@
             order: 2;
         }
 
-        /* Peek states */
+        /* Peek states - title text is controlled by JS */
         #learningModal.is-review-mode.peek-active #modalTitle {
-            visibility: visible !important;
-            opacity: 1 !important;
             transition: all 0.28s ease;
         }
         #learningModal.is-review-mode.peek-releasing #modalTitle {
-            visibility: visible !important;
-            opacity: 0 !important;
-            transition: opacity 0.24s ease-out;
+            transition: all 0.24s ease-out;
         }
 
         #learningModal.is-review-mode.peek-releasing .result-card.active {
