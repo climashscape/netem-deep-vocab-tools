@@ -9031,18 +9031,15 @@
 
                 // Refocus spelling input after releasing peek so user can continue typing
                 // On Android, focus() from touchend doesn't activate keyboard
-                // Solution: simulate a click event which allows keyboard activation
+                // Solution: Use Capacitor Keyboard.show() API to explicitly show keyboard
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
                     setTimeout(() => {
-                        // Create and dispatch a click event to satisfy Android's user interaction requirement
-                        const clickEvent = new MouseEvent('click', {
-                            bubbles: true,
-                            cancelable: true,
-                            view: window
-                        });
-                        spellingInput.dispatchEvent(clickEvent);
                         spellingInput.focus();
+                        // Use Capacitor Keyboard API to show keyboard on Android
+                        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
+                            window.Capacitor.Plugins.Keyboard.show();
+                        }
                     }, 100);
                 }
 
