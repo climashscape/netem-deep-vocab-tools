@@ -6673,7 +6673,7 @@
             }
 
             // Set title: show asterisks in review mode, real word otherwise
-            if (isReviewMode) {
+            if (isReview) {
                 modalTitle.dataset.realWord = verb;
                 modalTitle.innerText = '*'.repeat(verb.length);
             } else {
