@@ -2781,7 +2781,8 @@
                 localStorage.setItem(STATE_KEY, JSON.stringify(state));
             } catch (e) {}
             
-            // Trigger specific page logic (Defer slightly to let the page transition animation start smoothly)
+            // Trigger specific page logic (Defer to let the page transition animation complete)
+            // Animation duration: 350ms (slideUp), wait for it to finish before heavy rendering
             setTimeout(() => {
                 // Skip render if content was already pre-rendered during swipe
                 if (!isSwipingPage) {
@@ -2802,7 +2803,7 @@
                         applyFilters();
                     }
                 }
-            }, 50);
+            }, 350);
             
             // Scroll to top of the content area
             if (appContent) {
