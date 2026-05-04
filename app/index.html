@@ -9036,10 +9036,13 @@
                 if (spellingInput) {
                     setTimeout(() => {
                         spellingInput.focus();
-                        // Use Capacitor Keyboard API to show keyboard on Android
-                        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
-                            window.Capacitor.Plugins.Keyboard.show();
-                        }
+                        // Keyboard.show() must be called AFTER focus() is effective
+                        // Add a small delay to ensure focus is established
+                        setTimeout(() => {
+                            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
+                                window.Capacitor.Plugins.Keyboard.show();
+                            }
+                        }, 50);
                     }, 100);
                 }
 
