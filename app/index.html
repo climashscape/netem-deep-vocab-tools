@@ -6655,6 +6655,14 @@
                         isPushingState=true;history.pushState({ isReview: isReview, depth: modalHistoryCount }, "", newHash);
                     }
                 }
+                // CRITICAL: Always reset closing flag and review mode when modal is reused
+                isClosing = false;
+                isReviewMode = isReview;
+                if (isReview) {
+                    modal.classList.add('is-review-mode');
+                } else {
+                    modal.classList.remove('is-review-mode');
+                }
             } else {
                 // Starting fresh modal
                 isClosing = false; // Reset closing flag to ensure clean state
