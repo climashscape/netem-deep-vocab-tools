@@ -9028,16 +9028,24 @@
                 if (modalTitle && modalTitle.dataset.realWord) {
                     modalTitle.innerText = '*'.repeat(modalTitle.dataset.realWord.length);
                 }
-                
+
                 // Refocus spelling input after releasing peek so user can continue typing
-                // Use same delay as modal open (100ms) to ensure input method activates properly
+                // On Android, focus() from touchend doesn't activate keyboard
+                // Solution: simulate a click event which allows keyboard activation
                 const spellingInput = document.getElementById('spellingInput');
                 if (spellingInput) {
                     setTimeout(() => {
+                        // Create and dispatch a click event to satisfy Android's user interaction requirement
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        spellingInput.dispatchEvent(clickEvent);
                         spellingInput.focus();
                     }, 100);
                 }
-                
+
                 clearTimeout(peekReleaseTimer);
                 peekReleaseTimer = setTimeout(() => {
                     modal.classList.remove('peek-releasing');
