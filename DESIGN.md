@@ -1,15 +1,13 @@
-# NETEM Deep Vocab Tools - Full App Design System
+# NETEM Deep Vocab Tools - Apple HIG Design System
 
-This file is a project-specific design specification extracted from the current production UI and behavior in:
+This file is the project-specific design specification for the Apple Human Interface Guidelines (HIG) redesign.
 
-- `app/index.html`
+It references:
+- `app/index.html` (CSS variables + HTML structure)
 - `app/static/js/db.js`
 - `app/static/js/local_api.js`
 - `app/static/js/llm.js`
 - `app/static/js/ebbinghaus.js`
-- `docs/guidelines/UI_UX_GUIDELINES.md`
-
-It defines not only visuals, but also interaction patterns, page-level structure, state feedback, and AI-content presentation style.
 
 ---
 
@@ -18,21 +16,22 @@ It defines not only visuals, but also interaction patterns, page-level structure
 NETEM is a long-session study tool, not a short-session social feed.
 
 - Design objective: reduce cognitive friction and preserve attention for memorization
-- Core emotional tone: calm, focused, reliable, slightly warm
-- Visual language: mobile-first soft neumorphism with low-contrast depth
+- Core emotional tone: calm, focused, reliable, native-feeling
+- Visual language: **Apple HIG** — flat, clear hierarchy, system fonts, safe areas, light/dark adaptive
 - Functional emphasis: clear progress, clear due status, clear next action
 
 Top-level principles:
 
 1. Reading and recall come before decoration.
 2. Status and progression must always be perceivable at a glance.
-3. Every interaction should provide immediate tactile or visual confirmation.
+3. Every interaction should provide immediate visual confirmation.
+4. Follow iOS platform conventions for familiarity and predictability.
 
 ---
 
-## 2. Information Architecture (Current App Reality)
+## 2. Information Architecture
 
-Primary navigation is a 5-tab bottom bar:
+Primary navigation is a 5-tab bottom bar (iOS Tab Bar style):
 
 1. `philosophy` (intro/start)
 2. `learn` (main learning batch)
@@ -42,133 +41,157 @@ Primary navigation is a 5-tab bottom bar:
 
 Global shells:
 
-- Sticky header with search and compact stats
-- Scrollable content region
-- Fixed bottom navigation
-- Modal layer stack for learning flow and settings confirmations
-
-Design implication: every new page must respect this shell and not introduce alternate navigation patterns.
+- iOS Navigation Bar (sticky) with Large Title + search + compact stats
+- Scrollable content region (safe-area-aware)
+- Fixed bottom Tab Bar with frosted glass background
+- iOS Sheet-style modal layer for learning flow
+- iOS Alert-style dialogs for confirmations
 
 ---
 
 ## 3. Visual Theme and Core Tokens
 
-### 3.1 Light Theme
+All tokens are defined as CSS custom properties in `:root` (light) and `prefers-color-scheme: dark` media query.
 
-- `bg.base`: `#e0e5ec`
-- `text.primary`: `#4a5568`
-- `text.secondary`: `#6b7280`
-- `accent.primary`: `#3b82f6`
-- `accent.hover`: `#2563eb`
-- `success`: `#22c55e`
-- `warning`: `#f59e0b`
-- `danger`: `#ef4444`
-- `neutral.inactive`: `#a0aec0`
-- `surface.highlight`: `#ffffff`
+### 3.1 iOS System Colors
 
-Neumorphic shadow family:
+| Token | Light | Dark |
+|-------|-------|------|
+| `--ios-blue` | `#007AFF` | `#0A84FF` |
+| `--ios-red` | `#FF3B30` | `#FF453A` |
+| `--ios-green` | `#34C759` | `#30D158` |
+| `--ios-orange` | `#FF9500` | `#FF9F0A` |
+| `--ios-indigo` | `#5856D6` | `#5E5CE6` |
+| `--ios-purple` | `#AF52DE` | `#BF5AF2` |
+| `--ios-cyan` | `#32ADE6` | `#64D2FF` |
+| `--ios-teal` | `#5AC8FA` | `#64D2FF` |
 
-- Raised: `6px 6px 10px rgba(163,177,198,0.7), -6px -6px 10px rgba(255,255,255,0.8)`
-- Inset: `inset 4px 4px 6px rgba(163,177,198,0.7), inset -4px -4px 6px rgba(255,255,255,0.8)`
+### 3.2 Semantic Background Tokens
 
-### 3.2 Dark Theme Mapping
+| Token | Light | Dark |
+|-------|-------|------|
+| `--bg-primary` | `#F2F2F7` (grouped) | `#000000` |
+| `--bg-secondary` | `#FFFFFF` | `#1C1C1E` |
+| `--bg-tertiary` | `#F2F2F7` | `#2C2C2E` |
+| `--text-primary` | `#1C1C1E` | `#FFFFFF` |
+| `--text-secondary` | `#3A3A3C` | `#EBEBF5` |
+| `--text-tertiary` | `#8E8E93` | `#8E8E93` |
+| `--separator` | `rgba(60,60,67,0.12)` | `rgba(84,84,88,0.36)` |
+| `--fill-primary` | `rgba(120,120,128,0.20)` | `rgba(120,120,128,0.36)` |
 
-- background: `#1a1a1a`
-- surface: `#2d2d2d`
-- text primary: `#e5e7eb`
-- text secondary: `#9ca3af`
-- accent: `#60a5fa`
+### 3.3 Tab Bar
 
-Dark mode keeps geometry and hierarchy the same while reducing soft-shadow dependence.
+| Token | Light | Dark |
+|-------|-------|------|
+| `--tab-bar-bg` | `rgba(249,249,249,0.94)` | `rgba(34,34,36,0.92)` |
+| `--tab-bar-active` | `#007AFF` | `#0A84FF` |
+| `--tab-bar-inactive` | `#8E8E93` | `#8E8E93` |
+
+### 3.4 Navigation Bar
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `--nav-bar-bg` | `rgba(249,249,249,0.94)` | `rgba(34,34,36,0.92)` |
 
 ---
 
-## 4. Typography and Content Density
+## 4. Typography
 
-Primary stack (current app truth):
+Primary stack:
 
-- `'Times New Roman', Times, 'Georgia', serif`
+```css
+--font-system: -apple-system, 'SF Pro Display', 'SF Pro Text',
+               'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+--font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+```
 
-Scale guidance:
+iOS text style scale:
 
-- Hero/display: `28-34px`, `700-800`
-- Section titles: `20-24px`, `700`
-- Card titles: `16-20px`, `700-800`
-- Body reading: `14-16px`, line-height `1.55-1.75`
-- Status chips/meta: `10-12px`, often uppercase and bold
+| Style | Size | Weight | Letter-spacing |
+|-------|------|--------|----------------|
+| Large Title | `34px` | `700` | `0.37px` |
+| Title 2 | `22px` | `700` | `0.35px` |
+| Title 3 | `20px` | `600` | `0.38px` |
+| Headline | `17px` | `600` | `-0.43px` |
+| Body | `17px` | `400` | `-0.43px` |
+| Footnote | `13px` | `400` | `-0.08px` |
+| Caption | `12px` | `400` | `0px` |
 
 Reading rules:
 
 - Keep content blocks narrow and vertically segmented.
-- Prefer muted gray body text with selective color emphasis.
+- Prefer muted body text with selective color emphasis.
 - AI explanation markdown must prioritize hierarchy and whitespace.
 
 ---
 
-## 5. Component System (Canonical)
+## 5. Component System
 
 ### 5.1 Foundations
 
 - Radius:
-  - small `10-12px`
-  - medium `16px`
-  - large `20-24px`
+  - small `8-10px` (iOS pills, search fields)
+  - medium `12-14px` (cards, modals, buttons)
+  - large `14px` (modal sheets)
   - pill `9999px`
 - Touch target minimum: `44x44px`
-- Spacing rhythm: 4 / 8 / 12 / 16 / 24 / 32
+- Spacing rhythm: 4 / 8 / 12 / 16 / 20 / 24 / 32
 
 ### 5.2 Buttons and Press States
 
-Key classes/patterns: `neumorphic-btn`, `neumorphic-btn-sm`, `neumorphic-toggle-btn`, `chip-btn`
+Key classes: `neumorphic-btn`, `neumorphic-btn-sm`, `neumorphic-toggle-btn`, `chip-btn`
 
-- Default: raised soft surface
-- Pressed (`.is-pressed`): scale `0.95-0.98`, opacity drop, inset-shift shadow
-- Tab toggles: active tab uses brighter background and accent text
+- **Primary**: blue background (`--ios-blue`), white text, flat
+- **Secondary**: `--fill-tertiary` background, default text color
+- **Pressed** (`.is-pressed`): opacity drop to `0.7`, no transform
+- **Segmented Control toggle**: active uses `--bg-secondary` + shadow, inactive uses `--fill-tertiary`
 
 ### 5.3 Cards and Blocks
 
-Key classes/patterns: `verb-card`, `verb-card-block`, `learning-insight-card`, `neumorphic`
+Key classes: `verb-card`, `neumorphic` (now iOS card style)
 
-- Cards must visually separate title, phonetic, meaning, and auxiliary actions
-- Hard borders are secondary; depth mostly from shadow and subtle gradient
+- Cards use `--bg-secondary` background, `0.5px` subtle border (`--separator`)
+- Shadows: `0 1px 3px rgba(0,0,0,0.08)` — very subtle depth only
+- Hard borders replaced with `--separator` hairline
 - Review/mastery cards prioritize scanning over decoration
 
 ### 5.4 Progress and Status
 
-- Progress bars use blue/indigo gradients and smooth width transitions
-- Header summary displays total/review/mastered/today with distinct color coding
-- Badges are compact, high-contrast, and semantically colored
+- Progress bars: thin `4px` track, `--ios-blue` fill, `0.7s` ease transition
+- Header summary: compact stats row with `--fill-tertiary` background
+- Badges: compact, high-contrast, semantically colored
 
 ### 5.5 Navigation
 
-- Fixed bottom nav on `bg.base`
-- Inactive: neutral gray
-- Active: blue accent
-- Review badge (`nav-review-badge`) is red, compact, high urgency
+- **Tab Bar**: fixed bottom, frosted glass (`backdrop-filter: blur(20px)`), 5 tabs
+  - Inactive: `--tab-bar-inactive` (`#8E8E93`)
+  - Active: `--tab-bar-active` (`#007AFF`)
+- **Nav Bar**: sticky top, frosted glass, Large Title, search bar below
+- Review badge: red, compact, high urgency
 
 ### 5.6 Modals
 
 Core modal types:
 
-- Learning modal (`learningModal`) with staged controls
-- Confirmation modals (`confirmModal`, `resetModal`, `refreshConfirmModal`)
-- Utility modals (search, analytics, excluded words, import/export flows)
+- **Learning modal** (`learningModal`): iOS Sheet style (bottom-anchored, rounded top corners, slide-up animation)
+- **Alert modals** (`confirmModal`, `resetModal`, `refreshConfirmModal`): iOS Alert style (centered card, rounded `14px`)
+- **Utility modals** (search, analytics, settings): iOS Card style
 
 Modal rules:
 
-- Dark translucent backdrop (`~40-50%`) + subtle blur
-- Content surface uses same neumorphic family as main app
-- Enter/exit transitions should stay within `200-300ms`
+- Dark backdrop (`rgba(0,0,0,0.4)`) + blur
+- Content surface uses `--bg-secondary`
+- Enter/exit transitions: `250-400ms`, cubic-bezier `(0.22, 1, 0.36, 1)`
 
 ---
 
-## 6. Interaction and Motion Specification
+## 6. Interaction and Motion
 
 ### 6.1 Global Interaction Pattern
 
-- Tap feedback must be immediate and visible
-- Long press reserved for advanced actions (audio, overlays, card shortcuts)
-- Body scroll remains locked; scrolling is delegated to content containers
+- Tap feedback via JS-controlled `.is-pressed` class (opacity drop)
+- Long press reserved for advanced actions
+- Body scroll locked; scrolling delegated to content containers
 
 ### 6.2 Gesture Patterns
 
@@ -179,9 +202,9 @@ Modal rules:
 ### 6.3 Motion Budget
 
 - Standard transitions: `200-300ms`
-- Press transitions: `80-150ms`
+- Press transitions: `100-150ms`
 - Progress transitions: `300-1000ms`
-- Avoid complex blur stacks in repeated list items
+- Modal sheet enter: `400ms` cubic-bezier `(0.22, 1, 0.36, 1)`
 
 ---
 
@@ -192,7 +215,7 @@ Learning flow is staged and must remain explicit:
 - Stage progress indicator in modal
 - Separate containers for explanation content and essence content
 - Distinct control groups for study mode vs review mode
-- Reset/refresh actions always confirmed for destructive or expensive operations
+- Reset/refresh actions always confirmed for destructive/expensive operations
 
 Review outcomes:
 
@@ -208,47 +231,38 @@ Any redesign must preserve these cognitive landmarks.
 
 ### 8.1 Essential State Categories
 
-- Loading: skeleton/placeholder/progress text
-- Empty: clear call to action (start learning, open analytics, switch tab)
+- Loading: spinner/text in modal overlay
+- Empty: clear call to action
 - Offline/strict-cache: explicit fallback notice in explanation blocks
 - Success: soft affirmative coloring and concise message
 - Error: clear actionable copy; no vague failure text
 
-### 8.2 Persistence-Driven UX Expectations
+### 8.2 Persistence-Driven UX
 
 Data comes from IndexedDB and LocalStorage. UI must feel resilient:
 
 - Never block the whole app for single-item failures
 - Show cached data first when available
 - Surface "refresh explanation" as recoverable action
-- Keep settings-dependent behavior transparent (API key, image provider, daily goal)
+- Keep settings-dependent behavior transparent
 
 ---
 
 ## 9. Copywriting and Tone Rules
 
-Language style:
-
 - Concise, practical, academically oriented
 - Encouraging but not gamified-noisy
-- Action labels should be verb-first and clear (`Refresh`, `Reset`, `Import`, `Review`)
-
-Message hierarchy:
-
-- Title: what happened
-- Body: why / what changed
-- Action: next safest step
-
-For AI explanation fallback text, explicitly state offline/strict-cache context.
+- Action labels should be verb-first and clear
 
 ---
 
 ## 10. Accessibility and Device Constraints
 
-- Maintain minimum text/background contrast for all chips and badges
-- Preserve safe area support (`safe-area-inset-*`) in shell and nav
-- Avoid placing critical actions only in color; include icon/text cues
-- Keep one-hand mobile reachability for frequent actions
+- `safe-area-inset-*` support for notched devices
+- Minimum text/background contrast for all elements
+- Avoid placing critical actions only in color
+- One-hand mobile reachability for frequent actions
+- Dark mode follows system preference (`prefers-color-scheme`)
 
 ---
 
@@ -256,17 +270,20 @@ For AI explanation fallback text, explicitly state offline/strict-cache context.
 
 Do:
 
-- Keep neumorphism soft and consistent across new components
-- Maintain bottom-nav + sticky-header information hierarchy
+- Maintain iOS visual consistency across all components
+- Use CSS variables for all colors (never hardcode)
+- Keep bottom-nav + nav-bar information hierarchy
 - Prioritize scanability in review/mastery lists
 - Keep feedback immediate and deterministic
+- Support light/dark mode automatically
 
 Don't:
 
-- Introduce unrelated flat-enterprise UI blocks
+- Use neumorphism shadows or `#e0e5ec` backgrounds
+- Use external icon libraries for static icons (use inline SVG)
 - Use aggressive animations in dense reading regions
-- Replace serif reading stack without measurable readability gains
 - Hide important learning state transitions behind subtle visuals
+- Hardcode platform-specific colors
 
 ---
 
@@ -274,14 +291,12 @@ Don't:
 
 When generating or refactoring UI in this repo, follow this exact instruction set:
 
-1. Use NETEM soft neumorphic design (`#e0e5ec` base, dual-direction shadows, rounded 16/24).
+1. Use Apple HIG design system (CSS variables from `:root`, `--bg-*`, `--text-*`, `--ios-*`).
 2. Preserve the 5-tab bottom navigation architecture and sticky stats header.
 3. Keep mobile-first layout and safe-area correctness.
 4. Keep learning/review/mastery stage visibility explicit.
-5. Apply touch-first feedback (`is-pressed`, inset transition, subtle scale).
-6. Keep AI explanation areas readable, structured, and markdown-friendly.
-7. Design for resilient offline/cached behavior, not ideal-network-only scenarios.
-
-Prompt template:
-
-> "Use the repository DESIGN.md as strict source of truth. Preserve NETEM's full app shell (sticky header + bottom nav), soft neumorphic study aesthetic, stage-driven learning flow, and mobile-first interaction details. Improve clarity and density without changing the product's memorization-first behavior."
+5. Apply touch-feedback via `.is-pressed` (opacity, not transform).
+6. Use inline SVG icons for static icons; keep Font Awesome for JS-dynamic icons only.
+7. Keep AI explanation areas readable, structured, and markdown-friendly.
+8. Design for resilient offline/cached behavior, not ideal-network-only scenarios.
+9. Dark mode uses `prefers-color-scheme: dark` media query; do not add manual toggle.

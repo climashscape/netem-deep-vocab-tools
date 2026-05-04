@@ -812,7 +812,8 @@ const LocalAPI = {
                                     item.last_review || new Date().toISOString(),
                                     item.next_review || new Date().toISOString(),
                                     item.status || 'learning',
-                                    item.review_count || 0
+                                    item.review_count || 0,
+                                    item.first_learned_at || null // Preserve first learned timestamp
                                 );
                             }
                         }
@@ -836,14 +837,35 @@ const LocalAPI = {
                         await window.db.extra_vocabulary.bulkPut(importData.extra_vocabulary);
                     }
 
+                    // 3.6 Restore Verbs table (if included in backup)
+                    // If not included, LocalAPI.init() will rebuild it from netem_full_list.json
+                    if (importData.verbs && Array.isArray(importData.verbs) && window.db.verbs) {
+                        await window.db.verbs.bulkPut(importData.verbs);
+                        console.log(`LocalAPI: Restored ${importData.verbs.length} verbs from backup.`);
+                    }
+
                     // 4. Restore Settings
                     if (importData.settings) {
                         localStorage.setItem('app_settings', JSON.stringify(importData.settings));
+
                         // Sync Visuals Provider if present
                         if (importData.settings.image_provider) {
                             localStorage.setItem('visuals_provider', importData.settings.image_provider);
                         } else {
                             localStorage.removeItem('visuals_provider');
+                        }
+
+                        // Sync Analysis Mode if present (standalone key for UI state)
+                        if (importData.settings.analysisMode) {
+                            localStorage.setItem('analysisMode', importData.settings.analysisMode);
+                        }
+
+                        // Sync legacy keys for backwards compatibility
+                        if (importData.settings.autoAiAnalysis !== undefined) {
+                            localStorage.setItem('autoAiAnalysis', importData.settings.autoAiAnalysis);
+                        }
+                        if (importData.settings.cacheOnlyMode !== undefined) {
+                            localStorage.setItem('cacheOnlyMode', importData.settings.cacheOnlyMode);
                         }
                     }
 

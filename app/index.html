@@ -1944,6 +1944,14 @@
                 <div id="outputContainer" class="hide-scrollbar">
                     <!-- Cards are absolute positioned here -->
                 </div>
+                <!-- Floating Mark as Learned Button (Study Mode Only) -->
+                <button id="floatingMarkLearnedBtn" onclick="recordReview('remembered')" class="hidden absolute bottom-3 right-3 z-[55] inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] font-semibold text-[14px] shadow-lg transition-all" style="background:var(--ios-blue);color:white;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 11 12 14 22 4"/>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                    </svg>
+                    <span>Mark as Learned</span>
+                </button>
             </div>
 
             <!-- ESSENCE CARD AREA (Sticky Bottom) -->
@@ -1955,16 +1963,7 @@
 
             <!-- Ebbinghaus Review Controls -->
             <div id="reviewControls" class="px-0 pb-4 pt-2 flex justify-center gap-4 z-[60] shrink-0 hidden" style="background:var(--bg-secondary);">
-                <!-- Study Mode -->
-                <div id="studyModeControls" class="flex gap-4 w-[94%] max-w-[720px] justify-center">
-                    <button onclick="recordReview('remembered')" class="inline-flex items-center gap-2 px-6 py-3 rounded-[12px] font-semibold text-[15px]" style="background:var(--ios-blue);color:white;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="9 11 12 14 22 4"/>
-                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-                        </svg>
-                        <span>Mark as Learned</span>
-                    </button>
-                </div>
+                <!-- Study Mode: Mark as Learned is now a floating button in outputContainer -->
 
                 <!-- Review Mode: Peek + Progress Buttons in one row -->
                 <div id="reviewModeControls" class="hidden flex justify-center gap-2 w-[94%] max-w-[720px]">
@@ -6729,7 +6728,7 @@
             // Only apply is-review-mode (which causes blur) if isReviewMode is explicitly true
             if (isReviewMode) {
                 modal.classList.add('is-review-mode');
-                document.getElementById('studyModeControls')?.classList.add('hidden');
+                document.getElementById('floatingMarkLearnedBtn')?.classList.add('hidden');
                 document.getElementById('reviewModeControls')?.classList.remove('hidden');
                 
                 // Pre-calculate peek layout metrics for smoother interaction
@@ -6747,9 +6746,9 @@
                 // IMPORTANT: We never show "MARK AS LEARNED" for OOV words.
                 const isNewWord = !status || status.stage === 0;
                 if (isNewWord && currentPage !== 'review' && !isOOV) {
-                    document.getElementById('studyModeControls')?.classList.remove('hidden');
+                    document.getElementById('floatingMarkLearnedBtn')?.classList.remove('hidden');
                 } else {
-                    document.getElementById('studyModeControls')?.classList.add('hidden');
+                    document.getElementById('floatingMarkLearnedBtn')?.classList.add('hidden');
                 }
                 
                 document.getElementById('reviewModeControls')?.classList.add('hidden');
@@ -6771,22 +6770,12 @@
                 priorityBtnContainer.style.display = 'none';
             }
 
-            // Show/Hide Review Controls (the bottom buttons like "Mark as Learned" or "Already Mastered")
+            // Show/Hide Review Controls (contains only reviewModeControls now - Hold to Peek)
             const controls = document.getElementById('reviewControls');
             if (controls) {
-                const now = new Date();
-                const isDue = status && new Date(status.next_review) <= now && status.status !== 'mastered';
-                
-                // Show controls if:
-                // 1. It's due for review
-                // 2. We are explicitly in review session mode
-                // 3. It's a brand new word (no status) on Learn page
-                // 4. We are on the Review page (Review Now tab)
-                // BUT only if we are NOT in Library/Mastery/Search results
-                const isMasteryPage = currentPage === 'mastery';
-                const isReviewLibrary = currentPage === 'review' && currentReviewTab === 'library';
-                
-                if (!isMasteryPage && !isReviewLibrary && !isOOV && (isDue || isReviewMode || (!status && currentPage === 'learn') || (currentPage === 'review' && currentReviewTab === 'session'))) {
+                // reviewControls only shows in review mode (for Hold to Peek button)
+                // Mark as Learned is now a floating button in outputContainer
+                if (isReviewMode && !isOOV) {
                     controls.classList.remove('hidden');
                 } else {
                     controls.classList.add('hidden');
@@ -8995,6 +8984,14 @@
                     modal.classList.add('peek-active');
                 });
             }
+            
+            // Keep spelling input focused to maintain keyboard open
+            const spellingInput = document.getElementById('spellingInput');
+            if (spellingInput) {
+                requestAnimationFrame(() => {
+                    spellingInput.focus();
+                });
+            }
         }
 
         function handlePeekEnd(event) {
@@ -10833,7 +10830,7 @@ function syncStageBadgeToActiveCard(cards) {
                     // We prioritize the manual browsing history over automatic batch progression
                     if (modalHistoryCount > 1) {
                         // Hide learn button after marking as learned
-                        document.getElementById('studyModeControls')?.classList.add('hidden');
+                        document.getElementById('floatingMarkLearnedBtn')?.classList.add('hidden');
                         
                         // Update background grid (skip updateCounts since we already called it above)
                         if (currentPage === 'review') renderReviewPage(true);
@@ -10911,7 +10908,7 @@ function syncStageBadgeToActiveCard(cards) {
                             }, 800);
                         }, 50); // Small initial delay to ensure DOM is ready
                     } else if (currentPage === 'learn') {
-                        document.getElementById('studyModeControls')?.classList.add('hidden');
+                        document.getElementById('floatingMarkLearnedBtn')?.classList.add('hidden');
                         setTimeout(() => {
                             displayedVerbs = displayedVerbs.filter(v => (v.word || v['单词']).toLowerCase() !== verb.toLowerCase());
                             renderGrid(true);
