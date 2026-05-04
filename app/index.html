@@ -9041,6 +9041,10 @@
                     // Focus the clone after a short delay
                     setTimeout(() => {
                         clone.focus();
+                        // Move cursor to end of text
+                        if (savedValue.length > 0) {
+                            clone.setSelectionRange(savedValue.length, savedValue.length);
+                        }
                     }, 50);
                 }
             }
