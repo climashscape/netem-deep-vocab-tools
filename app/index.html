@@ -6775,14 +6775,7 @@
                 modal.classList.add('is-review-mode');
                 document.getElementById('floatingMarkLearnedBtn')?.classList.add('hidden');
                 document.getElementById('reviewModeControls')?.classList.remove('hidden');
-                
-                // Pre-calculate peek layout metrics for smoother interaction
-                // Use requestAnimationFrame to ensure DOM is ready
-                requestAnimationFrame(() => {
-                    if (typeof updatePeekLayoutMetrics === 'function') {
-                        updatePeekLayoutMetrics();
-                    }
-                });
+                // Peek layout metrics deferred to after animation in unified timeout below
             } else {
                 modal.classList.remove('is-review-mode');
                 
@@ -6827,15 +6820,29 @@
                 }
             }
             ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
-            window.openVerb = openVerb;
             
-            // Single call after modal animation completes (400ms)
-            // Removed multiple setTimeout calls that caused layout thrashing
-            if (!modal.classList.contains('active')) {
-                setTimeout(adjustModalTitleFontSize, 400);
+            // Defer non-critical DOM updates until after modal animation (400ms)
+            // This prevents layout thrashing during slide-up animation
+            const isModalNewlyOpened = !modal.classList.contains('active');
+            const domUpdateDelay = isModalNewlyOpened ? 400 : 0;
+            
+            if (isModalNewlyOpened) {
+                // Schedule title adjustment and peek metrics after animation
+                setTimeout(() => {
+                    adjustModalTitleFontSize();
+                    if (isReviewMode && typeof updatePeekLayoutMetrics === 'function') {
+                        updatePeekLayoutMetrics();
+                    }
+                }, domUpdateDelay);
             } else {
+                // Modal already open, update immediately
                 adjustModalTitleFontSize();
+                if (isReviewMode && typeof updatePeekLayoutMetrics === 'function') {
+                    updatePeekLayoutMetrics();
+                }
             }
+            
+            window.openVerb = openVerb;
             
             // Save active verb to state
             try {
