@@ -6834,11 +6834,13 @@
             ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             window.openVerb = openVerb;
             
-            // Multiple calls to handle different stages of modal expansion
-            adjustModalTitleFontSize();
-            setTimeout(adjustModalTitleFontSize, 50);
-            setTimeout(adjustModalTitleFontSize, 150);
-            setTimeout(adjustModalTitleFontSize, 300);
+            // Single call after modal animation completes (400ms)
+            // Removed multiple setTimeout calls that caused layout thrashing
+            if (!modal.classList.contains('active')) {
+                setTimeout(adjustModalTitleFontSize, 400);
+            } else {
+                adjustModalTitleFontSize();
+            }
             
             // Save active verb to state
             try {
