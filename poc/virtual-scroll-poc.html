@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POC 1: Virtual Scroll Performance</title>
+    <style>
+        :root {
+            --bg-primary: #F2F2F7;
+            --bg-secondary: #FFFFFF;
+            --text-primary: #1C1C1E;
+            --text-secondary: #3A3A3C;
+            --separator: rgba(60,60,67,0.12);
+            --ios-blue: #007AFF;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #000000;
+                --bg-secondary: #1C1C1E;
+                --text-primary: #FFFFFF;
+                --text-secondary: #EBEBF5;
+                --separator: rgba(84,84,88,0.36);
+                --ios-blue: #0A84FF;
+            }
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        
+        h1 { font-size: 24px; margin-bottom: 16px; }
+        .metric {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: inline-block;
+            min-width: 120px;
+            margin-right: 12px;
+        }
+        .metric-label { font-size: 13px; color: var(--text-secondary); }
+        .metric-value { font-size: 28px; font-weight: 700; color: var(--ios-blue); }
+        
+        #container {
+            height: 400px;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            margin-top: 20px;
+            position: relative;
+        }
+        
+        .item {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            border-bottom: 0.5px solid var(--separator);
+        }
+        .item-word { font-weight: 600; width: 100px; }
+        .item-stage { 
+            background: var(--ios-blue);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .btn {
+            background: var(--ios-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-top: 16px;
+        }
+        
+        .log {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>POC 1: Virtual Scroll Performance Benchmark</h1>
+    
+    <div>
+        <div class="metric">
+            <div class="metric-label">Full Render</div>
+            <div class="metric-value" id="fullTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Virtual Scroll</div>
+            <div class="metric-value" id="virtualTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Speedup</div>
+            <div class="metric-value" id="speedup">-</div>
+        </div>
+    </div>
+    
+    <div>
+        <button class="btn" onclick="runBenchmark()">Run Benchmark (5000 items)</button>
+        <button class="btn" onclick="clearContainer()">Clear</button>
+    </div>
+    
+    <div id="container"></div>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        // Generate mock data (5000 words)
+        const MOCK_WORDS = [];
+        const STAGES = ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'];
+        
+        for (let i = 0; i < 5000; i++) {
+            MOCK_WORDS.push({
+                word: `word_${i.toString().padStart(4, '0')}`,
+                stage: Math.floor(Math.random() * 10),
+                status: Math.random() > 0.1 ? 'learning' : 'mastered'
+            });
+        }
+        
+        const ITEM_HEIGHT = 60;
+        const BUFFER_SIZE = 5;
+        let container = document.getElementById('container');
+        let logEl = document.getElementById('log');
+        
+        function log(msg) {
+            logEl.innerHTML += `[${new Date().toISOString().split('T')[1]}] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // ============ Method 1: Full Render (Current Approach) ============
+        function renderFull() {
+            const start = performance.now();
+            
+            container.innerHTML = '';
+            container.style.position = 'static';
+            const fragment = document.createDocumentFragment();
+            
+            MOCK_WORDS.forEach(item => {
+                if (item.status === 'mastered') return;
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.innerHTML = `
+                    <span class="item-word">${item.word}</span>
+                    <span class="item-stage">${STAGES[item.stage]}</span>
+                `;
+                fragment.appendChild(div);
+            });
+            
+            container.appendChild(fragment);
+            
+            const end = performance.now();
+            return (end - start).toFixed(2);
+        }
+        
+        // ============ Method 2: Virtual Scroll (Optimized) ============
+        function renderVirtual() {
+            const start = performance.now();
+            
+            const containerHeight = container.clientHeight;
+            const activeWords = MOCK_WORDS.filter(w => w.status !== 'mastered');
+            const totalCount = activeWords.length;
+            const totalHeight = totalCount * ITEM_HEIGHT;
+            
+            container.innerHTML = '';
+            container.style.position = 'relative';
+            
+            // Create wrapper for scrollbar
+            const wrapper = document.createElement('div');
+            wrapper.style.height = `${totalHeight}px`;
+            wrapper.style.position = 'relative';
+            
+            const fragment = document.createDocumentFragment();
+            const scrollTop = container.scrollTop;
+            const visibleStart = Math.floor(scrollTop / ITEM_HEIGHT);
+            const visibleCount = Math.ceil(containerHeight / ITEM_HEIGHT);
+            const startIndex = Math.max(0, visibleStart - BUFFER_SIZE);
+            const endIndex = Math.min(totalCount, visibleStart + visibleCount + BUFFER_SIZE);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const item = activeWords[i];
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.style.position = 'absolute';
+                div.style.top = `${i * ITEM_HEIGHT}px`;
+                div.style.width = '100%';
+                div.innerHTML = `
+                    <span class="item-word">${item.word}</span>
+                    <span class="item-stage">${STAGES[item.stage]}</span>
+                `;
+                fragment.appendChild(div);
+            }
+            
+            wrapper.appendChild(fragment);
+            container.appendChild(wrapper);
+            
+            const end = performance.now();
+            return (end - start).toFixed(2);
+        }
+        
+        // ============ Benchmark ============
+        function runBenchmark() {
+            log('Starting benchmark...');
+            
+            // Warm up
+            renderFull();
+            renderVirtual();
+            log('Warm-up complete');
+            
+            // Measure full render
+            const fullTime = renderFull();
+            document.getElementById('fullTime').textContent = `${fullTime}ms`;
+            log(`Full render: ${fullTime}ms`);
+            
+            // Switch to virtual mode with scroll handler
+            container.addEventListener('scroll', onScroll);
+            
+            // Measure virtual render
+            const virtualTime = renderVirtual();
+            document.getElementById('virtualTime').textContent = `${virtualTime}ms`;
+            log(`Virtual scroll: ${virtualTime}ms`);
+            
+            // Calculate speedup
+            const speedup = (parseFloat(fullTime) / parseFloat(virtualTime)).toFixed(1);
+            document.getElementById('speedup').textContent = `${speedup}x`;
+            log(`Speedup: ${speedup}x faster`);
+        }
+        
+        function onScroll() {
+            const start = performance.now();
+            renderVirtual();
+            const elapsed = performance.now() - start;
+            if (elapsed > 16) {
+                log(`Scroll render: ${elapsed.toFixed(2)}ms (dropped frame)`);
+            }
+        }
+        
+        function clearContainer() {
+            container.innerHTML = '';
+            container.removeEventListener('scroll', onScroll);
+            document.getElementById('fullTime').textContent = '-';
+            document.getElementById('virtualTime').textContent = '-';
+            document.getElementById('speedup').textContent = '-';
+            logEl.innerHTML = '';
+        }
+    </script>
+</body>
+</html>

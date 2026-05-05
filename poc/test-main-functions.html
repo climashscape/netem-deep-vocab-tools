@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test showConfirm</title>
+</head>
+<body>
+    <h1>Test showConfirm Function</h1>
+    <button onclick="testShowConfirm()">Test showConfirm</button>
+    <button onclick="testExportData()">Test exportData</button>
+    <div id="result" style="margin-top:20px;white-space:pre;font-family:monospace;"></div>
+    
+    <!-- Minimal confirmModal -->
+    <div id="confirmModal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
+        <div style="background:white;padding:20px;border-radius:14px;max-width:320px;">
+            <h3 id="confirmTitle">Title</h3>
+            <p id="confirmText">Text</p>
+            <button id="confirmCancelBtn">Cancel</button>
+            <button id="confirmOkBtn">OK</button>
+        </div>
+    </div>
+    
+    <script>
+        const result = document.getElementById('result');
+        
+        function log(msg) {
+            result.textContent += msg + '\n';
+            console.log(msg);
+        }
+        
+        function pushModalState(closeFn) {
+            history.pushState({ modal: true }, '');
+            window.addEventListener('popstate', closeFn);
+        }
+        
+        function showConfirm(title, text, onOk) {
+            log('[DEBUG] showConfirm called: ' + title);
+            const modal = document.getElementById('confirmModal');
+            const titleEl = document.getElementById('confirmTitle');
+            const textEl = document.getElementById('confirmText');
+            const okBtn = document.getElementById('confirmOkBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+
+            if (!modal || !titleEl || !textEl || !okBtn || !cancelBtn) {
+                log('[ERROR] Missing elements!');
+                return;
+            }
+            
+            log('[DEBUG] All elements found');
+            
+            titleEl.innerText = title;
+            textEl.innerText = text;
+
+            const close = (fromPopState = false) => {
+                if (fromPopState !== true) {
+                    history.back();
+                }
+                modal.classList.add('hidden');
+            };
+
+            pushModalState(close);
+            okBtn.onclick = () => {
+                close();
+                if (onOk) onOk();
+            };
+
+            cancelBtn.onclick = close;
+
+            modal.classList.remove('hidden');
+            log('[DEBUG] Modal shown');
+        }
+        
+        function testShowConfirm() {
+            log('--- Testing showConfirm ---');
+            showConfirm('Test Title', 'Test message', () => {
+                log('OK clicked!');
+            });
+        }
+        
+        function testExportData() {
+            log('--- Testing exportData simulation ---');
+            showConfirm('Export Backup', 'This will save a backup file to your device. Continue?', async () => {
+                log('Export confirmed, running export logic...');
+                try {
+                    log('Export successful!');
+                } catch (e) {
+                    log('Export error: ' + e.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

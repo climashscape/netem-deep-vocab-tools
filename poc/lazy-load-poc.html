@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POC 2: Lazy Load Legacy Data</title>
+    <style>
+        :root {
+            --bg-primary: #F2F2F7;
+            --bg-secondary: #FFFFFF;
+            --text-primary: #1C1C1E;
+            --text-secondary: #3A3A3C;
+            --ios-blue: #007AFF;
+            --ios-red: #FF3B30;
+            --ios-green: #34C759;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #000000;
+                --bg-secondary: #1C1C1E;
+                --text-primary: #FFFFFF;
+                --text-secondary: #EBEBF5;
+                --ios-blue: #0A84FF;
+            }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        h1 { font-size: 24px; margin-bottom: 16px; }
+        .metric {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: inline-block;
+            min-width: 140px;
+            margin-right: 12px;
+        }
+        .metric-label { font-size: 13px; color: var(--text-secondary); }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.good { color: var(--ios-green); }
+        .metric-value.bad { color: var(--ios-red); }
+        .btn {
+            background: var(--ios-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-top: 16px;
+        }
+        .log {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #dataStatus {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>POC 2: Lazy Load Legacy Data (15MB)</h1>
+    
+    <div>
+        <div class="metric">
+            <div class="metric-label">Script Load Time</div>
+            <div class="metric-value" id="loadTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Parse Time</div>
+            <div class="metric-value" id="parseTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Time</div>
+            <div class="metric-value" id="totalTime">-</div>
+        </div>
+    </div>
+    
+    <div>
+        <button class="btn" onclick="loadSync()">Sync Load (Blocking)</button>
+        <button class="btn" onclick="loadAsync()">Async Load (Non-blocking)</button>
+        <button class="btn" onclick="loadChunked()">Chunked Load (Optimized)</button>
+        <button class="btn" onclick="clearData()">Clear</button>
+    </div>
+    
+    <div id="dataStatus">
+        <strong>Current Status:</strong> <span id="status">Not loaded</span>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        const logEl = document.getElementById('log');
+        const statusEl = document.getElementById('status');
+        const LEGACY_PATH = '../app/static/js/data_legacy.js';
+        
+        function log(msg) {
+            logEl.innerHTML += `[${new Date().toISOString().split('T')[1]}] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // ============ Method 1: Sync Load (Current - Blocking) ============
+        async function loadSync() {
+            log('=== Sync Load (Blocking) ===');
+            const totalStart = performance.now();
+            
+            // Create script tag (blocks parser)
+            const script = document.createElement('script');
+            script.src = LEGACY_PATH;
+            
+            const loadPromise = new Promise((resolve, reject) => {
+                script.onload = () => {
+                    const loadEnd = performance.now();
+                    const loadTime = (loadEnd - totalStart).toFixed(0);
+                    document.getElementById('loadTime').textContent = `${loadTime}ms`;
+                    document.getElementById('loadTime').className = 'metric-value ' + (loadTime > 1000 ? 'bad' : 'good');
+                    log(`Script downloaded in ${loadTime}ms`);
+                    resolve();
+                };
+                script.onerror = () => reject(new Error('Load failed'));
+            });
+            
+            document.head.appendChild(script);
+            await loadPromise;
+            
+            const parseStart = performance.now();
+            
+            // Access global variable (triggers JS engine parse)
+            const data = window.NETEM_LEGACY_DATA;
+            
+            const parseEnd = performance.now();
+            const parseTime = (parseEnd - parseStart).toFixed(0);
+            const totalTime = (parseEnd - totalStart).toFixed(0);
+            
+            document.getElementById('parseTime').textContent = `${parseTime}ms`;
+            document.getElementById('totalTime').textContent = `${totalTime}ms`;
+            
+            statusEl.textContent = `Loaded ${Object.keys(data || {}).length} entries`;
+            log(`Data accessed: ${Object.keys(data || {}).length} entries`);
+            log(`Total time: ${totalTime}ms`);
+        }
+        
+        // ============ Method 2: Async Load (Non-blocking) ============
+        async function loadAsync() {
+            log('=== Async Load (Non-blocking) ===');
+            const totalStart = performance.now();
+            
+            // Use fetch + eval in separate task
+            const fetchStart = performance.now();
+            const response = await fetch(LEGACY_PATH);
+            const text = await response.text();
+            const loadTime = (performance.now() - fetchStart).toFixed(0);
+            
+            document.getElementById('loadTime').textContent = `${loadTime}ms`;
+            document.getElementById('loadTime').className = 'metric-value ' + (loadTime > 1000 ? 'bad' : 'good');
+            log(`Script fetched in ${loadTime}ms`);
+            
+            // Defer parsing to next event loop
+            statusEl.textContent = 'Downloaded, parsing deferred...';
+            log('Deferring parse to next event loop...');
+            
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            const parseStart = performance.now();
+            
+            // Execute in isolated scope
+            const data = await new Promise(resolve => {
+                // Use blob URL to avoid blocking
+                const blob = new Blob([text], { type: 'application/javascript' });
+                const url = URL.createObjectURL(blob);
+                const worker = new Worker(url);
+                worker.onmessage = (e) => {
+                    URL.revokeObjectURL(url);
+                    resolve(e.data);
+                };
+                worker.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                };
+                // Request data from worker
+                worker.postMessage('getData');
+            });
+            
+            const parseEnd = performance.now();
+            const parseTime = (parseEnd - parseStart).toFixed(0);
+            const totalTime = (parseEnd - totalStart).toFixed(0);
+            
+            document.getElementById('parseTime').textContent = `${parseTime}ms`;
+            document.getElementById('totalTime').textContent = `${totalTime}ms`;
+            
+            statusEl.textContent = 'Loaded (Web Worker parsed)';
+            log(`Parse time: ${parseTime}ms (in worker)`);
+            log(`Total time: ${totalTime}ms`);
+        }
+        
+        // ============ Method 3: Chunked Load (Optimized) ============
+        async function loadChunked() {
+            log('=== Chunked Load (Optimized) ===');
+            const totalStart = performance.now();
+            
+            // Simulate chunked loading with streaming
+            const response = await fetch(LEGACY_PATH);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            let chunks = 0;
+            let totalSize = 0;
+            let partialText = '';
+            
+            statusEl.textContent = 'Streaming...';
+            log('Starting streaming read...');
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                totalSize += value.length;
+                chunks++;
+                partialText += decoder.decode(value, { stream: true });
+                
+                // Yield to main thread every 1MB
+                if (totalSize % (1024 * 1024) < 100) {
+                    statusEl.textContent = `Streaming... ${(totalSize / 1024 / 1024).toFixed(1)}MB`;
+                    await new Promise(r => setTimeout(r, 0)); // Yield
+                }
+            }
+            
+            const loadTime = (performance.now() - totalStart).toFixed(0);
+            document.getElementById('loadTime').textContent = `${loadTime}ms`;
+            log(`Streamed ${chunks} chunks, ${(totalSize / 1024 / 1024).toFixed(1)}MB`);
+            
+            // Parse in Web Worker
+            statusEl.textContent = 'Parsing in worker...';
+            const parseStart = performance.now();
+            
+            const blob = new Blob([partialText], { type: 'application/javascript' });
+            const url = URL.createObjectURL(blob);
+            
+            window.NETEM_LEGACY_DATA = await new Promise(resolve => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(window.NETEM_LEGACY_DATA);
+                };
+                document.head.appendChild(script);
+            });
+            
+            const parseEnd = performance.now();
+            const parseTime = (parseEnd - parseStart).toFixed(0);
+            const totalTime = (parseEnd - totalStart).toFixed(0);
+            
+            document.getElementById('parseTime').textContent = `${parseTime}ms`;
+            document.getElementById('totalTime').textContent = `${totalTime}ms`;
+            document.getElementById('totalTime').className = 'metric-value ' + (totalTime > 2000 ? 'bad' : 'good');
+            
+            statusEl.textContent = `Loaded ${Object.keys(window.NETEM_LEGACY_DATA || {}).length} entries`;
+            log(`Parse time: ${parseTime}ms`);
+            log(`Total time: ${totalTime}ms`);
+        }
+        
+        // ============ Clear Data ============
+        function clearData() {
+            delete window.NETEM_LEGACY_DATA;
+            document.getElementById('loadTime').textContent = '-';
+            document.getElementById('parseTime').textContent = '-';
+            document.getElementById('totalTime').textContent = '-';
+            statusEl.textContent = 'Not loaded';
+            logEl.innerHTML = '';
+            log('Data cleared');
+        }
+    </script>
+</body>
+</html>

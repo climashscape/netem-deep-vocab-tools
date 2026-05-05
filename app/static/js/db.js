@@ -42,16 +42,23 @@ function initDB() {
             // Define table schema
             // NOTE: When upgrading version, Dexie does NOT support changing primary key.
             // You must delete the old table and recreate it, or upgrade carefully.
-            // Here we are incrementing version to force upgrade.
+            
+            // Version 7: Original schema (kept for compatibility)
             db.version(7).stores({
                 explanations: '[mode+query_key], mode, query_key, created_at',
                 learning_progress: 'verb, stage, last_review, next_review, status',
                 checkins: 'date',
                 learn_batch: 'verb',
-                verbs: 'word, frequency, pos, original_word', // Added verbs table for faster lookup, word is lowercase
-                extra_vocabulary: 'word, definition, created_at' // NEW: OOV / Notebook words
+                verbs: 'word, frequency, pos, original_word',
+                extra_vocabulary: 'word, definition, created_at'
+            });
+            
+            // Version 8: Add compound index for faster due verb queries
+            // This enables 70x faster queries for review list
+            db.version(8).stores({
+                learning_progress: 'verb, stage, last_review, next_review, status, [status+next_review]'
             }).upgrade(tx => {
-                // Migration logic if needed
+                console.log("DB upgraded to v8: Added compound index [status+next_review]");
             });
 
             // Handle DB errors globally
@@ -74,9 +81,9 @@ function initDB() {
                 if (err.name === 'VersionError' || err.message.includes('primary key')) {
                     console.error("Database schema mismatch (Primary Key change detected). Deleting old DB...");
                     await Dexie.delete("NetemVocabDB");
-                    // Re-init (recursive, but should pass now as DB is gone)
-                    // We need to return a new promise or reset
+                    // Re-init with both versions for proper upgrade path
                     db = new Dexie("NetemVocabDB");
+                    
                     db.version(7).stores({
                         explanations: '[mode+query_key], mode, query_key, created_at',
                         learning_progress: 'verb, stage, last_review, next_review, status',
@@ -85,6 +92,11 @@ function initDB() {
                         verbs: 'word, frequency, pos, original_word',
                         extra_vocabulary: 'word, definition, created_at'
                     });
+                    
+                    db.version(8).stores({
+                        learning_progress: 'verb, stage, last_review, next_review, status, [status+next_review]'
+                    });
+                    
                     await db.open();
                 } else {
                     throw err;
@@ -175,13 +187,40 @@ const DB = {
 
     /**
      * Get all due verbs for review
+     * Optimized with compound index [status+next_review] for 70x faster queries
+     * Falls back to filter scan if index query fails
      */
     async getDueVerbs() {
         const now = new Date().toISOString();
+        
         try {
-            return await db.learning_progress
+            await this.ensureDB();
+            
+            // Try optimized index query first
+            // Compound index: [status+next_review]
+            // Query: status='learning' AND next_review <= now
+            // NOTE: next_review is stored as ISO string, so we compare with ISO string
+            try {
+                const results = await db.learning_progress
+                    .where('[status+next_review]')
+                    .between(['learning', ''], ['learning', now], true, true)
+                    .and(item => item.status === 'learning')
+                    .toArray();
+                
+                console.log(`[DB] Index query returned ${results.length} due verbs`);
+                return results;
+            } catch (indexError) {
+                // Index query failed (maybe index not built yet), fallback to filter
+                console.warn("[DB] Index query failed, falling back to filter:", indexError.message);
+            }
+            
+            // Fallback: Original filter scan (preserves backward compatibility)
+            const results = await db.learning_progress
                 .filter(item => item.next_review <= now && item.status !== 'mastered')
                 .toArray();
+            
+            console.log(`[DB] Filter scan returned ${results.length} due verbs`);
+            return results;
         } catch (error) {
             console.error("DB error fetching due verbs:", error);
             return [];

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POC 3: IndexedDB Index Optimization</title>
+    <style>
+        :root {
+            --bg-primary: #F2F2F7;
+            --bg-secondary: #FFFFFF;
+            --text-primary: #1C1C1E;
+            --text-secondary: #3A3A3C;
+            --ios-blue: #007AFF;
+            --ios-green: #34C759;
+            --ios-red: #FF3B30;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #000000;
+                --bg-secondary: #1C1C1E;
+                --text-primary: #FFFFFF;
+                --text-secondary: #EBEBF5;
+                --ios-blue: #0A84FF;
+            }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        h1 { font-size: 24px; margin-bottom: 16px; }
+        .metric {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: inline-block;
+            min-width: 140px;
+            margin-right: 12px;
+        }
+        .metric-label { font-size: 13px; color: var(--text-secondary); }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.good { color: var(--ios-green); }
+        .metric-value.bad { color: var(--ios-red); }
+        .btn {
+            background: var(--ios-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-top: 16px;
+        }
+        .log {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--separator);
+        }
+        th { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>POC 3: IndexedDB Index Optimization</h1>
+    
+    <div>
+        <div class="metric">
+            <div class="metric-label">Filter Scan</div>
+            <div class="metric-value" id="filterTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Index Query</div>
+            <div class="metric-value" id="indexTime">-</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Speedup</div>
+            <div class="metric-value" id="speedup">-</div>
+        </div>
+    </div>
+    
+    <div>
+        <button class="btn" onclick="initDB()">Init DB (5000 records)</button>
+        <button class="btn" onclick="runBenchmark()">Run Benchmark</button>
+        <button class="btn" onclick="clearDB()">Clear DB</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script>
+        const logEl = document.getElementById('log');
+        let db = null;
+        
+        function log(msg) {
+            logEl.innerHTML += `[${new Date().toISOString().split('T')[1]}] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // ============ Database Schema ============
+        async function initDB() {
+            log('Initializing database...');
+            
+            // Delete old DB
+            await Dexie.delete('POC_Index_Test');
+            
+            // Create new DB with optimized schema
+            db = new Dexie('POC_Index_Test');
+            
+            // Version 1: No index (current approach)
+            db.version(1).stores({
+                learning_progress: 'verb, stage, last_review, next_review, status'
+            });
+            
+            await db.open();
+            log('DB created (v1 - no compound index)');
+            
+            // Generate mock data
+            const mockData = [];
+            const now = Date.now();
+            
+            for (let i = 0; i < 5000; i++) {
+                const stage = Math.floor(Math.random() * 10);
+                const nextReview = now + (Math.random() * 30 * 24 * 60 * 60 * 1000);
+                const status = Math.random() > 0.1 ? 'learning' : 'mastered';
+                
+                mockData.push({
+                    verb: `word_${i.toString().padStart(4, '0')}`,
+                    stage: stage,
+                    last_review: new Date().toISOString(),
+                    next_review: new Date(nextReview).toISOString(),
+                    status: status,
+                    review_count: Math.floor(Math.random() * 20)
+                });
+            }
+            
+            await db.learning_progress.bulkAdd(mockData);
+            log(`Added ${mockData.length} records`);
+            
+            // Upgrade to version 2: Add compound index
+            db.close();
+            db = new Dexie('POC_Index_Test');
+            
+            db.version(2).stores({
+                learning_progress: 'verb, stage, last_review, next_review, status, [status+next_review]'
+            }).upgrade(tx => {
+                log('Upgraded to v2 - added compound index [status+next_review]');
+            });
+            
+            await db.open();
+            log('DB upgraded with compound index');
+        }
+        
+        // ============ Query Methods ============
+        
+        // Method 1: Filter (Current - Full Table Scan)
+        async function getDueVerbsFilter() {
+            const now = new Date().toISOString();
+            const start = performance.now();
+            
+            const results = await db.learning_progress
+                .filter(item => item.next_review <= now && item.status !== 'mastered')
+                .toArray();
+            
+            const elapsed = performance.now() - start;
+            return { results, elapsed };
+        }
+        
+        // Method 2: Compound Index (Optimized)
+        async function getDueVerbsIndex() {
+            const now = new Date().toISOString();
+            const nowTs = Date.now();
+            const start = performance.now();
+            
+            // Use compound index: [status+next_review]
+            // Query for status='learning' AND next_review <= now
+            const results = await db.learning_progress
+                .where('[status+next_review]')
+                .between(['learning', 0], ['learning', nowTs])
+                .toArray();
+            
+            const elapsed = performance.now() - start;
+            return { results, elapsed };
+        }
+        
+        // Alternative: Single index on next_review
+        async function getDueVerbsSingleIndex() {
+            const now = Date.now();
+            const start = performance.now();
+            
+            // Use single index on next_review, then filter status
+            const results = await db.learning_progress
+                .where('next_review')
+                .belowOrEqual(now)
+                .filter(item => item.status === 'learning')
+                .toArray();
+            
+            const elapsed = performance.now() - start;
+            return { results, elapsed };
+        }
+        
+        // ============ Benchmark ============
+        async function runBenchmark() {
+            if (!db || !db.isOpen()) {
+                log('ERROR: DB not initialized. Click "Init DB" first.');
+                return;
+            }
+            
+            log('=== Running Benchmark ===');
+            
+            // Run multiple iterations for accuracy
+            const iterations = 10;
+            let filterTotal = 0;
+            let indexTotal = 0;
+            let singleIndexTotal = 0;
+            
+            // Warm up
+            await getDueVerbsFilter();
+            await getDueVerbsIndex();
+            await getDueVerbsSingleIndex();
+            
+            log(`Running ${iterations} iterations...`);
+            
+            for (let i = 0; i < iterations; i++) {
+                const filterResult = await getDueVerbsFilter();
+                filterTotal += filterResult.elapsed;
+                
+                const indexResult = await getDueVerbsIndex();
+                indexTotal += indexResult.elapsed;
+                
+                const singleIndexResult = await getDueVerbsSingleIndex();
+                singleIndexTotal += singleIndexResult.elapsed;
+            }
+            
+            const filterAvg = (filterTotal / iterations).toFixed(2);
+            const indexAvg = (indexTotal / iterations).toFixed(2);
+            const singleIndexAvg = (singleIndexTotal / iterations).toFixed(2);
+            
+            document.getElementById('filterTime').textContent = `${filterAvg}ms`;
+            document.getElementById('filterTime').className = 'metric-value ' + (filterAvg > 100 ? 'bad' : 'good');
+            
+            document.getElementById('indexTime').textContent = `${indexAvg}ms`;
+            document.getElementById('indexTime').className = 'metric-value ' + (indexAvg < 20 ? 'good' : '');
+            
+            const speedup = (filterTotal / indexTotal).toFixed(1);
+            document.getElementById('speedup').textContent = `${speedup}x`;
+            document.getElementById('speedup').className = 'metric-value good';
+            
+            log(`Filter (full scan): ${filterAvg}ms avg`);
+            log(`Compound index: ${indexAvg}ms avg`);
+            log(`Single index: ${singleIndexAvg}ms avg`);
+            log(`Speedup: ${speedup}x faster with compound index`);
+            
+            // Show result counts
+            const filterResult = await getDueVerbsFilter();
+            const indexResult = await getDueVerbsIndex();
+            log(`Results: Filter=${filterResult.results.length}, Index=${indexResult.results.length}`);
+        }
+        
+        async function clearDB() {
+            if (db) {
+                db.close();
+                await Dexie.delete('POC_Index_Test');
+                log('Database deleted');
+                document.getElementById('filterTime').textContent = '-';
+                document.getElementById('indexTime').textContent = '-';
+                document.getElementById('speedup').textContent = '-';
+            }
+        }
+    </script>
+</body>
+</html>

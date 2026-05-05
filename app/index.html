@@ -1058,6 +1058,10 @@
         /* --- Page Persistence --- */
         .page-section { display: none; }
         .page-section:not(.hidden) { display: block; }
+        
+        /* --- Global Hidden Class --- */
+        .hidden { display: none !important; }
+        
         body:not(.ready) .page-section,
         body:not(.ready) #sticky-header,
         body:not(.ready) .bottom-nav { display: none !important; }
@@ -2068,7 +2072,7 @@
 
 
     <!-- Confirm Modal -->
-    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center" style="-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 flex items-center justify-center" style="display:none;z-index:99999;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
         <div class="rounded-[14px] shadow-xl p-5 w-full max-w-sm mx-4" style="background:var(--bg-secondary);border:0.5px solid var(--separator);" onclick="event.stopPropagation()">
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-10 h-10 rounded-[10px] flex items-center justify-center" style="background:var(--fill-tertiary);color:var(--ios-blue);">
@@ -2093,7 +2097,7 @@
     </div>
 
     <!-- Generic Message Modal (Success/Error) - Keeps Font Awesome for JS dynamic icons -->
-    <div id="messageModal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center" style="-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div id="messageModal" class="fixed inset-0 bg-black/50 flex items-center justify-center" style="display:none;z-index:99999;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
         <div class="rounded-[14px] shadow-xl p-5 w-full max-w-sm mx-4" style="background:var(--bg-secondary);border:0.5px solid var(--separator);" onclick="event.stopPropagation()">
             <div class="flex items-center gap-3 mb-4">
                 <div id="messageIcon" class="w-10 h-10 rounded-[10px] flex items-center justify-center" style="background:var(--fill-tertiary);">
@@ -4357,7 +4361,7 @@
                     inner.classList.add('ios-alert-out');
                 }
                 setTimeout(() => {
-                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
                     if (inner) inner.classList.remove('ios-alert-out');
                 }, 200);
             };
@@ -4370,7 +4374,7 @@
 
             cancelBtn.onclick = close;
 
-            modal.classList.remove('hidden');
+            modal.style.cssText = 'display:flex;z-index:99999;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);';
             const inner = modal.querySelector('div');
             if (inner) {
                 inner.classList.remove('ios-alert-out');
@@ -4392,12 +4396,12 @@
                 inner.classList.add('ios-alert-out');
             }
             setTimeout(() => {
-                modal.classList.add('hidden');
+                modal.style.display = 'none';
                 if (inner) inner.classList.remove('ios-alert-out');
             }, 200);
         }
         
-
+        
         // Cloud Sync & Export/Import Logic
         async function cloudSync() {
             showConfirm('Export Data', 'This will prepare a backup of your progress and configuration. Continue?', async () => {
