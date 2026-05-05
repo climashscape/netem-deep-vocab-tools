@@ -1941,7 +1941,7 @@
                     <!-- Cards are absolute positioned here -->
                 </div>
                 <!-- Floating Mark as Learned Button (Study Mode Only) -->
-                <button id="floatingMarkLearnedBtn" onclick="recordReview('remembered')" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-[55] inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] font-semibold text-[14px] shadow-lg transition-all" style="background:var(--ios-blue);color:white;">
+                <button id="floatingMarkLearnedBtn" onclick="recordReview('remembered')" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-[55] inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] font-semibold text-[14px] shadow-lg transition-all whitespace-nowrap" style="background:var(--ios-blue);color:white;">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="9 11 12 14 22 4"/>
                         <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
@@ -3079,7 +3079,7 @@
             if (!btnCountdown) {
                 btnCountdown = document.createElement('button');
                 btnCountdown.id = 'librarySortCountdown';
-                btnCountdown.className = 'w-12 h-12 rounded-full flex items-center justify-center shadow-sm';
+                btnCountdown.className = 'w-12 h-12 rounded-full flex items-center justify-center shadow-md';
                 btnCountdown.style.background = 'var(--fill-tertiary)';
                 btnCountdown.style.color = 'var(--ios-blue)';
                 btnCountdown.style.position = 'fixed';
@@ -3087,8 +3087,9 @@
                 btnCountdown.style.bottom = '80px';
                 btnCountdown.style.zIndex = '60';
                 btnCountdown.style.display = 'none';
-                btnCountdown.title = '按倒计时排序';
-                btnCountdown.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+                btnCountdown.style.opacity = '1';
+                btnCountdown.style.transition = 'all 0.2s ease';
+                btnCountdown.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
                 btnCountdown.onclick = () => {
                     if (currentLibrarySortType !== 'countdown') {
                         currentLibrarySortType = 'countdown';
@@ -3097,22 +3098,24 @@
                         currentLibrarySortOrder = currentLibrarySortOrder === 'asc' ? 'desc' : 'asc';
                     }
                     renderReviewPage();
+                    updateSortButtonStyles();
                 };
                 document.body.appendChild(btnCountdown);
             }
             if (!btnFirst) {
                 btnFirst = document.createElement('button');
                 btnFirst.id = 'librarySortFirst';
-                btnFirst.className = 'w-12 h-12 rounded-full flex items-center justify-center shadow-sm';
+                btnFirst.className = 'w-12 h-12 rounded-full flex items-center justify-center shadow-md';
                 btnFirst.style.background = 'var(--fill-tertiary)';
-                btnFirst.style.color = 'var(--ios-blue)';
+                btnFirst.style.color = 'var(--ios-green)';
                 btnFirst.style.position = 'fixed';
                 btnFirst.style.right = '16px';
                 btnFirst.style.bottom = '140px';
                 btnFirst.style.zIndex = '60';
                 btnFirst.style.display = 'none';
-                btnFirst.title = '按首次学习时间排序';
-                btnFirst.innerHTML = '<i class="fas fa-calendar-day"></i>';
+                btnFirst.style.opacity = '1';
+                btnFirst.style.transition = 'all 0.2s ease';
+                btnFirst.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
                 btnFirst.onclick = () => {
                     if (currentLibrarySortType !== 'first') {
                         currentLibrarySortType = 'first';
@@ -3121,26 +3124,54 @@
                         currentLibrarySortOrder = currentLibrarySortOrder === 'asc' ? 'desc' : 'asc';
                     }
                     renderReviewPage();
+                    updateSortButtonStyles();
                 };
                 document.body.appendChild(btnFirst);
             }
             const display = show ? '' : 'none';
             btnCountdown.style.display = display;
             btnFirst.style.display = display;
-            if (show) {
-                const learningModal = document.getElementById('learningModal');
-                const isModalActive = learningModal && learningModal.classList.contains('active');
-                if (isModalActive) {
-                    btnCountdown.style.opacity = '0';
-                    btnCountdown.style.pointerEvents = 'none';
-                    btnFirst.style.opacity = '0';
-                    btnFirst.style.pointerEvents = 'none';
-                } else {
-                    btnCountdown.style.opacity = '1';
-                    btnCountdown.style.pointerEvents = '';
-                    btnFirst.style.opacity = '1';
-                    btnFirst.style.pointerEvents = '';
-                }
+            
+            // Update active state
+            updateSortButtonStyles();
+            
+            const learningModal = document.getElementById('learningModal');
+            const isModalActive = learningModal && learningModal.classList.contains('active');
+            if (show && isModalActive) {
+                btnCountdown.style.opacity = '0';
+                btnCountdown.style.pointerEvents = 'none';
+                btnFirst.style.opacity = '0';
+                btnFirst.style.pointerEvents = 'none';
+            } else {
+                btnCountdown.style.opacity = '1';
+                btnCountdown.style.pointerEvents = '';
+                btnFirst.style.opacity = '1';
+                btnFirst.style.pointerEvents = '';
+            }
+        }
+
+        function updateSortButtonStyles() {
+            const btnCountdown = document.getElementById('librarySortCountdown');
+            const btnFirst = document.getElementById('librarySortFirst');
+            if (!btnCountdown || !btnFirst) return;
+
+            // Reset both buttons
+            [btnCountdown, btnFirst].forEach(btn => {
+                btn.style.background = 'var(--fill-tertiary)';
+                btn.style.transform = 'scale(1)';
+            });
+
+            // Highlight active button
+            if (currentLibrarySortType === 'countdown') {
+                btnCountdown.style.background = 'var(--ios-blue)';
+                btnCountdown.style.color = 'white';
+                btnCountdown.style.transform = currentLibrarySortOrder === 'asc' ? 'scaleX(-1)' : 'scale(1)';
+                btnFirst.style.color = 'var(--ios-green)';
+            } else if (currentLibrarySortType === 'first') {
+                btnFirst.style.background = 'var(--ios-green)';
+                btnFirst.style.color = 'white';
+                btnFirst.style.transform = currentLibrarySortOrder === 'asc' ? 'scaleX(-1)' : 'scale(1)';
+                btnCountdown.style.color = 'var(--ios-blue)';
             }
         }
 
@@ -6679,6 +6710,8 @@
                 
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
+                // Hide library sort buttons when modal opens
+                ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             }
 
             // Set title: show asterisks in review mode, real word otherwise
@@ -6977,7 +7010,7 @@
                 essenceContainer.classList.add('hidden');
                 
                 isClosing = false;
-                
+
                 // Restore Review Library sort buttons visibility if applicable
                 ensureLibrarySortButton(currentPage === 'review' && currentReviewTab === 'library');
             }, 300);
