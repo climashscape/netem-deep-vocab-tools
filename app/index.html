@@ -8137,11 +8137,10 @@
                         });
                     }
 
-                    // Clear previous cards NOW, just before rendering new ones
-                    // This ensures the blur effect stays until the last moment
-                    Array.from(outputContainer.children).forEach(child => {
-                        if (child.id !== 'progressContainer') child.remove();
-                    });
+                    // DOUBLE-BUFFER: Build all cards in a temp container first
+                    // This prevents flicker caused by clearing + incremental rendering
+                    const tempContainer = document.createElement('div');
+                    tempContainer.style.cssText = 'position:absolute;inset:0;visibility:hidden;pointer-events:none;';
 
                     chunks.forEach((chunk, chunkIndex) => {
                         const card = document.createElement('div');
@@ -8474,9 +8473,19 @@
                             h3.className = "text-xl font-bold text-blue-800 p-4 border-b pb-2";
                         }
                         
-                        outputContainer.appendChild(card);
+                        tempContainer.appendChild(card);
                         cards.push(card);
                     });
+                    
+                    // DOUBLE-BUFFER: All cards built, now swap in one atomic operation
+                    // Clear old cards (except progressContainer)
+                    Array.from(outputContainer.children).forEach(child => {
+                        if (child.id !== 'progressContainer') child.remove();
+                    });
+                    // Move all cards from tempContainer to outputContainer
+                    while (tempContainer.firstChild) {
+                        outputContainer.appendChild(tempContainer.firstChild);
+                    }
                     
                     // 5. Vertical Flip Logic Initialization
                     if (cards.length > 0) {
