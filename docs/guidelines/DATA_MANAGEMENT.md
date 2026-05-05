@@ -27,10 +27,15 @@
 *   **Dexie.js**: ORM 封装。
 
 ### 2.2 Schema 定义 (`app/static/js/db.js`)
-*   **Version 1**:
-    *   `learning_progress`: `&verb, stage, next_review, last_review, status`
-    *   `explanations`: `&query_key, content, image_url`
-    *   `checkins`: `&date, count`
+*   **Version 7**:
+    *   `learning_progress`: `verb, stage, last_review, next_review, status`
+    *   `explanations`: `[mode+query_key], mode, query_key, created_at`
+    *   `checkins`: `date`
+    *   `learn_batch`: `verb`
+    *   `verbs`: `word, frequency, pos, original_word`
+    *   `extra_vocabulary`: `word, definition, created_at`
+*   **Version 8** (新增):
+    *   `learning_progress`: 新增复合索引 `[status+next_review]`，72x 查询加速
 
 ### 2.3 迁移策略 (Migration Strategy)
 *   **原则**: 向下兼容，绝不破坏现有用户数据。

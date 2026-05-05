@@ -25,13 +25,16 @@
 *   **Tailwind CSS**: 实用优先的 CSS 框架，负责所有样式（包括深色模式）。
 *   **JavaScript (ES6+)**: 原生 JS 开发，不使用 React/Vue/Angular 等重型框架，保持极度轻量和高性能。
     *   *理由*: 为了极致的加载速度和对老旧 Android WebView 的兼容性。
+*   **compromise.js**: NLP 库，词性感知的词根提取，提升单词识别率。
 
 ### 2.2 数据存储 (Data Storage)
 *   **IndexedDB**: 浏览器原生 NoSQL 数据库，用于存储海量结构化数据。
 *   **Dexie.js**: IndexedDB 的轻量级封装库，提供易用的 Promise API。
-    *   **Table `learning_progress`**: 存储每个单词的学习阶段、复习时间。
+    *   **Table `learning_progress`**: 存储每个单词的学习阶段、复习时间。**v8 新增复合索引 `[status+next_review]`，72x 查询加速**。
     *   **Table `explanations`**: 缓存 AI 生成的单词解析，避免重复消耗 Token。
     *   **Table `checkins`**: 记录每日打卡数据。
+    *   **Table `verbs`**: 核心词库表，词频、词性、原形。
+    *   **Table `extra_vocabulary`**: 生词本，收藏词库外单词 (OOV)。
 
 ### 2.3 移动端容器 (Mobile Container)
 *   **Capacitor**: 将 Web 应用封装为原生 Android/iOS 应用。
@@ -83,7 +86,27 @@
 
 ---
 
-## 5. 扩展性设计 (Extensibility)
+## 6. 性能优化 (Performance Optimization)
+
+### 6.1 IndexedDB 复合索引
+*   **问题**: `getDueVerbs()` 查询待复习单词需要遍历全表，耗时 36ms。
+*   **方案**: 新增 `[status+next_review]` 复合索引 (DB v8)。
+*   **效果**: 查询时间降至 0.5ms，**72x 加速**。
+
+### 6.2 双缓冲渲染
+*   **问题**: 卡片切换时逐个 DOM 更新导致视觉闪烁。
+*   **方案**: 先在隐藏容器构建所有卡片，一次性原子替换到显示区域。
+*   **效果**: 消除卡片闪烁，视觉平滑。
+
+### 6.3 POC 测试验证
+项目包含 `poc/` 目录，用于性能优化验证：
+*   `indexeddb-index-poc.html`: 复合索引效果测试
+*   `virtual-scroll-poc.html`: 虚拟滚动 (1.7x 提升)
+*   `lazy-load-poc.html`: Web Worker 懒加载 (非阻塞)
+
+---
+
+## 7. 扩展性设计 (Extensibility)
 
 *   **模块化**: 新增功能（如“拼写练习”）应作为独立 JS 模块引入，不侵入现有核心逻辑。
 *   **插件化 (规划中)**: 未来支持通过 `plugins/` 目录加载第三方 JS 脚本，通过 `window.NETEM_HOOKS` 暴露生命周期钩子。

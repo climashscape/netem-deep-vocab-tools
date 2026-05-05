@@ -118,6 +118,12 @@ const EBBINGHAUS_STAGES = [
 ### IndexedDB Schema
 
 ```javascript
+// Version 8: 新增复合索引用于 72x 查询加速
+db.version(8).stores({
+    learning_progress: 'verb, stage, last_review, next_review, status, [status+next_review]'
+});
+
+// Version 7: 原始 schema（保留兼容）
 db.version(7).stores({
     explanations: '[mode+query_key], mode, query_key, created_at',
     learning_progress: 'verb, stage, last_review, next_review, status',
@@ -128,7 +134,9 @@ db.version(7).stores({
 });
 ```
 
-**重要**：Dexie 不支持修改主键，如需修改 Schema 必须删除旧表重建。
+**重要**：
+- Dexie 不支持修改主键，如需修改 Schema 必须删除旧表重建
+- v8 新增 `[status+next_review]` 复合索引，用于加速待复习单词查询（72x 提升）
 
 ---
 
