@@ -9,8 +9,10 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
-.workbuddy/
 *.swp
+
+# Proma workspace config (local, not synced to repo)
+.context/
 
 # Python
 __pycache__/
