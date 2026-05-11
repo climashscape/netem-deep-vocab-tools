@@ -1903,7 +1903,7 @@
             <!-- Title, Phonetic & Actions Row -->
             <div class="px-4 pt-0 pb-1.5 shrink-0 w-full flex items-center gap-3" style="background:var(--bg-secondary);">
                 <div class="flex flex-col items-start min-w-0 flex-1">
-                    <h2 id="modalTitle" class="text-[22px] font-bold text-[var(--text-primary)] capitalize truncate w-full cursor-pointer" onclick="playAudio(event, this.dataset.realWord || this.innerText, 1)"></h2>
+                    <h2 id="modalTitle" class="text-[22px] font-bold text-[var(--text-primary)] capitalize truncate w-full cursor-pointer" ontouchstart="handleTitleSpeakStart(event)" ontouchend="handleTitleSpeakEnd(event)" ontouchcancel="handleTitleSpeakEnd(event)" onclick="handleTitleClick(event)"></h2>
                     <div id="modalPhonetic" class="text-[11px] font-medium text-[var(--text-tertiary)] mt-0.5 flex items-center gap-2 tracking-wider uppercase min-h-[20px]"></div>
                 </div>
                 <!-- Refresh Button -->
@@ -9098,6 +9098,70 @@
                         }
                     }, 50);
                 }
+            }
+        }
+
+        // Title speak handlers - play audio and refocus input on touchend/click
+        let isTitleSpeaking = false;
+
+        function handleTitleSpeakStart(event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            isTitleSpeaking = true;
+        }
+
+        function handleTitleSpeakEnd(event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (!isTitleSpeaking) return;
+            isTitleSpeaking = false;
+
+            // Play audio and refocus input
+            playAudioAndRefocusInput();
+        }
+
+        // Desktop click handler (also used as fallback)
+        function handleTitleClick(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            // If touchend already handled this, skip
+            if (isTitleSpeaking) {
+                isTitleSpeaking = false;
+                return;
+            }
+            // Play audio and refocus input
+            playAudioAndRefocusInput();
+        }
+
+        // Shared function: play audio and refocus spelling input
+        function playAudioAndRefocusInput() {
+            // Play audio
+            const modalTitle = document.getElementById('modalTitle');
+            if (modalTitle) {
+                const word = modalTitle.dataset.realWord || modalTitle.innerText;
+                playAudio(null, word, 1);
+            }
+
+            // Refocus spelling input using the same clone-replace technique as peekBtn
+            // Only in review mode where spelling input exists
+            const spellingInput = document.getElementById('spellingInput');
+            if (spellingInput) {
+                const savedValue = spellingInput.value;
+                const clone = spellingInput.cloneNode(true);
+                clone.value = savedValue;
+                spellingInput.parentNode.replaceChild(clone, spellingInput);
+
+                setTimeout(() => {
+                    clone.focus();
+                    if (savedValue.length > 0) {
+                        clone.setSelectionRange(savedValue.length, savedValue.length);
+                    }
+                }, 50);
             }
         }
 
