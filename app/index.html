@@ -1594,6 +1594,17 @@
                           </div>
                       </div>
                       <div id="mastery-stats-placeholder"></div>
+                      <!-- Notebook Search Bar (only visible in Notebook tab) -->
+                      <div id="notebook-search-bar" class="hidden mt-2">
+                          <div class="flex items-center bg-[var(--fill-tertiary)] rounded-[9px] px-3 h-8">
+                              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 shrink-0">
+                                  <circle cx="11" cy="11" r="8"/>
+                                  <path d="M21 21l-4.35-4.35"/>
+                              </svg>
+                              <input type="text" id="notebookSearchInput" placeholder="Search or add new word..." class="bg-transparent outline-none w-full text-[var(--text-primary)] text-[14px] placeholder-[var(--text-tertiary)]" oninput="filterNotebook()">
+                              <i id="notebookSearchClearBtn" class="fas fa-times-circle text-[var(--text-tertiary)] ml-2 text-xs cursor-pointer hover:opacity-70 hidden" onclick="clearNotebookSearch()"></i>
+                          </div>
+                      </div>
                   </div>
                 <div id="mastery-content-wrapper" class="overflow-hidden">
                     <div id="masteryGrid" class="verb-grid pb-24 px-4 pt-2">
@@ -3230,23 +3241,26 @@
         
         function switchMasteryTab(tab) {
             currentMasteryTab = tab;
-            
+
             // Update UI buttons
             const btnCore = document.getElementById('btn-mastery-core');
             const btnNotebook = document.getElementById('btn-mastery-notebook');
-            
+            const searchBar = document.getElementById('notebook-search-bar');
+
             if (tab === 'core') {
                 btnCore.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
                 btnCore.classList.remove('text-gray-500');
                 btnNotebook.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
                 btnNotebook.classList.add('text-gray-500');
+                if (searchBar) searchBar.classList.add('hidden');
             } else {
                 btnNotebook.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
                 btnNotebook.classList.remove('text-gray-500');
                 btnCore.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
                 btnCore.classList.add('text-gray-500');
+                if (searchBar) searchBar.classList.remove('hidden');
             }
-            
+
             renderMasteryPage();
         }
 
@@ -3264,7 +3278,7 @@
             
             if (currentMasteryTab === 'notebook') {
                 // NOTEBOOK MODE: Show OOV words from extra-vocabulary
-                const query = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
+                const query = document.getElementById('notebookSearchInput')?.value.trim().toLowerCase() || '';
                 let extraVocab = window.DB && window.DB.getExtraVocab ? await window.DB.getExtraVocab() : [];
                 
                 // Search Filter
@@ -3276,13 +3290,22 @@
                 extraVocab.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 if (extraVocab.length === 0) {
+                    // Check if query word can be added to Notebook
+                    const canAddOOV = query.length > 0 && !isWordInCoreVocab(query) && !await window.DB.isExtraVocab(query);
+
                     grid.innerHTML = `
                         <div class="col-span-full py-20 text-center animate-fade-in">
                             <div class="w-16 h-16 flex items-center justify-center text-purple-100 mx-auto mb-6 neumorphic rounded-full">
                                 <i class="fas fa-book-open text-2xl text-purple-400"></i>
                             </div>
                             <h3 class="text-xl font-black text-gray-700 mb-2">${query ? 'No Matches Found' : 'Notebook Empty'}</h3>
-                            <p class="text-gray-400 font-bold text-xs mb-8">${query ? 'Try a different search term.' : 'Tap unlinked words in explanations to add them here.'}</p>
+                            <p class="text-gray-400 font-bold text-xs mb-4">${query ? 'Try a different search term.' : 'Tap unlinked words in explanations to add them here.'}</p>
+                            ${canAddOOV ? `
+                            <button onclick="addOOVFromSearch('${query}')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-[13px] transition-all active:scale-[0.96]" style="background:var(--ios-purple);color:white;">
+                                <i class="fas fa-plus text-xs"></i>
+                                <span>Add "${query}" to Notebook</span>
+                            </button>
+                            ` : ''}
                         </div>`;
                     return;
                 }
@@ -6027,6 +6050,58 @@
                     hideExcludeOverlay(overlay);
                 }
             };
+        }
+
+        // Check if word exists in core vocabulary
+        function isWordInCoreVocab(word) {
+            const w = word.toLowerCase();
+            return allVerbs.some(v => (v.word || v['单词']).toLowerCase() === w);
+        }
+
+        // Notebook search filter
+        let notebookFilterTimer = null;
+        function filterNotebook() {
+            // Toggle clear button
+            const input = document.getElementById('notebookSearchInput');
+            const clearBtn = document.getElementById('notebookSearchClearBtn');
+            if (clearBtn && input) {
+                clearBtn.classList.toggle('hidden', !input.value);
+            }
+
+            if (notebookFilterTimer) clearTimeout(notebookFilterTimer);
+            notebookFilterTimer = setTimeout(() => {
+                renderMasteryPage();
+            }, 250);
+        }
+
+        function clearNotebookSearch() {
+            const input = document.getElementById('notebookSearchInput');
+            if (input) {
+                input.value = '';
+                filterNotebook();
+            }
+        }
+
+        // Add OOV word from Notebook search
+        async function addOOVFromSearch(word) {
+            if (!word || !word.trim()) return;
+            const normalizedWord = word.trim().toLowerCase();
+
+            // Double check: not in core vocab and not already in notebook
+            if (isWordInCoreVocab(normalizedWord)) {
+                return; // Already in core, openVerb will handle it
+            }
+            if (await window.DB.isExtraVocab(normalizedWord)) {
+                openVerb(normalizedWord); // Already in Notebook, just open
+                return;
+            }
+
+            // Add to Notebook
+            await window.DB.addExtraVocab(normalizedWord, 'Added from search');
+            extraVerbs = await window.DB.getExtraVocab(); // Refresh cache
+
+            // Open word detail modal
+            openVerb(normalizedWord);
         }
 
         async function confirmNotebookRemove(event, word) {
