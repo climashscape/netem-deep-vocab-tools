@@ -3277,11 +3277,11 @@
             grid.innerHTML = ''; // Clear first
             
             if (currentMasteryTab === 'notebook') {
-                // NOTEBOOK MODE: Show OOV words from extra-vocabulary
+                // NOTEBOOK MODE: Show OOV words from extra-vocabulary + Core matches
                 const query = document.getElementById('notebookSearchInput')?.value.trim().toLowerCase() || '';
                 let extraVocab = window.DB && window.DB.getExtraVocab ? await window.DB.getExtraVocab() : [];
-                
-                // Search Filter
+
+                // Search Filter for Notebook
                 if (query) {
                     extraVocab = extraVocab.filter(item => item.word.toLowerCase().includes(query));
                 }
@@ -3289,10 +3289,21 @@
                 // Sort by creation time (newest first)
                 extraVocab.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+                // Also search Core vocabulary for matches
+                let coreMatches = [];
+                if (query) {
+                    coreMatches = allVerbs.filter(v => {
+                        const word = (v.word || v['单词']).toLowerCase();
+                        return word.includes(query);
+                    });
+                }
+
                 // Check if query word can be added to Notebook (independent of search results)
                 const canAddOOV = query.length > 0 && !isWordInCoreVocab(query) && !await window.DB.isExtraVocab(query);
 
-                if (extraVocab.length === 0) {
+                const hasResults = extraVocab.length > 0 || coreMatches.length > 0;
+
+                if (!hasResults) {
                     grid.innerHTML = `
                         <div class="col-span-full py-20 text-center animate-fade-in">
                             <div class="w-16 h-16 flex items-center justify-center text-purple-100 mx-auto mb-6 neumorphic rounded-full">
@@ -3321,6 +3332,57 @@
                         </button>
                     `;
                     grid.appendChild(addBtn);
+                }
+
+                // Render Core matches first (if any)
+                if (coreMatches.length > 0) {
+                    const coreSection = document.createElement('div');
+                    coreSection.className = 'col-span-full mb-2';
+                    coreSection.innerHTML = `
+                        <div class="flex items-center gap-2 px-1 py-1.5">
+                            <i class="fas fa-book text-[10px]" style="color:var(--ios-blue);"></i>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text-tertiary);">Core Vocabulary (${coreMatches.length})</span>
+                        </div>
+                    `;
+                    grid.appendChild(coreSection);
+
+                    coreMatches.slice(0, 10).forEach(v => {
+                        const word = v.word || v['单词'];
+                        const card = document.createElement('div');
+                        card.className = 'verb-card group relative flex flex-col w-full bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-all duration-200 cursor-pointer overflow-hidden border border-blue-100 min-h-[80px] justify-center';
+                        card.innerHTML = `
+                            <div class="verb-content flex-1 flex flex-col px-4 py-3 relative z-10">
+                                <h3 class="text-lg font-black tracking-tight text-center w-full whitespace-nowrap overflow-hidden text-ellipsis" style="color:var(--text-primary);" title="${word}">${word}</h3>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <i class="fas fa-book text-[8px]" style="color:var(--ios-blue);"></i>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider" style="color:var(--text-tertiary);">Core</span>
+                                </div>
+                            </div>
+                            <div class="absolute inset-0 rounded-xl pointer-events-none z-20" style="border:0.5px solid var(--separator);"></div>
+                        `;
+                        card.onclick = () => openVerb(word);
+                        grid.appendChild(card);
+                    });
+
+                    if (coreMatches.length > 10) {
+                        const moreBtn = document.createElement('div');
+                        moreBtn.className = 'col-span-full text-center py-2';
+                        moreBtn.innerHTML = `<span class="text-[11px] font-medium" style="color:var(--text-tertiary);">+${coreMatches.length - 10} more in Core</span>`;
+                        grid.appendChild(moreBtn);
+                    }
+                }
+
+                // Notebook section header
+                if (extraVocab.length > 0) {
+                    const notebookSection = document.createElement('div');
+                    notebookSection.className = 'col-span-full mb-2 mt-4';
+                    notebookSection.innerHTML = `
+                        <div class="flex items-center gap-2 px-1 py-1.5">
+                            <i class="fas fa-bookmark text-[10px]" style="color:var(--ios-purple);"></i>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text-tertiary);">Notebook (${extraVocab.length})</span>
+                        </div>
+                    `;
+                    grid.appendChild(notebookSection);
                 }
                 
                 // Optimized Rendering for Notebook
