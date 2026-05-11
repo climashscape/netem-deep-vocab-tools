@@ -1238,7 +1238,7 @@
 
         /* Refresh Confirmation Modal */
         #refreshConfirmModal {
-            z-index: 200 !important;
+            z-index: 999999 !important;
             touch-action: none;
         }
         #refreshConfirmModal > div {
@@ -2047,7 +2047,7 @@
     </div>
 
     <!-- Refresh Confirm Modal -->
-    <div id="refreshConfirmModal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center" style="-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div id="refreshConfirmModal" class="fixed inset-0 bg-black/50 z-[999999] hidden flex items-center justify-center" style="-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
         <div class="rounded-[14px] shadow-xl p-5 w-full max-w-sm mx-4" style="background:var(--bg-secondary);border:0.5px solid var(--separator);" onclick="event.stopPropagation()">
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-10 h-10 rounded-[10px] flex items-center justify-center" style="background:var(--fill-tertiary);color:var(--ios-blue);">
