@@ -343,13 +343,16 @@ const LLM = {
             throw new Error("API Key not configured in settings.");
         }
 
+        // Detect if this is Xunfei Spark API (format: appid:api_key)
+        const isXunfei = apiKey.includes(':') && baseUrl.includes('xf-yun.com');
+
         // Special handling for case-sensitive inputs like "March" (month) vs "march" (walk)
         // We instruct the LLM to strictly respect the casing of the user input
         // and explicitly clarify the intended meaning if it's ambiguous.
         let finalUserInput = userInput;
         const userInputLower = userInput.toLowerCase();
-        
-        // If the input has uppercase letters (e.g. "March", "May", "Polish"), 
+
+        // If the input has uppercase letters (e.g. "March", "May", "Polish"),
         // add a system hint to the user prompt to enforce case sensitivity.
         if (userInput !== userInputLower) {
             finalUserInput = `请严格基于单词 "${userInput}" (注意大小写) 进行解析。如果该单词是专有名词（如月份、人名、地名等），请解析其专有含义，不要解析为其小写形式的含义。例如：如果是 "March"，请解析 "三月"，不要解析 "行军" (march)。\n\n单词：${userInput}`;
@@ -370,18 +373,29 @@ const LLM = {
         // Auto-detect and use local dev proxy if running on port 8000 or 8001
         // ONLY if we are NOT in the static 'dist' directory (heuristic check)
         const isDistBuild = window.location.pathname.includes('/dist/') || !window.location.pathname.includes('templates');
-        
+
+        // Build headers
+        let headers = {
+            'Content-Type': 'application/json'
+        };
+
+        if (isXunfei) {
+            // Xunfei Spark API uses appid:api_key format
+            // Authorization header format: Bearer appid:api_key
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        } else {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
         if ((window.location.port === '8000' || window.location.port === '8001') && !isDistBuild) {
             const proxyBase = `${window.location.origin}/proxy/llm`;
             // Pass the original target base URL to the proxy via header
+            headers['X-Target-Base-URL'] = baseUrl;
+
             const response = await fetch(`${proxyBase}/chat/completions`, {
                 method: 'POST',
                 mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'X-Target-Base-URL': baseUrl // Pass the user's custom base URL
-                },
+                headers: headers,
                 body: JSON.stringify({
                     model: model,
                     messages: [
@@ -405,10 +419,7 @@ const LLM = {
             const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
                 mode: 'cors', // Explicitly set cors mode
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
+                headers: headers,
                 body: JSON.stringify({
                     model: model,
                     messages: [
