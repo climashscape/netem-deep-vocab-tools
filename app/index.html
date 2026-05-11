@@ -2704,6 +2704,18 @@
                 }
             }
 
+            // Clear Notebook search input when switching pages
+            const notebookSearchInput = document.getElementById('notebookSearchInput');
+            if (notebookSearchInput && notebookSearchInput.value.trim().length > 0) {
+                notebookSearchInput.value = '';
+                const notebookClearBtn = document.getElementById('notebookSearchClearBtn');
+                if (notebookClearBtn) notebookClearBtn.classList.add('hidden');
+                if (notebookFilterTimer) {
+                    clearTimeout(notebookFilterTimer);
+                    notebookFilterTimer = null;
+                }
+            }
+
             // Update UI State
             document.querySelectorAll('.page-section').forEach(p => p.classList.add('hidden'));
             const targetPage = document.getElementById(`page-${pageId}`);
