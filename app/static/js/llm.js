@@ -373,6 +373,10 @@ const LLM = {
         // Auto-detect and use local dev proxy if running on port 8000 or 8001
         // Skip proxy only if explicitly in /dist/ directory (production build)
         const isDistBuild = window.location.pathname.includes('/dist/');
+        const currentPort = window.location.port;
+        const shouldUseProxy = (currentPort === '8000' || currentPort === '8001' || currentPort === '') && !isDistBuild;
+
+        console.log('[LLM] Proxy check:', { currentPort, isDistBuild, shouldUseProxy, origin: window.location.origin });
 
         // Build headers
         let headers = {
@@ -387,10 +391,12 @@ const LLM = {
             headers['Authorization'] = `Bearer ${apiKey}`;
         }
 
-        if ((window.location.port === '8000' || window.location.port === '8001') && !isDistBuild) {
+        if (shouldUseProxy) {
             const proxyBase = `${window.location.origin}/proxy/llm`;
             // Pass the original target base URL to the proxy via header
             headers['X-Target-Base-URL'] = baseUrl;
+
+            console.log('[LLM] Using proxy:', proxyBase);
 
             const response = await fetch(`${proxyBase}/chat/completions`, {
                 method: 'POST',
