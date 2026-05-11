@@ -371,8 +371,8 @@ const LLM = {
         else if (pos === 'other') systemPrompt = SYSTEM_PROMPTS.concept;
 
         // Auto-detect and use local dev proxy if running on port 8000 or 8001
-        // ONLY if we are NOT in the static 'dist' directory (heuristic check)
-        const isDistBuild = window.location.pathname.includes('/dist/') || !window.location.pathname.includes('templates');
+        // Skip proxy only if explicitly in /dist/ directory (production build)
+        const isDistBuild = window.location.pathname.includes('/dist/');
 
         // Build headers
         let headers = {
