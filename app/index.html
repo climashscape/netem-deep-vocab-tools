@@ -1443,26 +1443,26 @@
                     </div>
                     <span id="header-progress-percent" class="text-[9px] font-semibold text-[var(--text-tertiary)] shrink-0">0%</span>
                 </div>
-                <div class="flex items-center justify-between bg-[var(--fill-tertiary)] rounded-[8px] px-2.5 py-1.5">
-                    <div class="flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-                        <span class="text-[9px] text-[var(--text-tertiary)] font-medium">Total</span>
-                        <span id="header-count-total" class="text-[10px] font-semibold text-[var(--text-primary)]">0</span>
+                <div class="flex items-center justify-around bg-[var(--fill-tertiary)] rounded-[8px] px-1 py-1.5">
+                    <div class="flex items-center gap-0.5">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+                        <span id="header-count-total" class="text-[11px] font-bold text-[var(--text-primary)]">0</span>
+                        <span class="text-[10px] text-[var(--text-tertiary)]">Total</span>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--ios-orange)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span class="text-[9px] text-[var(--text-tertiary)] font-medium">Review</span>
-                        <span id="header-count-review" class="text-[10px] font-semibold text-[var(--text-primary)]">0</span>
+                    <div class="flex items-center gap-0.5">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--ios-orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span id="header-count-review" class="text-[11px] font-bold text-[var(--text-primary)]">0</span>
+                        <span class="text-[10px] text-[var(--text-tertiary)]">Rev</span>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--ios-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                        <span class="text-[9px] text-[var(--text-tertiary)] font-medium">Mastered</span>
-                        <span id="header-count-mastered" class="text-[10px] font-semibold text-[var(--text-primary)]">0</span>
+                    <div class="flex items-center gap-0.5">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--ios-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                        <span id="header-count-mastered" class="text-[11px] font-bold text-[var(--text-primary)]">0</span>
+                        <span class="text-[10px] text-[var(--text-tertiary)]">Done</span>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                        <span class="text-[9px] text-[var(--text-tertiary)] font-medium">Today</span>
-                        <span id="header-count-today" class="text-[10px] font-semibold text-[var(--text-primary)]">0</span>
+                    <div class="flex items-center gap-0.5">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <span id="header-count-today" class="text-[11px] font-bold text-[var(--text-primary)]">0</span>
+                        <span class="text-[10px] text-[var(--text-tertiary)]">Today</span>
                     </div>
                 </div>
             </div>
@@ -3732,6 +3732,23 @@
             saveTodayNewWords(set);
         }
 
+        // Track today's review count
+        function getTodayReviewCount() {
+            try {
+                const key = `review_count:${getTodayKey()}`;
+                const raw = localStorage.getItem(key);
+                return raw ? parseInt(raw) : 0;
+            } catch (_) { return 0; }
+        }
+        function saveTodayReviewCount(count) {
+            const key = `review_count:${getTodayKey()}`;
+            localStorage.setItem(key, count.toString());
+        }
+        function addReviewForToday() {
+            const count = getTodayReviewCount();
+            saveTodayReviewCount(count + 1);
+        }
+
         async function autoCheckin() {
             // Use logical date for today (0-4am flexible window)
             const logicalDate = getLogicalDate();
@@ -3758,30 +3775,39 @@
             // Fetch daily goal from settings
             const settings = JSON.parse(localStorage.getItem('app_settings') || '{}');
             const DAILY_NEW_GOAL = parseInt(settings.daily_goal || '40');
+            const DAILY_REVIEW_MIN = parseInt(settings.daily_review_min || '100');
 
             try {
                 // New definition: Only words that entered stage > 0 for the first time today
                 const newWordsToday = getTodayNewWords().size;
+                const reviewsToday = getTodayReviewCount();
                 const dueWordsRemaining = dueCount;
 
                 // Update UI Progress
                 const progressEl = document.getElementById('daily-goal-progress');
                 if (progressEl) {
+                    // Progress bar shows new words progress
                     const newPercent = Math.min(100, (newWordsToday / DAILY_NEW_GOAL) * 100);
                     progressEl.style.width = `${newPercent}%`;
-                    
+
                     const statsText = document.getElementById('daily-goal-text');
                     if (statsText) {
-                        statsText.innerText = `${newWordsToday}/${DAILY_NEW_GOAL} New | ${dueWordsRemaining} Due`;
-                        statsText.className = `text-[10px] font-black uppercase tracking-tight ${dueWordsRemaining === 0 && newWordsToday >= DAILY_NEW_GOAL ? 'text-green-500' : 'text-gray-400'}`;
+                        // Show both new words and review progress
+                        const reviewGoalMet = DAILY_REVIEW_MIN === 0 || reviewsToday >= DAILY_REVIEW_MIN;
+                        statsText.innerText = `${newWordsToday}/${DAILY_NEW_GOAL} New | ${reviewsToday}/${DAILY_REVIEW_MIN} Rev`;
+                        statsText.className = `text-[10px] font-black uppercase tracking-tight ${reviewGoalMet && newWordsToday >= DAILY_NEW_GOAL ? 'text-green-500' : 'text-gray-400'}`;
                     }
-                    
+
                     const hintText = document.getElementById('daily-goal-hint');
                     if (hintText) {
-                        hintText.innerText = `Complete ${DAILY_NEW_GOAL} new words & clear all reviews to check-in`;
+                        if (DAILY_REVIEW_MIN > 0) {
+                            hintText.innerText = `Complete ${DAILY_NEW_GOAL} new words & ${DAILY_REVIEW_MIN} reviews to check-in`;
+                        } else {
+                            hintText.innerText = `Complete ${DAILY_NEW_GOAL} new words to check-in`;
+                        }
                     }
                 }
-                
+
                 // If already checked in today, update UI to reflect "Goal Achieved" and exit
                 if (checkinHistory.includes(today)) {
                      if (progressEl) {
@@ -3795,8 +3821,10 @@
                     return;
                 }
 
-                // Check if criteria met: 40+ new words AND 0 due reviews
-                if (newWordsToday >= DAILY_NEW_GOAL && dueWordsRemaining === 0) {
+                // Check if criteria met: new words goal AND review goal (if enabled)
+                const newWordsGoalMet = newWordsToday >= DAILY_NEW_GOAL;
+                const reviewGoalMet = DAILY_REVIEW_MIN === 0 || reviewsToday >= DAILY_REVIEW_MIN;
+                if (newWordsGoalMet && reviewGoalMet) {
                     // Only post if not already checked in
                     if (!checkinHistory.includes(today)) {
                         // Optimistic Update: Update UI immediately before fetch
@@ -7252,6 +7280,9 @@
                             addNewWordForToday(spellingWord);
                         }
 
+                        // Track review count for today (spelling review is the real review)
+                        addReviewForToday();
+
                         // Remove from reviewVerbsList so "Start Reviewing" picks the next word
                         if (typeof reviewVerbsList !== 'undefined' && Array.isArray(reviewVerbsList)) {
                              const idx = reviewVerbsList.findIndex(v => v['单词'] === spellingWord);
@@ -9452,16 +9483,28 @@ function syncStageBadgeToActiveCard(cards) {
                     <h3 class="px-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style="color:var(--text-tertiary);">
                         <i class="fas fa-flag-checkered text-xs"></i> Daily Goal
                     </h3>
-                    <div class="neumorphic p-4 rounded-2xl space-y-2">
+                    <div class="neumorphic p-4 rounded-2xl space-y-3">
+                        <!-- New Words per Day -->
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold uppercase tracking-wider ml-1" style="color:var(--text-secondary);">New Words per Day</label>
                             <div class="relative">
                                 <i class="fas fa-sort-numeric-up absolute left-4 top-1/2 -translate-y-1/2 text-xs" style="color:var(--text-tertiary);"></i>
-                                <input type="number" name="daily_goal" 
-                                    class="w-full neumorphic-inset bg-transparent text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all" style="color:var(--text-primary);" 
+                                <input type="number" name="daily_goal"
+                                    class="w-full neumorphic-inset bg-transparent text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all" style="color:var(--text-primary);"
                                     placeholder="40" min="5" max="200">
                             </div>
                             <p class="text-[10px] ml-1 italic" style="color:var(--text-tertiary);">Default is 40 words</p>
+                        </div>
+                        <!-- Min Reviews per Day -->
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold uppercase tracking-wider ml-1" style="color:var(--text-secondary);">Min Reviews per Day</label>
+                            <div class="relative">
+                                <i class="fas fa-sync-alt absolute left-4 top-1/2 -translate-y-1/2 text-xs" style="color:var(--text-tertiary);"></i>
+                                <input type="number" name="daily_review_min"
+                                    class="w-full neumorphic-inset bg-transparent text-sm font-bold rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-400/20 transition-all" style="color:var(--text-primary);"
+                                    placeholder="100" min="0" max="500">
+                            </div>
+                            <p class="text-[10px] ml-1 italic" style="color:var(--text-tertiary);">Default is 100 words. Set 0 to disable.</p>
                         </div>
                     </div>
                 </div>
@@ -11065,6 +11108,13 @@ function syncStageBadgeToActiveCard(cards) {
                         dailyGoalInput.value = data.daily_goal || localSettings.daily_goal || 40;
                     }
 
+                    // Load Daily Review Min (Explicitly)
+                    const dailyReviewMinInput = settingsForm.querySelector('input[name="daily_review_min"]');
+                    if (dailyReviewMinInput) {
+                        // Priority: Server > Local > Default(100)
+                        dailyReviewMinInput.value = data.daily_review_min || localSettings.daily_review_min || 100;
+                    }
+
                     // Load Auto Backup Setting
                     const autoBackupToggle = document.getElementById('autoBackupToggle');
                     if (autoBackupToggle) {
@@ -11116,12 +11166,12 @@ function syncStageBadgeToActiveCard(cards) {
                     // Update local status
                     const isNewWord = !learningStatus[verb.toLowerCase()] || learningStatus[verb.toLowerCase()].stage === 0;
                     await loadLearningStatus();
-                    
+
                     // Track "new word today" BEFORE autoCheckin so UI reflects correct New count
                     if (result === 'remembered' && isNewWord) {
                         addNewWordForToday(verb);
                     }
-                    
+
                     // Trigger daily check-in
                     autoCheckin();
                     
@@ -11290,6 +11340,12 @@ function syncStageBadgeToActiveCard(cards) {
                 const dailyGoalInput = document.querySelector('input[name="daily_goal"]');
                 if (dailyGoalInput) {
                     newSettings.daily_goal = dailyGoalInput.value.trim();
+                }
+
+                // Capture Daily Review Min
+                const dailyReviewMinInput = document.querySelector('input[name="daily_review_min"]');
+                if (dailyReviewMinInput) {
+                    newSettings.daily_review_min = dailyReviewMinInput.value.trim();
                 }
 
                 // Capture Auto Backup
