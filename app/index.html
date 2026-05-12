@@ -5985,12 +5985,17 @@
             if (overlay) {
                 const masteryBtn = overlay.querySelector('.mastery-confirm-btn');
                 const excludeBtn = overlay.querySelector('.exclude-confirm-btn');
-                
+
                 // Clear any manual transitions that might interfere
                 card.style.transition = '';
-                
-                if (currentPage === 'mastery') {
-                    // Mastery Page: Only "Reset to Review"
+
+                // 检查单词的实际状态，而非仅根据页面判断
+                const verbKey = word.toLowerCase();
+                const status = learningStatus[verbKey];
+                const isMastered = status && status.status === 'mastered';
+
+                if (isMastered) {
+                    // 已 mastered 的单词：显示 "Confirm Reset"
                     if (masteryBtn) masteryBtn.style.display = 'none';
                     if (excludeBtn) excludeBtn.style.display = 'flex';
                     excludeBtn.innerHTML = '<i class="fas fa-history text-sm"></i> <span>Confirm Reset</span>';
@@ -5998,13 +6003,12 @@
                     excludeBtn.classList.add('text-blue-600');
                     excludeBtn.onclick = (e) => resetToReview(e, word);
                 } else {
-                    // Learn Page or Review Library: Only "Mark as Mastered"
+                    // 未 mastered 的单词：显示 "Mark Mastered"
                     if (masteryBtn) {
                         masteryBtn.style.display = 'flex';
                         masteryBtn.innerHTML = '<i class="fas fa-trophy text-sm"></i> <span>Mark Mastered</span>';
                         masteryBtn.onclick = (e) => confirmMastery(e, word);
                     }
-                    // Hide exclude button
                     if (excludeBtn) excludeBtn.style.display = 'none';
                 }
                 
