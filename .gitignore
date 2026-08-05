@@ -13,6 +13,7 @@ Thumbs.db
 
 # Proma workspace config (local, not synced to repo)
 .context/
+.pi/
 
 # Python
 __pycache__/
