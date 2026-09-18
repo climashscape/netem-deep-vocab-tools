@@ -1,0 +1,8 @@
+# Windows 原生脚本：在任何机器上都以 CRLF 检出（cmd.exe 等要求 CRLF）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+
+# shell 脚本：在任何机器上都以 LF 检出（CRLF 的 shebang 在 Linux/WSL 下会失败）
+*.sh text eol=lf
