@@ -16,14 +16,31 @@ def is_verb(word):
     synsets = wn.synsets(word, pos=wn.VERB)
     return len(synsets) > 0
 
+def _resolve_within(base_dir, *parts):
+    """Resolve *parts* under base_dir and refuse path escapes (CWE-22).
+
+    The candidate path is fully resolved (``..`` segments and symlinks
+    collapsed via realpath); anything landing outside base_dir — including
+    absolute paths and ``..`` traversal — is rejected with ValueError.
+    """
+    base = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base, *parts))
+    if os.path.commonpath([base, candidate]) != base:
+        raise ValueError(
+            "Refusing path outside %s: %r" % (base, os.path.join(*parts))
+        )
+    return candidate
+
 def main():
     # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Construct path relative to script directory
-    # Script is in scripts/generate-doc/
-    # JSON is in root/netem_full_list.json
-    input_file = os.path.join(script_dir, '../../netem_full_list.json')
-    output_file = os.path.join(script_dir, '../../netem_verbs.json')
+    # Repo root: this script lives in tools/generate-doc/. The dataset files
+    # are canonical in tools/data/ (the historical repo-root copies no longer
+    # exist), so anchor both paths there and validate the boundary.
+    repo_root = os.path.dirname(os.path.dirname(script_dir))
+    data_dir = os.path.join(repo_root, 'tools', 'data')
+    input_file = _resolve_within(data_dir, 'netem_full_list.json')
+    output_file = _resolve_within(data_dir, 'netem_verbs.json')
 
     try:
         with open(input_file, 'r', encoding='utf-8') as f:

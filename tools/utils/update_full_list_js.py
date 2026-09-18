@@ -1,12 +1,33 @@
 import json
 import os
 
+# Repository root: this script lives in tools/utils/, two levels below root.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _resolve_within(base_dir, *parts):
+    """Resolve *parts* under base_dir and refuse path escapes (CWE-22).
+
+    The candidate path is fully resolved (``..`` segments and symlinks
+    collapsed via realpath); anything landing outside base_dir — including
+    absolute paths and ``..`` traversal — is rejected with ValueError.
+    """
+    base = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base, *parts))
+    if os.path.commonpath([base, candidate]) != base:
+        raise ValueError(
+            "Refusing path outside %s: %r" % (base, os.path.join(*parts))
+        )
+    return candidate
+
+
 # Define source and target paths
-# We use the Tools data file as the source of truth
-SOURCE_JSON = os.path.join("tools", "data", "netem_full_list.json")
+# We use the Tools data file as the source of truth. Paths are anchored to
+# the repository root (no CWD dependence) and boundary-checked.
+SOURCE_JSON = _resolve_within(_REPO_ROOT, "tools", "data", "netem_full_list.json")
 
 # Target for the JS wrapper file in the app
-TARGET_JS_APP = os.path.join("app", "static", "js", "data_full_list.js")
+TARGET_JS_APP = _resolve_within(_REPO_ROOT, "app", "static", "js", "data_full_list.js")
 
 def main():
     print(f"Reading source: {SOURCE_JSON}")
