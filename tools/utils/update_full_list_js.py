@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 # Repository root: this script lives in tools/utils/, two levels below root.
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,8 +37,7 @@ def main():
         return
 
     try:
-        with open(SOURCE_JSON, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = json.loads(Path(SOURCE_JSON).read_text(encoding='utf-8'))
             
         # Create JS content
         # window.NETEM_FULL_LIST = { ... }
@@ -48,8 +48,7 @@ def main():
         for target in targets:
             try:
                 os.makedirs(os.path.dirname(target), exist_ok=True)
-                with open(target, 'w', encoding='utf-8') as f:
-                    f.write(js_content)
+                Path(target).write_text(js_content, encoding='utf-8')
                 print(f"✅ Generated: {target} ({len(js_content)} bytes)")
             except Exception as e:
                 print(f"❌ Failed to write {target}: {e}")

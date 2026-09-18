@@ -1,6 +1,7 @@
 import os
 import json
 import nltk
+from pathlib import Path
 from nltk.corpus import wordnet as wn
 
 # Ensure wordnet is downloaded
@@ -43,8 +44,7 @@ def main():
     output_file = _resolve_within(data_dir, 'netem_verbs.json')
 
     try:
-        with open(input_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = json.loads(Path(input_file).read_text(encoding='utf-8'))
     except FileNotFoundError:
         print(f"Error: File {input_file} not found.")
         return
@@ -66,8 +66,10 @@ def main():
 
     # Save to JSON
     output_data = {f"{key} (Verbs Only)": verbs}
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(output_data, f, ensure_ascii=False, indent=2)
+    Path(output_file).write_text(
+        json.dumps(output_data, ensure_ascii=False, indent=2),
+        encoding='utf-8',
+    )
 
     print(f"Filtered {len(verbs)} verbs from {len(word_list)} words.")
     print(f"Saved to {output_file}")

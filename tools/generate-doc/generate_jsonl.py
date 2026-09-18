@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 # 仓库根目录：本脚本位于 tools/generate-doc/，向上回溯两级。
 # 路径不再依赖当前工作目录（原先按 CWD 相对解析，只有在仓库根运行才正确）。
@@ -26,8 +27,7 @@ input_json_file = _resolve_within(_REPO_ROOT, 'tools', 'data', 'netem_full_list.
 output_jsonl_file = _resolve_within(_REPO_ROOT, 'tools', 'data', 'netem_full_list.jsonl')
 
 # 读取JSON文件
-with open(input_json_file, 'r', encoding='utf-8') as json_file:
-    data = json.load(json_file)
+data = json.loads(Path(input_json_file).read_text(encoding='utf-8'))
 
 # 获取JSON对象的第一个键，假设您只有一个对象
 obj_name = list(data.keys())[0]
@@ -36,9 +36,10 @@ obj_name = list(data.keys())[0]
 obj_list = data.get(obj_name, [])
 
 # 打开JSONL文件以写入
-with open(output_jsonl_file, 'w', encoding='utf-8') as jsonl_file:
-    # 遍历对象列表并将每个对象以JSONL格式写入JSONL文件
-    for item in obj_list:
-        jsonl_file.write(json.dumps(item, ensure_ascii=False) + '\n')
+# 遍历对象列表并将每个对象以JSONL格式写入JSONL文件
+Path(output_jsonl_file).write_text(
+    ''.join(json.dumps(item, ensure_ascii=False) + '\n' for item in obj_list),
+    encoding='utf-8',
+)
 
 print(f"转换完成，已将数据写入 {output_jsonl_file}")
